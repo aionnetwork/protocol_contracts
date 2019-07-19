@@ -4,6 +4,7 @@ import avm.Address;
 import avm.Blockchain;
 import avm.Result;
 
+import org.aion.avm.tooling.abi.Callable;
 import org.aion.avm.userlib.AionMap;
 
 import java.math.BigInteger;
@@ -22,14 +23,16 @@ public class StakingRegistry {
         // maps addresses to the votes those addresses have sent to this staker
         // the sum of votes.values() should always equal totalVote
         private Map<Address, BigInteger> votes;
+        
+        public Staker() {
+            this.totalVote = BigInteger.ZERO;
+            this.votes = new AionMap<>();
+        }
     }
     
     private static Map<Address, Staker> stakers;
-    
-    public static byte[] main() {
-        return null;
-    }
 
+    @Callable
     public static boolean register(Address address) {
         if (Blockchain.getCaller().equals(address)) {
             stakers.put(address, new Staker());
@@ -39,6 +42,7 @@ public class StakingRegistry {
         }
     }
 
+    @Callable
     public static void vote(Address stakerAddress) {
         BigInteger value = Blockchain.getValue();
         Address senderAddress = Blockchain.getCaller();
@@ -56,6 +60,7 @@ public class StakingRegistry {
         }
     }
 
+    @Callable
     public static void unvote(Address stakerAddress, long amount) {
         Address senderAddress = Blockchain.getCaller();
         Blockchain.require(amount >= 0);
@@ -80,6 +85,7 @@ public class StakingRegistry {
         }
     }
 
+    @Callable
     public static long getVote(Address stakingAddress) {
         Staker staker = stakers.get(stakingAddress);
         if (staker != null) {
