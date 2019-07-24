@@ -49,12 +49,6 @@ public class StakingRegistry {
         }
     }
 
-    @Deprecated
-    @Callable
-    public static boolean register(Address address) {
-        return register(Blockchain.getCaller(), Blockchain.getCaller());
-    }
-
     // TODO: add return value for vote/unvote
 
     @Callable
@@ -117,7 +111,7 @@ public class StakingRegistry {
 
     @Callable
     public static Address getCoinbaseAddress(Address staker) {
-        return stakers.containsKey(staker) ? stakers.get(staker).signingAddress : null;
+        return stakers.containsKey(staker) ? stakers.get(staker).coinbaseAddress : null;
     }
 
     @Callable

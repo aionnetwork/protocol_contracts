@@ -36,6 +36,7 @@ public class StakingRegistryTest {
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("register")
                 .encodeOneAddress(preminedAddress)
+                .encodeOneAddress(preminedAddress)
                 .toBytes()
                 ;
         AvmRule.ResultWrapper result = RULE.call(preminedAddress, dAppAddress, BigInteger.ZERO, txData);
