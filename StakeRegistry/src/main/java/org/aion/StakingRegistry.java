@@ -18,13 +18,17 @@ public class StakingRegistry {
     }
     
     private static class Staker {
+        private Address signingAddress;
+        private Address coinbaseAddress;
         private BigInteger totalVote;
         
         // maps addresses to the votes those addresses have sent to this staker
         // the sum of votes.values() should always equal totalVote
         private Map<Address, BigInteger> votes;
         
-        public Staker() {
+        public Staker(Address signingAddress, Address coinbaseAddress) {
+            this.signingAddress = signingAddress;
+            this.coinbaseAddress = coinbaseAddress;
             this.totalVote = BigInteger.ZERO;
             this.votes = new AionMap<>();
         }
@@ -33,14 +37,25 @@ public class StakingRegistry {
     private static Map<Address, Staker> stakers;
 
     @Callable
-    public static boolean register(Address address) {
-        if (Blockchain.getCaller().equals(address)) {
-            stakers.put(address, new Staker());
+    public static boolean register(Address signingAddress, Address coinbaseAddress) {
+        Address caller = Blockchain.getCaller();
+        Staker staker = new Staker(signingAddress, coinbaseAddress);
+
+        if (!stakers.containsKey(caller)) {
+            stakers.put(caller, staker);
             return true;
         } else {
             return false;
         }
     }
+
+    @Deprecated
+    @Callable
+    public static boolean register(Address address) {
+        return register(Blockchain.getCaller(), Blockchain.getCaller());
+    }
+
+    // TODO: add return value for vote/unvote
 
     @Callable
     public static void vote(Address stakerAddress) {
@@ -93,5 +108,35 @@ public class StakingRegistry {
         } else {
             return 0;
         }
+    }
+
+    @Callable
+    public static Address getSigningAddress(Address staker) {
+        return stakers.containsKey(staker) ? stakers.get(staker).signingAddress : null;
+    }
+
+    @Callable
+    public static Address getCoinbaseAddress(Address staker) {
+        return stakers.containsKey(staker) ? stakers.get(staker).signingAddress : null;
+    }
+
+    @Callable
+    public static boolean setSigningAddress(Address newSigningAddress) {
+        Address caller = Blockchain.getCaller();
+        if (stakers.containsKey(caller)) {
+            stakers.get(caller).signingAddress = newSigningAddress;
+            return true;
+        }
+        return false;
+    }
+
+    @Callable
+    public static boolean setCoinbaseAddress(Address newCoinbaseAddress) {
+        Address caller = Blockchain.getCaller();
+        if (stakers.containsKey(caller)) {
+            stakers.get(caller).coinbaseAddress = newCoinbaseAddress;
+            return true;
+        }
+        return false;
     }
 }
