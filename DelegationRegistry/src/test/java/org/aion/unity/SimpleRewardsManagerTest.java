@@ -10,7 +10,7 @@ import java.util.Random;
 
 import static org.aion.unity.RewardsManager.Event;
 import static org.aion.unity.RewardsManager.EventType;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 public class SimpleRewardsManagerTest {
 
@@ -148,9 +148,34 @@ public class SimpleRewardsManagerTest {
 
         //RewardsManager dp = new DPRewardsManager();
         //Map<Address, Long> r1 = dp.computeRewards(v);
-
-        System.out.println("testVector001Simple");
     }
 
+
+    private void runVector(List<Event> v) {
+        for (int i = 0; i < v.size(); i++) {
+            List<Event> events = v.subList(0, i + 1);
+            Map<Address, Long> r0 = new SimpleRewardsManager().computeRewards(events);
+            Map<Address, Long> r1 = new DPRewardsManager().computeRewards(events);
+            assertTrue("Result mismatch at Event #" + i + "\n"
+                    + "Event  = " + events.get(i) + "\n"
+                    + "Simple = " + r0.toString() + "\n"
+                    + "DP     = " + r1.toString(), match(r0, r1));
+        }
+    }
+
+    private boolean match(Map<Address, Long> map1, Map<Address, Long> map2) {
+        if (map1.size() != map2.size()) {
+            return false;
+        }
+
+        for (Map.Entry<Address, Long> entry : map1.entrySet()) {
+            Long v = map2.get(entry.getKey());
+            if (v == null || Math.abs(entry.getValue() - map2.get(entry.getKey())) > 2.0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
 }

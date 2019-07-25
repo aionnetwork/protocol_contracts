@@ -23,6 +23,16 @@ public abstract class RewardsManager {
             this.blockNumber = blockNumber;
             this.amount = amount;
         }
+
+        @Override
+        public String toString() {
+            return "Event{" +
+                    "type=" + type +
+                    ", source=" + source +
+                    ", blockNumber=" + blockNumber +
+                    ", amount=" + amount +
+                    '}';
+        }
     }
 
     /**
