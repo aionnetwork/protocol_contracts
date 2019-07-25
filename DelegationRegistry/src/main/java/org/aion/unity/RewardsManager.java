@@ -7,27 +7,21 @@ import java.util.Map;
 
 public abstract class RewardsManager {
 
-    public static class Event {
-        public String type; // "vote", "unvote", "withdraw"
-        public Address delegator;
-        public long stake;
-        public long blockNumber;
-
-        public Event(String type, Address delegator, long stake, long blockNumber) {
-            this.type = type;
-            this.delegator = delegator;
-            this.stake = stake;
-            this.blockNumber = blockNumber;
-        }
+    public enum EventType {
+        VOTE, UNVOTE, WITHDRAW, BLOCK
     }
 
-    public static class Block {
-        public long number;
-        public long rewards;
+    public static class Event {
+        public EventType type;
+        public Address source;
+        public long blockNumber;
+        public long amount;
 
-        public Block(long number, long rewards) {
-            this.number = number;
-            this.rewards = rewards;
+        public Event(EventType type, Address source, long blockNumber, long amount) {
+            this.type = type;
+            this.source = source;
+            this.blockNumber = blockNumber;
+            this.amount = amount;
         }
     }
 
@@ -35,8 +29,7 @@ public abstract class RewardsManager {
      * Compute the final rewards of all delegators.
      *
      * @param events a list of user operations
-     * @param blocks a list of blocks
-     * @return the rewards of all delegators
+     * @return the settled rewards of all delegators
      */
-    public abstract Map<Address, Long> computeRewards(List<Event> events, List<Block> blocks);
+    public abstract Map<Address, Long> computeRewards(List<Event> events);
 }
