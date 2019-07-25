@@ -8,6 +8,8 @@ import java.util.*;
 
 public class DPRewardsManager extends RewardsManager {
 
+    private static final boolean DEBUG = false;
+
     private static class Pair<K, V> {
         private K first;
         private V second;
@@ -123,6 +125,10 @@ public class DPRewardsManager extends RewardsManager {
         Set<Address> addresses = new HashSet<>();
 
         for (Event event : events) {
+            if (DEBUG) {
+                System.out.println(event);
+            }
+
             switch (event.type) {
                 case VOTE: {
                     addresses.add(event.source);
@@ -136,7 +142,11 @@ public class DPRewardsManager extends RewardsManager {
                 }
                 case UNVOTE: {
                     addresses.add(event.source);
-                    psm.onLeave(event.source, event.amount);
+                    long stake = psm.getStake(event.source);
+                    psm.onLeave(event.source, stake);
+                    if (stake != event.amount) {
+                        psm.onJoin(event.source, event.blockNumber, stake - event.amount);
+                    }
                     // TODO: call stake registry to unvote
                     break;
                 }
@@ -144,8 +154,8 @@ public class DPRewardsManager extends RewardsManager {
                     addresses.add(event.source);
                     long stake = psm.getStake(event.source);
                     if (stake != 0) {
-                        psm.onLeave(event.source, psm.getStake(event.source));
-                        psm.onJoin(event.source, event.blockNumber, psm.getStake(event.source));
+                        psm.onLeave(event.source, stake);
+                        psm.onJoin(event.source, event.blockNumber, stake);
                     }
                     psm.onWithdraw(event.source, event.amount);
                     // TODO: add a transfer
