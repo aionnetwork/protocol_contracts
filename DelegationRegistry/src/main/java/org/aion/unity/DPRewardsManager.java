@@ -31,7 +31,7 @@ public class DPRewardsManager extends RewardsManager {
         long totalStake;
         long unsettledShares;
         long unsettledRewards;
-        long lastBlockProduced;
+        long lastBlockProduced = -1;
         Map<Address, Long> settledRewards = new HashMap<>();
 
         public Set<Address> getDelegators() {
@@ -53,7 +53,7 @@ public class DPRewardsManager extends RewardsManager {
             assert (stake > 0);
 
             // initialize last block number
-            if (lastBlockProduced == 0) {
+            if (lastBlockProduced == -1) {
                 lastBlockProduced = blockNumber - 1;
             }
 
