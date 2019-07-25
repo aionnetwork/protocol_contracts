@@ -29,7 +29,7 @@ public class DPRewardsManager extends RewardsManager {
         long totalStake;
         long unsettledShares;
         long unsettledRewards;
-        long lastUpdate;
+        long lastBlockProduced;
         Map<Address, Long> settledRewards = new HashMap<>();
 
         public Set<Address> getDelegators() {
@@ -50,8 +50,8 @@ public class DPRewardsManager extends RewardsManager {
             assert (blockNumber > 0);
             assert (stake > 0);
 
-            if (lastUpdate == 0) {
-                lastUpdate = blockNumber;
+            if (lastBlockProduced == 0) {
+                lastBlockProduced = blockNumber;
             }
 
             Pair<Long, Long> pair = delegators.get(delegator);
@@ -60,10 +60,10 @@ public class DPRewardsManager extends RewardsManager {
             }
 
 
-            // NOTE: we're using the `lastUpdate`, rather than the actual block number,
-            // mainly because the `unsettledShare` is based on that number.
+            // NOTE: we're using the `lastBlockProduced`, rather than the actual block number,
+            // mainly because the `unsettledShares` is based on it.
             totalStake += stake;
-            delegators.put(delegator, new Pair(lastUpdate, stake));
+            delegators.put(delegator, new Pair(lastBlockProduced, stake));
         }
 
         // in-block
@@ -76,7 +76,7 @@ public class DPRewardsManager extends RewardsManager {
                 throw new IllegalArgumentException("Invalid stake");
             }
 
-            long shares = stake * (lastUpdate - pair.first);
+            long shares = stake * (lastBlockProduced - pair.first);
             long rewards = (unsettledShares == 0) ? unsettledRewards : unsettledRewards * shares / unsettledShares;
             settledRewards.put(delegator, rewards + settledRewards.getOrDefault(delegator, 0L));
 
@@ -107,9 +107,9 @@ public class DPRewardsManager extends RewardsManager {
             assert (blockNumber > 0);
             assert (blockRewards > 0);
 
-            unsettledShares += totalStake * (blockNumber - lastUpdate);
+            unsettledShares += totalStake * (blockNumber - lastBlockProduced);
             unsettledRewards += blockRewards;
-            lastUpdate = blockNumber;
+            lastBlockProduced = blockNumber;
         }
     }
 
