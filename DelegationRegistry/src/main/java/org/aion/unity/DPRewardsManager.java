@@ -50,13 +50,14 @@ public class DPRewardsManager extends RewardsManager {
             assert (blockNumber > 0);
             assert (stake > 0);
 
+            // initialize last block number
             if (lastBlockProduced == 0) {
                 lastBlockProduced = blockNumber - 1;
             }
 
-            Pair<Long, Long> pair = delegators.get(delegator);
-            if (pair != null) {
-                onLeave(delegator, pair.second);
+            // do not allow double-join
+            if (delegators.containsKey(delegator)) {
+                throw new IllegalStateException("Delegator already exist");
             }
 
 
@@ -71,9 +72,10 @@ public class DPRewardsManager extends RewardsManager {
             assert (delegator != null);
             assert (stake > 0);
 
+            // only allow to leave with all stake
             Pair<Long, Long> pair = delegators.get(delegator);
             if (pair == null || pair.second != stake) {
-                throw new IllegalArgumentException("Invalid stake");
+                throw new IllegalArgumentException("Invalid stake to leave");
             }
 
             long shares = stake * (lastBlockProduced - pair.first);
@@ -122,17 +124,23 @@ public class DPRewardsManager extends RewardsManager {
 
         for (Event event : events) {
             switch (event.type) {
-                case VOTE:
+                case VOTE: {
                     addresses.add(event.source);
-                    psm.onJoin(event.source, event.blockNumber, event.amount);
+                    long stake = psm.getStake(event.source);
+                    if (stake != 0) {
+                        psm.onLeave(event.source, stake);
+                    }
+                    psm.onJoin(event.source, event.blockNumber, stake + event.amount);
                     // TODO: call stake registry to vote
                     break;
-                case UNVOTE:
+                }
+                case UNVOTE: {
                     addresses.add(event.source);
                     psm.onLeave(event.source, event.amount);
                     // TODO: call stake registry to unvote
                     break;
-                case WITHDRAW:
+                }
+                case WITHDRAW: {
                     addresses.add(event.source);
                     long stake = psm.getStake(event.source);
                     if (stake != 0) {
@@ -142,9 +150,11 @@ public class DPRewardsManager extends RewardsManager {
                     psm.onWithdraw(event.source, event.amount);
                     // TODO: add a transfer
                     break;
-                case BLOCK:
+                }
+                case BLOCK: {
                     psm.onBlock(event.blockNumber, event.amount);
                     break;
+                }
             }
         }
 

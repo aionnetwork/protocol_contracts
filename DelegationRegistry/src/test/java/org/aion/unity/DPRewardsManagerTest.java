@@ -154,4 +154,18 @@ public class DPRewardsManagerTest {
         // assertEquals(9000 * (3 * 2) / (2 * 4 + 3 * 2), rewards.get(addressOf(2)).longValue());
         assertEquals(9000 - 9000 * (2 * 4) / (2 * 4 + 3 * 2), rewards.get(addressOf(2)).longValue());
     }
+
+    @Test
+    public void testDoubleVote() {
+        List<Event> events = Arrays.asList(
+                new Event(EventType.VOTE, addressOf(1), 3001, 2),
+                new Event(EventType.BLOCK, addressOf(100), 3002, 5000),
+                new Event(EventType.VOTE, addressOf(1), 3003, 2),
+                new Event(EventType.VOTE, addressOf(2), 3003, 3),
+                new Event(EventType.BLOCK, addressOf(100), 3004, 5000)
+        );
+        Map<Address, Long> rewards = new DPRewardsManager().computeRewards(events);
+        assertEquals(5000 + 5000 * (4 * 2) / (4 * 2 + 3 * 2), rewards.get(addressOf(1)).longValue());
+        assertEquals(10000 - (5000 + 5000 * (4 * 2) / (4 * 2 + 3 * 2)), rewards.get(addressOf(2)).longValue());
+    }
 }
