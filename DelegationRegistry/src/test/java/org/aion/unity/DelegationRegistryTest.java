@@ -1,8 +1,9 @@
 package org.aion.unity;
 
 import avm.Address;
-import org.aion.avm.core.util.ABIUtil;
-import org.aion.avm.tooling.AvmRule;
+
+import org.aion.avm.embed.AvmRule;
+import org.aion.avm.tooling.ABIUtil;
 import org.aion.unity.model.Pool;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;

@@ -22,6 +22,34 @@
     <dependencies>
         <dependency>
             <groupId>org.aion</groupId>
+            <artifactId>aion-types</artifactId>
+            <version>0.0.0</version>
+            <scope>system</scope>
+            <systemPath>${avm.lib.dir}/aion-types-d6eb8f7.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>org.aion</groupId>
+            <artifactId>avm-rt</artifactId>
+            <version>0.0.0</version>
+            <scope>system</scope>
+            <systemPath>${avm.lib.dir}/org-aion-avm-rt.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>org.aion</groupId>
+            <artifactId>avm-core</artifactId>
+            <version>0.0.0</version>
+            <scope>system</scope>
+            <systemPath>${avm.lib.dir}/org-aion-avm-core.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>org.aion</groupId>
+            <artifactId>avm-embed</artifactId>
+            <version>0.0.0</version>
+            <scope>system</scope>
+            <systemPath>${avm.lib.dir}/org-aion-avm-embed.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>org.aion</groupId>
             <artifactId>avm-api</artifactId>
             <version>0.0.0</version>
             <scope>system</scope>
@@ -42,17 +70,64 @@
             <systemPath>${avm.lib.dir}/org-aion-avm-tooling.jar</systemPath>
         </dependency>
 
-        <!-- Test dependencies -->
+        <!-- ASM dependencies -->
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+            <version>6.2.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-analysis</artifactId>
+            <version>6.2.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-commons</artifactId>
+            <version>6.2.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-tree</artifactId>
+            <version>6.2.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-util</artifactId>
+            <version>6.2.1</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Logging dependencies -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.26</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>1.7.26</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- JUnit dependencies -->
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>4.11</version>
+            <version>4.12</version>
             <scope>test</scope>
         </dependency>
+
         <!-- Don't change the following dependency. This is required to compile & run test cases. The avm.jar for the project will be
         installed into the local maven repository during mvn initialize phase. -->
         <dependency>
-            <groupId>org.aion.StakeRegistry</groupId>
+            <groupId>org.aion.DelegationRegistry</groupId>
             <artifactId>avm</artifactId>
             <version>1.0-SNAPSHOT</version>
             <scope>test</scope>
