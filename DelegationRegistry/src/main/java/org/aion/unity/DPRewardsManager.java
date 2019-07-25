@@ -51,7 +51,7 @@ public class DPRewardsManager extends RewardsManager {
             assert (stake > 0);
 
             if (lastBlockProduced == 0) {
-                lastBlockProduced = blockNumber;
+                lastBlockProduced = blockNumber - 1;
             }
 
             Pair<Long, Long> pair = delegators.get(delegator);
