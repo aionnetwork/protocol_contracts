@@ -70,12 +70,20 @@ public class SimpleRewardsManagerTest {
         v.add(new Event(EventType.BLOCK, null, 7, REWARD));
         v.add(new Event(EventType.BLOCK, null, 8, REWARD));
         v.add(new Event(EventType.BLOCK, null, 11, REWARD));
-        //v.add(new Event(EventType.WITHDRAW, addressOf(2), 12, 100));
-        //v.add(new Event(EventType.WITHDRAW, addressOf(3), 12, 100));
-        //v.add(new Event(EventType.WITHDRAW, addressOf(4), 12, 100));
+        v.add(new Event(EventType.WITHDRAW, addressOf(2), 12, 8000));
+        v.add(new Event(EventType.WITHDRAW, addressOf(3), 12, 3500));
+        v.add(new Event(EventType.WITHDRAW, addressOf(4), 12, 500));
+        v.add(new Event(EventType.VOTE, addressOf(5), 12, 1200));
+        v.add(new Event(EventType.UNVOTE, addressOf(2), 12, 3000));
+        v.add(new Event(EventType.BLOCK, null, 25, REWARD));
+        v.add(new Event(EventType.WITHDRAW, addressOf(5), 26, 5000));
 
-        RewardsManager rm = new SimpleRewardsManager();
-        Map<Address, Long> r = rm.computeRewards(v);
+        RewardsManager simple = new SimpleRewardsManager();
+        Map<Address, Long> r0 = simple.computeRewards(v);
+
+        RewardsManager dp = new DPRewardsManager();
+        Map<Address, Long> r1 = dp.computeRewards(v);
+
         System.out.println("testVector001Simple");
     }
 

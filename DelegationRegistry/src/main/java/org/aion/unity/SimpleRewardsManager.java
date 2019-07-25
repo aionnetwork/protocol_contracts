@@ -7,7 +7,7 @@ import java.util.*;
 public class SimpleRewardsManager extends RewardsManager {
 
     private long totalStake = 0L;
-    private long totalRewards = 0L;
+    private long rewardsOutstanding = 0L;
     private Map<Address, Long> stakeMap = new HashMap<>();
     private Map<Address, Long> rewardsMap = new HashMap<>();
 
@@ -60,7 +60,7 @@ public class SimpleRewardsManager extends RewardsManager {
                     if (ns < 0) throw new RuntimeException("Un-vote event made stake balance negative.");
                     rewardsMap.put(x.source, ns);
 
-                    totalRewards -= x.amount;
+                    rewardsOutstanding -= x.amount;
                     break;
                 }
                 case BLOCK: {
@@ -69,6 +69,7 @@ public class SimpleRewardsManager extends RewardsManager {
 
                     // split the rewards for this block between the stakers who contributed to it.
                     long blockReward = x.amount;
+                    rewardsOutstanding += blockReward;
 
                     // i need to compute the ratio of what is owed to each of the stakers
                     Map<Address, Float> ratioOwed = new HashMap<>();
