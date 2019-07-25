@@ -123,7 +123,7 @@ public class DPRewardsManagerTest {
         );
         Map<Address, Long> rewards = new DPRewardsManager().computeRewards(events);
         assertEquals(7000L, rewards.get(addressOf(1)).longValue());
-        assertEquals(2000L, rewards.get(addressOf(2)).longValue());
+        assertEquals(3000L, rewards.get(addressOf(2)).longValue());
     }
 
     @Ignore

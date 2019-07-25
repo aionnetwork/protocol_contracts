@@ -36,10 +36,10 @@ public abstract class RewardsManager {
     }
 
     /**
-     * Compute the final rewards of all delegators.
+     * Compute the final rewards for all delegators.
      *
      * @param events a list of user operations
-     * @return the settled rewards of all delegators
+     * @return both pending and withdrawn rewards
      */
     public abstract Map<Address, Long> computeRewards(List<Event> events);
 }
