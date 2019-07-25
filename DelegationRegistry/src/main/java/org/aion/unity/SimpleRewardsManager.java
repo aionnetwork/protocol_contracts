@@ -9,8 +9,8 @@ public class SimpleRewardsManager extends RewardsManager {
     private long totalStake = 0L;
     private long rewardOutstanding = 0L;
     private Map<Address, Long> stakeMap = new HashMap<>();
-    private Map<Address, Long> rewardMap = new HashMap<>();
-    private Map<Address, Long> withdrawnMap = new HashMap<>();
+    private Map<Address, Long> pendingRewardMap = new HashMap<>();
+    private Map<Address, Long> withdrawnRewardMap = new HashMap<>();
 
     public Map<Address, Long> computeRewards(List<Event> events) throws RuntimeException {
         // ASSUMPTIONS:
@@ -54,19 +54,19 @@ public class SimpleRewardsManager extends RewardsManager {
                     break;
                 }
                 case WITHDRAW: {
-                    if (!rewardMap.containsKey(x.source))
+                    if (!pendingRewardMap.containsKey(x.source))
                         throw new RuntimeException("Withdraw event called without any rewards balance.");
 
-                    long ns = rewardMap.get(x.source) - x.amount;
+                    long ns = pendingRewardMap.get(x.source) - x.amount;
                     if (ns < 0) throw new RuntimeException("Un-vote event made stake balance negative.");
 
-                    rewardMap.put(x.source, ns);
+                    pendingRewardMap.put(x.source, ns);
                     rewardOutstanding -= x.amount;
 
-                    if (withdrawnMap.containsKey(x.source)) {
-                        withdrawnMap.put(x.source, withdrawnMap.get(x.source) + x.amount);
+                    if (withdrawnRewardMap.containsKey(x.source)) {
+                        withdrawnRewardMap.put(x.source, withdrawnRewardMap.get(x.source) + x.amount);
                     } else {
-                        withdrawnMap.put(x.source, x.amount);
+                        withdrawnRewardMap.put(x.source, x.amount);
                     }
 
                     break;
@@ -87,10 +87,10 @@ public class SimpleRewardsManager extends RewardsManager {
 
                     for (Map.Entry<Address, Float> r : ratioOwed.entrySet()) {
                         long stakerReward = (long) Math.floor(blockReward * r.getValue());
-                        if (rewardMap.containsKey(r.getKey())) {
-                            rewardMap.put(r.getKey(), rewardMap.get(r.getKey()) + stakerReward);
+                        if (pendingRewardMap.containsKey(r.getKey())) {
+                            pendingRewardMap.put(r.getKey(), pendingRewardMap.get(r.getKey()) + stakerReward);
                         } else {
-                            rewardMap.put(r.getKey(), stakerReward);
+                            pendingRewardMap.put(r.getKey(), stakerReward);
                         }
                     }
                     break;
@@ -101,8 +101,11 @@ public class SimpleRewardsManager extends RewardsManager {
         }
 
         Map<Address, Long> toReturnMap = new HashMap<>();
-        rewardMap.forEach((k, v) -> {
-            toReturnMap.put(k, v + withdrawnMap.get(k));
+        pendingRewardMap.forEach((k, v) -> {
+            if (withdrawnRewardMap.containsKey(k))
+                toReturnMap.put(k, v + withdrawnRewardMap.get(k));
+            else
+                toReturnMap.put(k, v);
         });
         return toReturnMap;
     }
@@ -115,14 +118,21 @@ public class SimpleRewardsManager extends RewardsManager {
     }
 
     /**
-     * @return clone of the rewardMap (local state)
+     * @return clone of the pendingRewardMap (local state)
      */
-    public Map<Address, Long> getRewardMap() {
-        return new HashMap<>(rewardMap);
+    public Map<Address, Long> getPendingRewardMap() {
+        return new HashMap<>(pendingRewardMap);
     }
 
     /**
-     * @return clone of the rewardMap (local state)
+     * @return clone of the withdrawnRewardMap (local state)
+     */
+    public Map<Address, Long> getWithdrawnRewardMap() {
+        return new HashMap<>(withdrawnRewardMap);
+    }
+
+    /**
+     * @return clone of the pendingRewardMap (local state)
      */
     public long getRewardOutstanding() {
         return rewardOutstanding;
