@@ -86,17 +86,20 @@ public class DPRewardsManager extends RewardsManager {
             delegators.remove(delegator);
         }
 
-        public void onWithdraw(Address delegator, long limit) {
+        public long onWithdraw(Address delegator, long limit) {
             assert (delegator != null);
             assert (limit > 0);
 
             long rewards = settledRewards.getOrDefault(delegator, 0L);
-            long remaining = rewards - Math.max(limit, rewards);
+            long withdrawn = Math.min(limit, rewards);
+            long remaining = rewards - withdrawn;
             if (remaining == 0) {
                 settledRewards.remove(delegator);
             } else {
                 settledRewards.put(delegator, remaining);
             }
+
+            return withdrawn;
         }
 
         // post-block
@@ -131,8 +134,11 @@ public class DPRewardsManager extends RewardsManager {
                     break;
                 case WITHDRAW:
                     addresses.add(event.source);
-                    psm.onLeave(event.source, psm.getStake(event.source));
-                    psm.onJoin(event.source, event.blockNumber, psm.getStake(event.source));
+                    long stake = psm.getStake(event.source);
+                    if (stake != 0) {
+                        psm.onLeave(event.source, psm.getStake(event.source));
+                        psm.onJoin(event.source, event.blockNumber, psm.getStake(event.source));
+                    }
                     psm.onWithdraw(event.source, event.amount);
                     // TODO: add a transfer
                     break;

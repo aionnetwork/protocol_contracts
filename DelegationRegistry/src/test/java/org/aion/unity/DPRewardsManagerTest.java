@@ -110,4 +110,20 @@ public class DPRewardsManagerTest {
         assertEquals(7000L, rewards.get(addressOf(1)).longValue());
         assertEquals(3000L, rewards.get(addressOf(2)).longValue());
     }
+
+    @Test
+    public void testWithdraw() {
+        List<Event> events = Arrays.asList(
+                new Event(EventType.VOTE, addressOf(1), 3001, 2),
+                new Event(EventType.VOTE, addressOf(2), 3003, 3),
+                new Event(EventType.BLOCK, addressOf(100), 3005, 5000),
+                new Event(EventType.UNVOTE, addressOf(2), 3006, 3),
+                new Event(EventType.WITHDRAW, addressOf(2), 3007, 1000),
+                new Event(EventType.BLOCK, addressOf(100), 3008, 5000)
+        );
+        Map<Address, Long> rewards = new DPRewardsManager().computeRewards(events);
+        assertEquals(7000L, rewards.get(addressOf(1)).longValue());
+        assertEquals(2000L, rewards.get(addressOf(2)).longValue());
+    }
+
 }
