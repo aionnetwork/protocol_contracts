@@ -1,11 +1,11 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>org.aion.unity</groupId>
-    <artifactId>delegation-registry</artifactId>
+    <groupId>org.aion</groupId>
+    <artifactId>DelegationRegistry</artifactId>
     <version>1.0-SNAPSHOT</version>
 
-    <name>delegation-registry</name>
+    <name>DelegationRegistry</name>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -52,7 +52,7 @@
         <!-- Don't change the following dependency. This is required to compile & run test cases. The avm.jar for the project will be
         installed into the local maven repository during mvn initialize phase. -->
         <dependency>
-            <groupId>org.aion.stake-delegation</groupId>
+            <groupId>org.aion.StakeRegistry</groupId>
             <artifactId>avm</artifactId>
             <version>1.0-SNAPSHOT</version>
             <scope>test</scope>
