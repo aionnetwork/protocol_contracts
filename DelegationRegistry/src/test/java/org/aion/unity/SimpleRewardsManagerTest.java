@@ -62,7 +62,7 @@ public class SimpleRewardsManagerTest {
 
     @Test
     public void testVector001Simple() {
-        final long REWARD = 5000;
+        final long REWARD = 50_000_000;
 
         // Generate test vector
         List<Event> v = new ArrayList<>();
@@ -90,10 +90,13 @@ public class SimpleRewardsManagerTest {
         RewardsManager simple = new SimpleRewardsManager();
         Map<Address, Long> r0 = simple.computeRewards(v);
 
-        //RewardsManager dp = new DPRewardsManager();
-        //Map<Address, Long> r1 = dp.computeRewards(v);
+        RewardsManager acc = new AccRewardsManager();
+        Map<Address, Long> r1 = acc.computeRewards(v);
 
-        System.out.println("testVector001Simple");
+        System.out.println(r0);
+        System.out.println(r1);
+        double[] error = calcErrorSD(r0, r1);
+        System.out.printf("Error: mean = %.2f%%, sd = %.2f%%\n", error[0], error[1]);
     }
 
     private int getRandomInt(int min, int max) {
@@ -161,7 +164,7 @@ public class SimpleRewardsManagerTest {
                     } else if (choice == 2) { // unvote
                         if (stakedBalance > 0L)
                             v.add(new Event(EventType.UNVOTE, user, i, getRandomLong(1, stakedBalance)));
-                    } else if (stakedBalance > 0L) { // withdraw
+                    } else if (choice == 3 && stakedBalance > 0L) { // withdraw
                         Long pendingRewards = rm.getPendingRewardMap().get(user);
                         if (pendingRewards == null) pendingRewards = 0L;
 
@@ -217,14 +220,14 @@ public class SimpleRewardsManagerTest {
         List<Event> q = new ArrayList<>();
 
         // system params
-        int users = 10;
+        int users = 1000;
         long maxUserBalance = 25000;
         long startBlock = 1;
-        long endBlock = 1000;
+        long endBlock = 10000;
         int maxActionsPerBlock = 3;
         long blockReward = 5_000_000L;
         float poolProbability = 0.8f; // pool's probability of winning a block.
-        long preLockBlocks = 7;
+        long preLockBlocks = 6 * 60 * 24 * 3;
 
         SimpleRewardsManager rm = new SimpleRewardsManager();
 
@@ -269,7 +272,7 @@ public class SimpleRewardsManagerTest {
                     } else if (choice == 2 && isUserLocked.get(user) <= 0) { // unvote
                         if (stakedBalance > 0L)
                             v.add(new Event(EventType.UNVOTE, user, i, getRandomLong(1, stakedBalance)));
-                    } else if (stakedBalance > 0L && isUserLocked.get(user) <= 0) { // withdraw
+                    } else if (choice == 3 && stakedBalance > 0L && isUserLocked.get(user) <= 0) { // withdraw
                         Long pendingRewards = rm.getPendingRewardMap().get(user);
                         if (pendingRewards == null) pendingRewards = 0L;
 
@@ -310,7 +313,6 @@ public class SimpleRewardsManagerTest {
         Map<Address, Long> r0 = simple.computeRewards(q);
         System.out.println(r0);
 
-        /*
         RewardsManager dp = new DPRewardsManager();
         Map<Address, Long> r1 = dp.computeRewards(q);
         System.out.println(r1);
@@ -323,7 +325,6 @@ public class SimpleRewardsManagerTest {
         long sum1 = r1.values().stream().mapToLong(v -> v).sum();
         System.out.printf("Sum = [%d, %d], lose = [%.2f%%, %.2f%%]\n", sum0, sum1,
                 100.0 * Math.abs(sum0 - sum) / sum, 100.0 * Math.abs(sum1 - sum) / sum);
-        */
     }
 
     // assuming key sets are the same
