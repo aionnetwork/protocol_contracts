@@ -30,7 +30,7 @@ public class AccRewardsManager extends RewardsManager {
         // <block number, stake>
         Map<Address, Pair<Long, Long>> delegators = new LinkedHashMap<>();
         long totalStake;
-        Map<Long, Long> accumulatedRewardsPerStake = new HashMap<>();
+        Map<Long, Double> accumulatedRewardsPerStake = new HashMap<>();
         long lastBlockProduced = -1;
         Map<Address, Long> settledRewards = new HashMap<>();
         Map<Address, Long> withdrawnRewards = new HashMap<>();
@@ -85,9 +85,9 @@ public class AccRewardsManager extends RewardsManager {
                 throw new IllegalArgumentException("Invalid stake to leave");
             }
 
-            long startAccumulatedRewardsPerStake = accumulatedRewardsPerStake.getOrDefault(pair.first, 0L);
-            long endAccumulatedRewardsPerStake = accumulatedRewardsPerStake.getOrDefault(lastBlockProduced, 0L);
-            long rewards = (endAccumulatedRewardsPerStake - startAccumulatedRewardsPerStake) * pair.second;
+            double startAccumulatedRewardsPerStake = accumulatedRewardsPerStake.getOrDefault(pair.first, 0.0);
+            double endAccumulatedRewardsPerStake = accumulatedRewardsPerStake.getOrDefault(lastBlockProduced, 0.0);
+            long rewards = (long) Math.floor((endAccumulatedRewardsPerStake - startAccumulatedRewardsPerStake) * pair.second);
             settledRewards.put(delegator, rewards + settledRewards.getOrDefault(delegator, 0L));
 
             totalStake -= stake;
@@ -118,8 +118,8 @@ public class AccRewardsManager extends RewardsManager {
 
             // precision lost
             assert (totalStake > 0);
-            long rewardsPerStake = blockRewards / totalStake;
-            accumulatedRewardsPerStake.put(blockNumber, accumulatedRewardsPerStake.getOrDefault(lastBlockProduced, 0L) + rewardsPerStake);
+            double rewardsPerStake = (double)blockRewards / totalStake;
+            accumulatedRewardsPerStake.put(blockNumber, accumulatedRewardsPerStake.getOrDefault(lastBlockProduced, 0.0) + rewardsPerStake);
             lastBlockProduced = blockNumber;
         }
     }
