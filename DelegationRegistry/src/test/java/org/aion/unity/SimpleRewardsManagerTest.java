@@ -24,7 +24,6 @@ public class SimpleRewardsManagerTest {
     }
 
 
-
     @Test(expected = RuntimeException.class)
     public void testBadInput1() {
         // Order of blocks is wrong. Should throw a runtime exception.
@@ -97,11 +96,11 @@ public class SimpleRewardsManagerTest {
     }
 
     private int getRandomInt(int min, int max) {
-        return (int)(Math.random() * max) + min;
+        return (int) (Math.random() * max) + min;
     }
 
     private long getRandomLong(long min, long max) {
-        return (long)(Math.random() * max) + min;
+        return (long) (Math.random() * max) + min;
     }
 
     private boolean coinWithProbability(float probability) {
@@ -196,36 +195,27 @@ public class SimpleRewardsManagerTest {
         RewardsManager simple = new SimpleRewardsManager();
         Map<Address, Long> r0 = simple.computeRewards(q);
 
-        //RewardsManager dp = new DPRewardsManager();
-        //Map<Address, Long> r1 = dp.computeRewards(v);
+        RewardsManager dp = new DPRewardsManager();
+        Map<Address, Long> r1 = dp.computeRewards(q);
+        System.out.println(r1);
+
+        long[] diff = diff(r0, r1);
+        System.out.printf("Diff = %d, Sum = [%d, %d], error rate = %.2f%%\n", diff[0], diff[1], diff[2], 100.0 * diff[0] / Math.max(diff[1], diff[2]));
     }
 
 
-    private void runVector(List<Event> v) {
-        for (int i = 0; i < v.size(); i++) {
-            List<Event> events = v.subList(0, i + 1);
-            Map<Address, Long> r0 = new SimpleRewardsManager().computeRewards(events);
-            Map<Address, Long> r1 = new DPRewardsManager().computeRewards(events);
-            assertTrue("Result mismatch at Event #" + i + "\n"
-                    + "Event  = " + events.get(i) + "\n"
-                    + "Simple = " + r0.toString() + "\n"
-                    + "DP     = " + r1.toString(), match(r0, r1));
-        }
-    }
+    private long[] diff(Map<Address, Long> map1, Map<Address, Long> map2) {
+        Set<Address> keys = new HashSet<>(map1.keySet());
+        keys.addAll(map2.keySet());
 
-    private boolean match(Map<Address, Long> map1, Map<Address, Long> map2) {
-        if (map1.size() != map2.size()) {
-            return false;
+        long diff = 0;
+        for (Address key : keys) {
+            Long v1 = map1.getOrDefault(key, 0L);
+            Long v2 = map2.getOrDefault(key, 0L);
+            diff += Math.abs(v1 - v2);
         }
 
-        for (Map.Entry<Address, Long> entry : map1.entrySet()) {
-            Long v = map2.get(entry.getKey());
-            if (v == null || Math.abs(entry.getValue() - map2.get(entry.getKey())) > 2.0) {
-                return false;
-            }
-        }
-
-        return true;
+        return new long[]{diff, map1.values().stream().mapToLong(v -> v).sum(), map2.values().stream().mapToLong(v -> v).sum()};
     }
 
 }
