@@ -110,35 +110,33 @@ public class SimpleRewardsManagerTest {
 
     @Test
     public void testVectorAutogen() {
-        // generate test vector
-        List<Event> v = new ArrayList<>();
+        // generated vector
+        List<Event> q = new ArrayList<>();
 
         // system params
-        int users = 8;
+        int users = 1000;
         long maxUserBalance = 25000;
         long startBlock = 1;
-        long endBlock = 200;
+        long endBlock = 10000;
         int maxActionsPerBlock = 3;
         long blockReward = 5000;
         float poolProbability = 0.8f; // pool's probability of winning a block.
+
+        SimpleRewardsManager rm  = new SimpleRewardsManager();
 
         // abuse the simple rewards manager a little bit, by running it every time we add a new entry,
         // to see what we can do next. probably a much better way to do this, but whatever ...
         for(long i = startBlock; i <= endBlock; i++) {
 
+            // temporary list where we accumuate the events in this block
+            List<Event> v = new ArrayList<>();
+
+            Set<Address> usersInThisRound = new HashSet<>();
+
             // pick a certain number of actions to do in this round
             int numActions = getRandomInt(0, maxActionsPerBlock);
             for (int j = 0; j < numActions; j++) {
 
-                SimpleRewardsManager rm = new SimpleRewardsManager();
-                try {
-                    rm.computeRewards(v);
-                } catch (Exception e) {
-                    System.out.println("Bad events-list constructed.");
-                }
-
-
-                Set<Address> usersInThisRound = new HashSet<>();
                 // choose a random user, not already used in this round
                 Address user;
                 do {
@@ -184,10 +182,19 @@ public class SimpleRewardsManagerTest {
             if (coinWithProbability(poolProbability)) {
                 v.add(new Event(EventType.BLOCK, null, i, blockReward));
             }
+
+            // apply the rewards this round to the simple rewards manager
+            try {
+                rm.computeRewards(v);
+            } catch (Exception e) {
+                System.out.println("Bad events-list constructed.");
+            }
+
+            q.addAll(v);
         }
 
         RewardsManager simple = new SimpleRewardsManager();
-        Map<Address, Long> r0 = simple.computeRewards(v);
+        Map<Address, Long> r0 = simple.computeRewards(q);
 
         //RewardsManager dp = new DPRewardsManager();
         //Map<Address, Long> r1 = dp.computeRewards(v);
