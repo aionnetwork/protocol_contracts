@@ -33,6 +33,7 @@ public class DPRewardsManager extends RewardsManager {
         long unsettledRewards;
         long lastBlockProduced = -1;
         Map<Address, Long> settledRewards = new HashMap<>();
+        Map<Address, Long> withdrawnRewards = new HashMap<>();
 
         public Set<Address> getDelegators() {
             return new HashSet<>(delegators.keySet());
@@ -42,8 +43,12 @@ public class DPRewardsManager extends RewardsManager {
             return delegators.containsKey(delegator) ? delegators.get(delegator).second : 0L;
         }
 
-        public long getRewards(Address delegator) {
+        public long getSettledRewards(Address delegator) {
             return settledRewards.getOrDefault(delegator, 0L);
+        }
+
+        public long getWithdrawnRewards(Address delegator) {
+            return withdrawnRewards.getOrDefault(delegator, 0L);
         }
 
         // in-block
@@ -103,6 +108,7 @@ public class DPRewardsManager extends RewardsManager {
                 settledRewards.put(delegator, remaining);
             }
 
+            withdrawnRewards.put(delegator, withdrawn + withdrawnRewards.getOrDefault(delegator, 0L));
             return withdrawn;
         }
 
@@ -176,7 +182,7 @@ public class DPRewardsManager extends RewardsManager {
         // lookup all known addresses
         Map<Address, Long> rewards = new HashMap<>();
         for (Address a : addresses) {
-            long r = psm.getRewards(a);
+            long r = psm.getSettledRewards(a) + psm.getWithdrawnRewards(a);
             if (r != 0) {
                 rewards.put(a, r);
             }
