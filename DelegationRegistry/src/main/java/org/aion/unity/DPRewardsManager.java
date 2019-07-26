@@ -10,6 +10,10 @@ public class DPRewardsManager extends RewardsManager {
 
     private static final boolean DEBUG = false;
 
+    private static final boolean AUTO_SETTLEMENT = false;
+    private static final long MAX_IDLE_PERIOD = 6 * 60 * 24;
+    private static final int MAX_ACCOUNTS_TO_SETTLE = 10;
+
     private static class Pair<K, V> {
         private K first;
         private V second;
@@ -34,8 +38,6 @@ public class DPRewardsManager extends RewardsManager {
         long lastBlockProduced = -1;
         Map<Address, Long> settledRewards = new HashMap<>();
         Map<Address, Long> withdrawnRewards = new HashMap<>();
-        long maxIdlePeriod = Long.MAX_VALUE;
-        int maxAutoRejoin = 10;
 
         public Set<Address> getDelegators() {
             return new HashSet<>(delegators.keySet());
@@ -123,16 +125,20 @@ public class DPRewardsManager extends RewardsManager {
             unsettledRewards += blockRewards;
             lastBlockProduced = blockNumber;
 
-            Iterator<Map.Entry<Address, Pair<Long, Long>>> itr = delegators.entrySet().iterator();
-            List<Address> addresses = new ArrayList<>();
-            while (addresses.size() < maxAutoRejoin && itr.hasNext()) {
-                addresses.add(itr.next().getKey());
-            }
-            for (Address address : addresses) {
-                Pair<Long, Long> p =  delegators.get(address);
-                if (blockNumber - p.first > maxIdlePeriod) {
-                    onLeave(address, p.second);
-                    onJoin(address, blockNumber, p.second);
+            if (AUTO_SETTLEMENT) {
+                Iterator<Map.Entry<Address, Pair<Long, Long>>> itr = delegators.entrySet().iterator();
+                List<Address> addresses = new ArrayList<>();
+                while (addresses.size() < MAX_ACCOUNTS_TO_SETTLE && itr.hasNext()) {
+                    addresses.add(itr.next().getKey());
+                }
+                for (Address address : addresses) {
+                    Pair<Long, Long> p = delegators.get(address);
+                    if (blockNumber - p.first > MAX_IDLE_PERIOD) {
+                        onLeave(address, p.second);
+                        onJoin(address, blockNumber, p.second);
+                    } else {
+                        break;
+                    }
                 }
             }
         }

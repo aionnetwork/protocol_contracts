@@ -5,10 +5,11 @@ import org.junit.Test;
 
 import java.math.BigInteger;
 import java.util.*;
+import java.util.stream.DoubleStream;
 
 import static org.aion.unity.RewardsManager.Event;
 import static org.aion.unity.RewardsManager.EventType;
-import static org.junit.Assert.*;
+import static org.junit.Assert.fail;
 
 public class SimpleRewardsManagerTest {
 
@@ -118,14 +119,14 @@ public class SimpleRewardsManagerTest {
         long startBlock = 1;
         long endBlock = 10000;
         int maxActionsPerBlock = 3;
-        long blockReward = 5000;
+        long blockReward = 5_000_000L;
         float poolProbability = 0.8f; // pool's probability of winning a block.
 
-        SimpleRewardsManager rm  = new SimpleRewardsManager();
+        SimpleRewardsManager rm = new SimpleRewardsManager();
 
         // abuse the simple rewards manager a little bit, by running it every time we add a new entry,
         // to see what we can do next. probably a much better way to do this, but whatever ...
-        for(long i = startBlock; i <= endBlock; i++) {
+        for (long i = startBlock; i <= endBlock; i++) {
 
             // temporary list where we accumuate the events in this block
             List<Event> v = new ArrayList<>();
@@ -150,7 +151,7 @@ public class SimpleRewardsManagerTest {
                     v.add(new Event(EventType.VOTE, user, i, getRandomLong(1, maxUserBalance)));
                 } else {
                     // choose between withdraw, unvote or vote more, with 1/3 probability
-                    int choice = getRandomInt(1,3);
+                    int choice = getRandomInt(1, 3);
                     Long stakedBalance = rm.getStakeMap().get(user);
                     if (stakedBalance == null) stakedBalance = 0L;
 
@@ -200,23 +201,29 @@ public class SimpleRewardsManagerTest {
         Map<Address, Long> r1 = dp.computeRewards(q);
         System.out.println(r1);
 
-        long[] diff = diff(r0, r1);
-        System.out.printf("Diff = %d, Sum = [%d, %d], error rate = %.2f%%\n", diff[0], diff[1], diff[2], 100.0 * diff[0] / Math.max(diff[1], diff[2]));
+        double[] error = calcErrorSD(r0, r1);
+        System.out.printf("Error: mean = %.2f%%, sd = %.2f%%\n", error[0], error[1]);
+
+        long sum = q.stream().filter(e -> e.type == EventType.BLOCK).mapToLong(e -> e.amount).sum();
+        long sum0 = r0.values().stream().mapToLong(v -> v).sum();
+        long sum1 = r1.values().stream().mapToLong(v -> v).sum();
+        System.out.printf("Sum = [%d, %d], lose = [%.2f%%, %.2f%%]\n", sum0, sum1,
+                100.0 * Math.abs(sum0 - sum) / sum, 100.0 * Math.abs(sum1 - sum) / sum);
     }
 
 
-    private long[] diff(Map<Address, Long> map1, Map<Address, Long> map2) {
-        Set<Address> keys = new HashSet<>(map1.keySet());
-        keys.addAll(map2.keySet());
+    // assuming key sets are the same
+    private double[] calcErrorSD(Map<Address, Long> base, Map<Address, Long> toCheck) {
+        double[] errors = base.keySet().stream().mapToDouble(k -> {
+            Long v1 = base.getOrDefault(k, 0L);
+            Long v2 = toCheck.getOrDefault(k, 0L);
+            return 100.0 * Math.abs(v2 - v1) / v1;
+        }).toArray();
 
-        long diff = 0;
-        for (Address key : keys) {
-            Long v1 = map1.getOrDefault(key, 0L);
-            Long v2 = map2.getOrDefault(key, 0L);
-            diff += Math.abs(v1 - v2);
-        }
 
-        return new long[]{diff, map1.values().stream().mapToLong(v -> v).sum(), map2.values().stream().mapToLong(v -> v).sum()};
+        double mean = DoubleStream.of(errors).sum() / errors.length;
+        double sd = Math.sqrt(DoubleStream.of(errors).map(e -> Math.pow(e - mean, 2)).sum() / errors.length);
+
+        return new double[]{mean, sd};
     }
-
 }
