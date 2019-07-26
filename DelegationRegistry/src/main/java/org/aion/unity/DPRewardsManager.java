@@ -27,13 +27,15 @@ public class DPRewardsManager extends RewardsManager {
 
     private static class PoolStateMachine {
         // <block number, stake>
-        Map<Address, Pair<Long, Long>> delegators = new HashMap<>();
+        Map<Address, Pair<Long, Long>> delegators = new LinkedHashMap<>();
         long totalStake;
         long unsettledShares;
         long unsettledRewards;
         long lastBlockProduced = -1;
         Map<Address, Long> settledRewards = new HashMap<>();
         Map<Address, Long> withdrawnRewards = new HashMap<>();
+        long maxIdlePeriod = Long.MAX_VALUE;
+        int maxAutoRejoin = 10;
 
         public Set<Address> getDelegators() {
             return new HashSet<>(delegators.keySet());
@@ -120,6 +122,19 @@ public class DPRewardsManager extends RewardsManager {
             unsettledShares += totalStake * (blockNumber - lastBlockProduced);
             unsettledRewards += blockRewards;
             lastBlockProduced = blockNumber;
+
+            Iterator<Map.Entry<Address, Pair<Long, Long>>> itr = delegators.entrySet().iterator();
+            List<Address> addresses = new ArrayList<>();
+            while (addresses.size() < maxAutoRejoin && itr.hasNext()) {
+                addresses.add(itr.next().getKey());
+            }
+            for (Address address : addresses) {
+                Pair<Long, Long> p =  delegators.get(address);
+                if (blockNumber - p.first > maxIdlePeriod) {
+                    onLeave(address, p.second);
+                    onJoin(address, blockNumber, p.second);
+                }
+            }
         }
     }
 

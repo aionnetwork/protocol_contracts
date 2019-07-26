@@ -194,6 +194,7 @@ public class SimpleRewardsManagerTest {
 
         RewardsManager simple = new SimpleRewardsManager();
         Map<Address, Long> r0 = simple.computeRewards(q);
+        System.out.println(r0);
 
         RewardsManager dp = new DPRewardsManager();
         Map<Address, Long> r1 = dp.computeRewards(q);
