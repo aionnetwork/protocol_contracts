@@ -117,8 +117,7 @@ public class AccRewardsManager extends RewardsManager {
             assert (blockRewards > 0);
 
             // precision lost
-            assert (totalStake > 0);
-            double rewardsPerStake = (double)blockRewards / totalStake;
+            double rewardsPerStake = totalStake == 0 ? 0 : (double)blockRewards / totalStake;
             accumulatedRewardsPerStake.put(blockNumber, accumulatedRewardsPerStake.getOrDefault(lastBlockProduced, 0.0) + rewardsPerStake);
             lastBlockProduced = blockNumber;
         }

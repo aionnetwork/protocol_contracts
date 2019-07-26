@@ -149,7 +149,7 @@ public class AccRewardsManagerTest {
                 new Event(EventType.BLOCK, addressOf(100), 3004, 5000)
         );
         Map<Address, Long> rewards = new AccRewardsManager().computeRewards(events);
-        assertEquals(5000 + 5000 / 7 * 4, rewards.get(addressOf(1)).longValue());
-        assertEquals(5000 / 7 * 3, rewards.get(addressOf(2)).longValue());
+        assertEquals(5000 + 5000 * 4/7, rewards.get(addressOf(1)).longValue());
+        assertEquals(5000 * 3/7, rewards.get(addressOf(2)).longValue());
     }
 }
