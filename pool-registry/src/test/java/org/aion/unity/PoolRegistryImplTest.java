@@ -5,6 +5,7 @@ import avm.Address;
 import org.aion.avm.core.util.ABIUtil;
 import org.aion.avm.tooling.AvmRule;
 import org.aion.unity.model.Pool;
+import org.aion.unity.model.Staker;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -14,7 +15,7 @@ import java.math.BigInteger;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-public class PoolRegistryTest {
+public class PoolRegistryImplTest {
 
     @ClassRule
     public static AvmRule avmRule = new AvmRule(true);
@@ -29,7 +30,7 @@ public class PoolRegistryTest {
     @BeforeClass
     public static void deployDapp() {
         byte[] arguments = ABIUtil.encodeDeploymentArguments(stakeRegistry);
-        byte[] dapp = avmRule.getDappBytes(PoolRegistry.class, arguments, StakeRegistry.class, StakeRegistryListener.class, Pool.class);
+        byte[] dapp = avmRule.getDappBytes(PoolRegistryImpl.class, arguments, PoolRegistry.class, Pool.class, Staker.class);
         delegationRegistry = avmRule.deploy(from, BigInteger.ZERO, dapp).getDappAddress();
     }
 

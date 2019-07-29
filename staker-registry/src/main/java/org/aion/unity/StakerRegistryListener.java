@@ -4,7 +4,7 @@ import avm.Address;
 
 import java.math.BigInteger;
 
-public interface StakeRegistryListener {
+public interface StakerRegistryListener {
 
     /**
      * When the coinbase address of a staker is changed.

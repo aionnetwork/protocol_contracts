@@ -12,7 +12,7 @@ import org.junit.Test;
 import java.math.BigInteger;
 
 
-public class StakerRegistryTest {
+public class StakerRegistryImplTest {
     @Rule
     public AvmRule RULE = new AvmRule(true);
 
@@ -29,7 +29,7 @@ public class StakerRegistryTest {
         // We will vote with 1 billion.
         BigInteger valueToVote = new BigInteger("1000000000");
         
-        byte[] dAppBytes = RULE.getDappBytes(StakerRegistry.class, null);
+        byte[] dAppBytes = RULE.getDappBytes(StakerRegistryImpl.class, null);
         Address dAppAddress = RULE.deploy(preminedAddress, BigInteger.ZERO, dAppBytes).getDappAddress();
         
         // Register.
