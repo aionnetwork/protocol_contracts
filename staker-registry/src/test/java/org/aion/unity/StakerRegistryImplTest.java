@@ -34,11 +34,10 @@ public class StakerRegistryImplTest {
         
         // Register.
         byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("register")
+                .encodeOneString("registerStaker")
                 .encodeOneAddress(preminedAddress)
                 .encodeOneAddress(preminedAddress)
-                .toBytes()
-                ;
+                .toBytes();                ;
         AvmRule.ResultWrapper result = RULE.call(preminedAddress, dAppAddress, BigInteger.ZERO, txData);
         ResultCode status = result.getReceiptStatus();
         Assert.assertTrue(status.isSuccess());
@@ -47,18 +46,16 @@ public class StakerRegistryImplTest {
         txData = new ABIStreamingEncoder()
                 .encodeOneString("vote")
                 .encodeOneAddress(preminedAddress)
-                .toBytes()
-                ;
+                .toBytes();
         result = RULE.call(preminedAddress, dAppAddress, valueToVote, txData);
         status = result.getReceiptStatus();
         Assert.assertTrue(status.isSuccess());
         
         // Verify.
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getVote")
+                .encodeOneString("getTotalStake")
                 .encodeOneAddress(preminedAddress)
-                .toBytes()
-                ;
+                .toBytes();
         result = RULE.call(preminedAddress, dAppAddress, BigInteger.ZERO, txData);
         status = result.getReceiptStatus();
         Assert.assertTrue(status.isSuccess());

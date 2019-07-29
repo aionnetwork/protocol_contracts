@@ -116,4 +116,11 @@ public interface StakerRegistry {
      * @param listener the address of the listener contract
      */
     void registerListener(Address listener);
+
+    /**
+     * Deregisters a listener. Owner only.
+     *
+     * @param listener the address of the listener contract
+     */
+    void deregisterListener(Address listener);
 }

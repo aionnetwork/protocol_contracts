@@ -6,131 +6,220 @@ import avm.Result;
 
 import org.aion.avm.tooling.abi.Callable;
 import org.aion.avm.userlib.AionMap;
+import org.aion.avm.userlib.AionSet;
 
 import java.math.BigInteger;
 import java.util.Map;
+import java.util.Set;
 
 
 public class StakerRegistryImpl {
-    
-    static {
-        stakers = new AionMap<>();
-    }
-    
+
+    // TODO: replace long with BigInteger once the ABI supports it.
+
+    // Conventions:
+    // 1. REQUIRE exception is thrown when the input data is malformed or the staker doesn't exist
+    // 2. The return value is to indicate the operation result
+
     private static class Staker {
         private Address signingAddress;
         private Address coinbaseAddress;
-        private BigInteger totalVote;
-        
-        // maps addresses to the votes those addresses have sent to this staker
-        // the sum of votes.values() should always equal totalVote
-        private Map<Address, BigInteger> votes;
-        
+        private BigInteger totalStake;
+
+        // maps addresses to the stakes those addresses have sent to this staker
+        // the sum of stakes.values() should always equal totalStake
+        private Map<Address, BigInteger> stakes;
+
+        private Set<Address> listeners;
+
         public Staker(Address signingAddress, Address coinbaseAddress) {
             this.signingAddress = signingAddress;
             this.coinbaseAddress = coinbaseAddress;
-            this.totalVote = BigInteger.ZERO;
-            this.votes = new AionMap<>();
+            this.totalStake = BigInteger.ZERO;
+            this.stakes = new AionMap<>();
+            this.listeners = new AionSet<>();
         }
     }
-    
-    private static Map<Address, Staker> stakers;
+
+    private static Map<Address, Staker> stakers = new AionMap<>();
 
     @Callable
-    public static boolean register(Address signingAddress, Address coinbaseAddress) {
+    public static boolean registerStaker(Address signingAddress, Address coinbaseAddress) {
         Address caller = Blockchain.getCaller();
-        Staker staker = new Staker(signingAddress, coinbaseAddress);
+
+        requireNonNull(signingAddress);
+        requireNonNull(coinbaseAddress);
 
         if (!stakers.containsKey(caller)) {
-            stakers.put(caller, staker);
+            stakers.put(caller, new Staker(signingAddress, coinbaseAddress));
             return true;
-        } else {
-            return false;
         }
-    }
 
-    // TODO: add return value for vote/unvote
-
-    @Callable
-    public static void vote(Address stakerAddress) {
-        BigInteger value = Blockchain.getValue();
-        Address senderAddress = Blockchain.getCaller();
-        if (null != stakerAddress && stakers.containsKey(stakerAddress) && value.compareTo(BigInteger.ZERO) > 0) {
-            Staker staker = stakers.get(stakerAddress);
-            staker.totalVote = staker.totalVote.add(value);
-            
-            BigInteger vote = staker.votes.get(senderAddress);
-            if (null == vote) {
-                // This is the first time the sender has voted for this staker
-                staker.votes.put(senderAddress, value);
-            } else {
-                staker.votes.replace(senderAddress, vote.add(value));
-            }
-        }
+        return false;
     }
 
     @Callable
-    public static void unvote(Address stakerAddress, long amount) {
-        Address senderAddress = Blockchain.getCaller();
-        Blockchain.require(amount >= 0);
+    public static boolean vote(Address staker) {
+        Address caller = Blockchain.getCaller();
+        BigInteger amount = Blockchain.getValue();
+
+        requireStaker(staker);
+        requirePositive(amount);
+
+        Staker s = stakers.get(staker);
+        s.totalStake = s.totalStake.add(amount);
+        BigInteger previousStake = getOrDefault(s.stakes, caller, BigInteger.ZERO);
+        putOrRemove(s.stakes, caller, previousStake.add(amount));
+
+        return true;
+    }
+
+    @Callable
+    public static boolean unvote(Address staker, long amount) {
+        return unvoteTo(staker, amount, Blockchain.getCaller());
+    }
+
+    @Callable
+    public static boolean unvoteTo(Address staker, long amount, Address receiver) {
+        Address caller = Blockchain.getCaller();
+
+        requireStaker(staker);
+        requirePositive(amount);
+        requireNonNull(receiver);
+
+        Staker s = stakers.get(staker);
+        BigInteger previousStake = getOrDefault(stakers.get(staker).stakes, caller, BigInteger.ZERO);
         BigInteger amountBI = BigInteger.valueOf(amount);
-        if (null != stakerAddress && stakers.containsKey(stakerAddress)) {
-            Staker staker = stakers.get(stakerAddress);
-            if (staker != null && staker.votes.containsKey(senderAddress)) {
-                Result result;
-                BigInteger vote = staker.votes.get(senderAddress);
-                if (vote.compareTo(amountBI) > 0) {
-                    staker.votes.replace(senderAddress, vote.subtract(amountBI));
-                    staker.totalVote = staker.totalVote.subtract(amountBI);
-                    result = Blockchain.call(senderAddress, amountBI, new byte[0], Blockchain.getRemainingEnergy());
-                } else {
-                    staker.totalVote = staker.totalVote.subtract(vote);
-                    result = Blockchain.call(senderAddress, vote, new byte[0], Blockchain.getRemainingEnergy());
-                    staker.votes.remove(senderAddress);
-                }
-                // TODO: Determine what we want to do with "result".
-                assert (null != result);
-            }
+
+        if (amountBI.compareTo(previousStake) <= 0) {
+            s.totalStake = s.totalStake.subtract(amountBI);
+            putOrRemove(s.stakes, caller, previousStake.subtract(amountBI));
+
+            Blockchain.call(receiver, amountBI, new byte[0], Blockchain.getRemainingEnergy());
+            return true;
         }
+
+        return false;
     }
 
     @Callable
-    public static long getVote(Address stakingAddress) {
-        Staker staker = stakers.get(stakingAddress);
-        if (staker != null) {
-            return staker.totalVote.longValue();
-        } else {
-            return 0;
+    public static boolean transferStake(Address fromStaker, Address toStaker, long amount) {
+        Address caller = Blockchain.getCaller();
+
+        requireStaker(fromStaker);
+        requireStaker(toStaker);
+        requirePositive(amount);
+
+        Staker s1 = stakers.get(fromStaker);
+        Staker s2 = stakers.get(toStaker);
+        BigInteger previousStake1 = getOrDefault(s1.stakes, caller, BigInteger.ZERO);
+        BigInteger previousStake2 = getOrDefault(s2.stakes, caller, BigInteger.ZERO);
+        BigInteger amountBI = BigInteger.valueOf(amount);
+
+        if (amountBI.compareTo(previousStake1) <= 0) {
+            s1.totalStake = s1.totalStake.subtract(amountBI);
+            putOrRemove(s1.stakes, caller, previousStake1.subtract(amountBI));
+
+            s2.totalStake = s2.totalStake.add(amountBI);
+            putOrRemove(s2.stakes, caller, previousStake2.add(amountBI));
+
+            return true;
         }
+
+        return false;
+    }
+
+    @Callable
+    public static long getTotalStake(Address staker) {
+        requireStaker(staker);
+
+        return stakers.get(staker).totalStake.longValue();
+    }
+
+    @Callable
+    public static long getStake(Address staker, Address voter) {
+        requireStaker(staker);
+
+        return getOrDefault(stakers.get(staker).stakes, voter, BigInteger.ZERO).longValue();
     }
 
     @Callable
     public static Address getSigningAddress(Address staker) {
-        return stakers.containsKey(staker) ? stakers.get(staker).signingAddress : null;
+        requireStaker(staker);
+
+        return stakers.get(staker).signingAddress;
     }
 
     @Callable
     public static Address getCoinbaseAddress(Address staker) {
-        return stakers.containsKey(staker) ? stakers.get(staker).coinbaseAddress : null;
+        requireStaker(staker);
+
+        return stakers.get(staker).coinbaseAddress;
     }
 
     @Callable
-    public static boolean setSigningAddress(Address newSigningAddress) {
-        Address caller = Blockchain.getCaller();
-        if (stakers.containsKey(caller)) {
-            stakers.get(caller).signingAddress = newSigningAddress;
-            return true;
-        }
-        return false;
+    public static void setSigningAddress(Address staker, Address newSigningAddress) {
+        requireStaker(staker);
+
+        stakers.get(staker).signingAddress = newSigningAddress;
+
+        // TODO: notify all the listeners
     }
 
     @Callable
-    public static boolean setCoinbaseAddress(Address newCoinbaseAddress) {
+    public static void setCoinbaseAddress(Address staker, Address newCoinbaseAddress) {
+        requireStaker(staker);
+
+        stakers.get(staker).coinbaseAddress = newCoinbaseAddress;
+
+        // TODO: notify all the listeners
+    }
+
+    @Callable
+    public static void registerListener(Address listener) {
         Address caller = Blockchain.getCaller();
-        if (stakers.containsKey(caller)) {
-            stakers.get(caller).coinbaseAddress = newCoinbaseAddress;
-            return true;
+
+        requireStaker(caller);
+        stakers.get(caller).listeners.add(listener);
+    }
+
+    @Callable
+    public static void deregisterListener(Address listener) {
+        Address caller = Blockchain.getCaller();
+
+        requireStaker(caller);
+        stakers.get(caller).listeners.remove(listener);
+    }
+
+    private static void requireStaker(Address staker) {
+        Blockchain.require(staker != null && stakers.containsKey(staker));
+    }
+
+    private static void requirePositive(BigInteger num) {
+        Blockchain.require(num != null && num.compareTo(BigInteger.ZERO) > 0);
+    }
+
+    private static void requirePositive(long num) {
+        Blockchain.require(num > 0);
+    }
+
+    private static void requireNonNull(Object obj) {
+        Blockchain.require(obj != null);
+    }
+
+    private static <K, V extends BigInteger> void putOrRemove(Map<K, V> map, K key, V value) {
+        if (value == null || value.compareTo(BigInteger.ZERO) == 0) {
+            map.remove(key);
+        } else {
+            map.put(key, value);
         }
-        return false;
+    }
+
+    private static <K, V> V getOrDefault(Map<K, V> map, K key, V defaultValue) {
+        if (map.containsKey(key)) {
+            return map.get(key);
+        } else {
+            return defaultValue;
+        }
     }
 }
