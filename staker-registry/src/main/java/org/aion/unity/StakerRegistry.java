@@ -97,18 +97,16 @@ public interface StakerRegistry {
     /**
      * Updates the signing address of a staker. Owner only.
      *
-     * @param staker            the address of the staker
      * @param newSigningAddress the new signing address
      */
-    void setSigningAddress(Address staker, Address newSigningAddress);
+    void setSigningAddress(Address newSigningAddress);
 
     /**
      * Updates the coinbase address of a staker. Owner only.
      *
-     * @param staker             the address of the staker
      * @param newCoinbaseAddress the new coinbase address
      */
-    void setCoinbaseAddress(Address staker, Address newCoinbaseAddress);
+    void setCoinbaseAddress(Address newCoinbaseAddress);
 
     /**
      * Registers a listener. Owner only.

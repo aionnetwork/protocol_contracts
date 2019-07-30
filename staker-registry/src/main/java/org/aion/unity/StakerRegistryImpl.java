@@ -7,6 +7,8 @@ import avm.Result;
 import org.aion.avm.tooling.abi.Callable;
 import org.aion.avm.userlib.AionMap;
 import org.aion.avm.userlib.AionSet;
+import org.aion.avm.userlib.abi.ABIEncoder;
+import org.aion.avm.userlib.abi.ABIStreamingEncoder;
 
 import java.math.BigInteger;
 import java.util.Map;
@@ -158,21 +160,39 @@ public class StakerRegistryImpl {
     }
 
     @Callable
-    public static void setSigningAddress(Address staker, Address newSigningAddress) {
+    public static void setSigningAddress(Address newSigningAddress) {
+        Address staker = Blockchain.getCaller();
         requireStaker(staker);
 
-        stakers.get(staker).signingAddress = newSigningAddress;
+        Staker s = stakers.get(staker);
+        s.signingAddress = newSigningAddress;
 
-        // TODO: notify all the listeners
+        for (Address listener : s.listeners) {
+            byte[] data =  new ABIStreamingEncoder()
+                    .encodeOneString("onSigningAddressChange")
+                    .encodeOneAddress(staker)
+                    .encodeOneAddress(newSigningAddress)
+                    .toBytes();
+            Blockchain.call(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+        }
     }
 
     @Callable
-    public static void setCoinbaseAddress(Address staker, Address newCoinbaseAddress) {
+    public static void setCoinbaseAddress(Address newCoinbaseAddress) {
+        Address staker = Blockchain.getCaller();
         requireStaker(staker);
 
-        stakers.get(staker).coinbaseAddress = newCoinbaseAddress;
+        Staker s = stakers.get(staker);
+        s.coinbaseAddress = newCoinbaseAddress;
 
-        // TODO: notify all the listeners
+        for (Address listener : s.listeners) {
+            byte[] data =  new ABIStreamingEncoder()
+                    .encodeOneString("onCoinbaseAddressChange")
+                    .encodeOneAddress(staker)
+                    .encodeOneAddress(newCoinbaseAddress)
+                    .toBytes();
+            Blockchain.call(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+        }
     }
 
     @Callable
