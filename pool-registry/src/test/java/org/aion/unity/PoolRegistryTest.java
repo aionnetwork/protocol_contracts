@@ -13,7 +13,7 @@ import java.math.BigInteger;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-public class PoolRegistryImplTest {
+public class PoolRegistryTest {
 
     @ClassRule
     public static AvmRule avmRule = new AvmRule(true);
@@ -28,7 +28,7 @@ public class PoolRegistryImplTest {
     @BeforeClass
     public static void deployDapp() {
         byte[] arguments = ABIUtil.encodeDeploymentArguments(stakerRegistry);
-        byte[] dapp = avmRule.getDappBytes(PoolRegistryImpl.class, arguments);
+        byte[] dapp = avmRule.getDappBytes(PoolRegistry.class, arguments);
         poolRegistry = avmRule.deploy(from, BigInteger.ZERO, dapp).getDappAddress();
     }
 

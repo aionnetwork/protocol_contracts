@@ -16,7 +16,7 @@
         <aion4j.plugin.version>0.6.7</aion4j.plugin.version>
         <avm.lib.dir>${project.basedir}/lib</avm.lib.dir>
 
-        <contract.main.class>org.aion.unity.StakerRegistryImpl</contract.main.class>
+        <contract.main.class>org.aion.unity.StakerRegistry</contract.main.class>
     </properties>
 
     <dependencies>

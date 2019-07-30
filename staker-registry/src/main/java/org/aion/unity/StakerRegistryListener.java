@@ -6,8 +6,6 @@ import java.math.BigInteger;
 
 public interface StakerRegistryListener {
 
-    // TODO: use BigInteger for block rewards
-
     /**
      * When the signing address of a staker is changed.
      *
@@ -23,14 +21,4 @@ public interface StakerRegistryListener {
      * @param newCoinbaseAddress the new coinbase address
      */
     void onCoinbaseAddressChange(Address staker, Address newCoinbaseAddress);
-
-    /**
-     * When a PoS block is created.
-     *
-     * @param staker  the staker address
-     * @param number  the block number
-     * @param hash    the block hash
-     * @param rewards the block rewards, including transaction fees collected
-     */
-    void onBlockProduction(Address staker, long number, byte[] hash, long rewards);
 }
