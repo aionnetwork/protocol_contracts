@@ -10,7 +10,7 @@ import java.math.BigInteger;
 /**
  * A dummy contract to collect block rewards.
  */
-public class Pool {
+public class PoolCoinbasee {
 
     // TODO: replace long with BigInteger
 
@@ -18,7 +18,7 @@ public class Pool {
     private static Address poolRegistry;
 
     @Callable
-    public void withdraw(long limit) {
+    public static void withdraw(long limit) {
         Blockchain.require(limit > 0);
         Blockchain.require(Blockchain.getCaller().equals(poolRegistry));
 

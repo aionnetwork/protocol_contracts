@@ -10,17 +10,19 @@ import java.util.Map;
  * Manages the state of a pool.
  */
 public class PoolState {
-    private Address stakerAddress;
-    private Address rewardsAddress;
+    boolean initialized;
 
-    private byte[] metaData;
-    private int commissionRate;
+    Address stakerAddress;
+    Address coinbaseAddress;
 
-    private Map<Address, BigInteger> delegators;
+    byte[] metaData;
+    int commissionRate;
 
-    public PoolState(Address stakerAddress, Address rewardsAddress, byte[] metaData, int commissionRate) {
+    Map<Address, BigInteger> delegators;
+
+    public PoolState(Address stakerAddress, Address coinbaseAddress, byte[] metaData, int commissionRate) {
         this.stakerAddress = stakerAddress;
-        this.rewardsAddress = rewardsAddress;
+        this.coinbaseAddress = coinbaseAddress;
         this.metaData = metaData;
         this.commissionRate = commissionRate;
         this.delegators = new AionMap<>();
