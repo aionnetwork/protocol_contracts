@@ -339,6 +339,8 @@ public class StakerRegistry {
         requireStaker(caller);
 
         stakers.get(caller).listeners.add(listener);
+
+        // TODO: notify listeners
     }
 
     /**
@@ -353,6 +355,8 @@ public class StakerRegistry {
         requireStaker(caller);
 
         stakers.get(caller).listeners.remove(listener);
+
+        // TODO: notify listeners
     }
 
     private static void require(boolean condition) {

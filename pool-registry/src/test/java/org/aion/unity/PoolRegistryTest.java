@@ -7,8 +7,10 @@ import org.aion.avm.tooling.AvmRule;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
+import org.spongycastle.util.encoders.Hex;
 
 import java.math.BigInteger;
+import java.util.Arrays;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -16,29 +18,39 @@ import static org.junit.Assert.assertTrue;
 public class PoolRegistryTest {
 
     @ClassRule
-    public static AvmRule avmRule = new AvmRule(true);
+    public static AvmRule RULE = new AvmRule(true);
 
     // default address with balance
-    private static Address from = avmRule.getPreminedAccount();
+    private static Address preminedAddress = RULE.getPreminedAccount();
 
     // contract address
-    private static Address stakerRegistry = new Address(new byte[32]);
+    private static Address stakerRegistry;
     private static Address poolRegistry;
 
     @BeforeClass
     public static void deployDapp() {
+        stakerRegistry = RULE.getRandomAddress(BigInteger.ZERO);
+
         byte[] arguments = ABIUtil.encodeDeploymentArguments(stakerRegistry);
-        byte[] dapp = avmRule.getDappBytes(PoolRegistry.class, arguments);
-        poolRegistry = avmRule.deploy(from, BigInteger.ZERO, dapp).getDappAddress();
+        byte[] jar = RULE.getDappBytes(PoolRegistry.class, arguments);
+        poolRegistry = RULE.deploy(preminedAddress, BigInteger.ZERO, jar).getDappAddress();
     }
 
     @Test
     public void testGetStakerRegistry() {
         byte[] txData = ABIUtil.encodeMethodArguments("getStakerRegistry");
-        AvmRule.ResultWrapper result = avmRule.call(from, poolRegistry, BigInteger.ZERO, txData);
+        AvmRule.ResultWrapper result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
 
         assertTrue(result.getReceiptStatus().isSuccess());
         assertEquals(stakerRegistry, result.getDecodedReturnData());
+    }
+
+    @Test
+    public void testPoolContract() {
+        byte[] arguments = ABIUtil.encodeDeploymentArguments(poolRegistry);
+        byte[] jar = RULE.getDappBytes(PoolRegistry.class, arguments);
+        System.out.println(Hex.toHexString(jar));
+        System.out.println(Arrays.toString(jar));
     }
 }
 

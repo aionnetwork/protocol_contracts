@@ -5,7 +5,6 @@ import org.aion.avm.tooling.abi.Callable;
 import org.aion.avm.tooling.abi.Initializable;
 import org.aion.avm.userlib.AionMap;
 
-import java.math.BigInteger;
 import java.util.Map;
 
 /**
@@ -14,7 +13,7 @@ import java.util.Map;
  */
 public class PoolRegistry {
 
-    private static Map<Address, Pool> pools = new AionMap<>();
+    private static Map<Address, PoolState> pools = new AionMap<>();
 
     @Initializable
     private static Address stakerRegistry;
@@ -25,9 +24,71 @@ public class PoolRegistry {
     }
 
 
+    /**
+     * Register a pool in the registry.
+     *
+     * @param metaData       the pool meta data
+     * @param commissionRate the pool commission rate
+     * @return the pool coinbase address
+     */
     @Callable
-    public static boolean registerPool(byte[] metaData, int commissionRate) {
-        return false;
+    public static Address registerPool(byte[] metaData, int commissionRate) {
+
+        return null;
+    }
+
+    /**
+     * Delegates stake to a pool.
+     *
+     * @param pool the pool address
+     */
+    @Callable
+    public static void delegate(Address pool) {
+
+    }
+
+    /**
+     * Cancels stake to a pool.
+     *
+     * @param pool   the pool address
+     * @param amount the amount of stake to undelegate
+     */
+    @Callable
+    public static void undelegate(Address pool, long amount) {
+
+    }
+
+    /**
+     * Redelegate a pool using the rewards.
+     *
+     * @param pool the pool address
+     */
+    @Callable
+    public static void redelegate(Address pool) {
+
+    }
+
+    /**
+     * Transfers stake from one pool to another.
+     *
+     * @param fromPool the from pool address
+     * @param toPool   the to pool address
+     * @param amount   the amount of stake to transfer
+     */
+    @Callable
+    public static void transferStake(Address fromPool, Address toPool, long amount) {
+
+    }
+
+    /**
+     * Withdraws rewards from one pool
+     *
+     * @param pool  the pool address
+     * @param limit the withdraw limit
+     */
+    @Callable
+    public static void withdraw(Address pool, long limit) {
+
     }
 
     @Callable
@@ -41,27 +102,12 @@ public class PoolRegistry {
     }
 
     @Callable
-    public static void onBlockProduction(Address staker, long number, byte[] hash, long rewards) {
+    public static void onListenerAdded(Address staker, Address listener) {
 
     }
 
-    public static class Pool {
+    @Callable
+    public static void onListenerRemoved(Address staker, Address listener) {
 
-        private Address ownerAddress;
-        private Address signingAddress;
-        private Address coinbaseAddress;
-        private byte[] metaData;
-        private int commissionRate;
-
-        private Map<Address, BigInteger> delegators;
-
-        public Pool(Address ownerAddress, Address signingAddress, Address coinbaseAddress, byte[] metaData, int commissionRate) {
-            this.ownerAddress = ownerAddress;
-            this.signingAddress = signingAddress;
-            this.coinbaseAddress = coinbaseAddress;
-            this.metaData = metaData;
-            this.commissionRate = commissionRate;
-            this.delegators = new AionMap<>();
-        }
     }
 }

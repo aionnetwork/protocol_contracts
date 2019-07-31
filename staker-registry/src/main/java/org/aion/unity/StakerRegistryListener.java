@@ -21,4 +21,8 @@ public interface StakerRegistryListener {
      * @param newCoinbaseAddress the new coinbase address
      */
     void onCoinbaseAddressChange(Address staker, Address newCoinbaseAddress);
+
+    void onListenerAdded(Address staker, Address listener);
+
+    void onListenerRemoved(Address staker, Address listener);
 }
