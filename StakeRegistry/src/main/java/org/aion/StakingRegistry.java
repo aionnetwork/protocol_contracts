@@ -71,7 +71,7 @@ public class StakingRegistry {
                 Result result;
                 BigInteger vote = staker.votes.get(senderAddress);
                 if (vote.compareTo(amountBI) > 0) {
-                    staker.votes.replace(senderAddress, vote.subtract(amountBI));
+                    staker.votes.put(senderAddress, vote.subtract(amountBI));
                     staker.totalVote = staker.totalVote.subtract(amountBI);
                     result = Blockchain.call(senderAddress, amountBI, new byte[0], Blockchain.getRemainingEnergy());
                 } else {
