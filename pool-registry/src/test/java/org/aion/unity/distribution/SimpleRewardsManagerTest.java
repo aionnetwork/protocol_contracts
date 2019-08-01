@@ -1,13 +1,15 @@
-package org.aion.unity;
+package org.aion.unity.distribution;
 
 import avm.Address;
+import org.aion.unity.distribution.RewardsManager;
+import org.aion.unity.distribution.SimpleRewardsManager;
 import org.junit.Test;
 
 import java.math.BigInteger;
 import java.util.*;
 
-import static org.aion.unity.RewardsManager.Event;
-import static org.aion.unity.RewardsManager.EventType;
+import static org.aion.unity.distribution.RewardsManager.Event;
+import static org.aion.unity.distribution.RewardsManager.EventType;
 import static org.junit.Assert.fail;
 
 public class SimpleRewardsManagerTest {

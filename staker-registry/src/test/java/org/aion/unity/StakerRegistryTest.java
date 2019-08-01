@@ -15,10 +15,11 @@ import java.math.BigInteger;
 
 
 public class StakerRegistryTest {
+
+    private static BigInteger ENOUGH_BALANCE_TO_TRANSACT = BigInteger.TEN.pow(18 + 5);
+
     @Rule
     public AvmRule RULE = new AvmRule(true);
-
-    private BigInteger ENOUGH_BALANCE_TO_TRANSACT = BigInteger.TEN.pow(18 + 5);
 
     private Address preminedAddress;
 

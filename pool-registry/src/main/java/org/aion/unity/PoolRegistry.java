@@ -17,6 +17,7 @@ import java.util.Map;
  */
 public class PoolRegistry {
 
+    // TODO: replace object graph with key-value storage
     // TODO: add restriction to operations based on pool state
     // TODO: add reward manager
 
@@ -178,7 +179,7 @@ public class PoolRegistry {
 
     @Callable
     public static void onCoinbaseAddressChange(Address staker, Address newCoinbaseAddress) {
-        // TODO: disable pool
+        // TODO: freeze pool when coinbase address is changed by the staker
     }
 
     @Callable
@@ -197,13 +198,15 @@ public class PoolRegistry {
         // the coinbase address has to be the reward collector
         require(coinbaseAddress.equals(ps.coinbaseAddress));
 
+        // TODO: also check if this contract is a listener
+
         // set the pool as activated
         ps.initialized = true;
     }
 
     @Callable
     public static void onListenerRemoved(Address staker, Address listener) {
-        // TODO: disable pool if this contract is no longer a listener
+        // TODO: freeze pool if this contract is no longer a listener
     }
 
     // TODO: add bunch of getters

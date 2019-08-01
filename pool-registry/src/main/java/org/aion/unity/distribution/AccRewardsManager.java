@@ -1,4 +1,4 @@
-package org.aion.unity;
+package org.aion.unity.distribution;
 
 import avm.Address;
 
@@ -6,13 +6,10 @@ import java.util.*;
 
 // NOTE: this code is for simulation purpose, not for production.
 
-public class DPRewardsManager extends RewardsManager {
+public class AccRewardsManager extends RewardsManager {
 
     private static final boolean DEBUG = false;
 
-    private static final boolean AUTO_SETTLEMENT = false;
-    private static final long MAX_IDLE_PERIOD = 6 * 60 * 24;
-    private static final int MAX_ACCOUNTS_TO_SETTLE = 10;
 
     private static class Pair<K, V> {
         private K first;
@@ -33,8 +30,7 @@ public class DPRewardsManager extends RewardsManager {
         // <block number, stake>
         Map<Address, Pair<Long, Long>> delegators = new LinkedHashMap<>();
         long totalStake;
-        long unsettledShares;
-        long unsettledRewards;
+        Map<Long, Double> accumulatedRewardsPerStake = new HashMap<>();
         long lastBlockProduced = -1;
         Map<Address, Long> settledRewards = new HashMap<>();
         Map<Address, Long> withdrawnRewards = new HashMap<>();
@@ -89,13 +85,12 @@ public class DPRewardsManager extends RewardsManager {
                 throw new IllegalArgumentException("Invalid stake to leave");
             }
 
-            long shares = stake * (lastBlockProduced - pair.first);
-            long rewards = (unsettledShares == 0) ? unsettledRewards : unsettledRewards * shares / unsettledShares;
+            double startAccumulatedRewardsPerStake = accumulatedRewardsPerStake.getOrDefault(pair.first, 0.0);
+            double endAccumulatedRewardsPerStake = accumulatedRewardsPerStake.getOrDefault(lastBlockProduced, 0.0);
+            long rewards = (long) Math.floor((endAccumulatedRewardsPerStake - startAccumulatedRewardsPerStake) * pair.second);
             settledRewards.put(delegator, rewards + settledRewards.getOrDefault(delegator, 0L));
 
             totalStake -= stake;
-            unsettledShares -= shares;
-            unsettledRewards -= rewards;
             delegators.remove(delegator);
         }
 
@@ -121,26 +116,10 @@ public class DPRewardsManager extends RewardsManager {
             assert (blockNumber > 0);
             assert (blockRewards > 0);
 
-            unsettledShares += totalStake * (blockNumber - lastBlockProduced);
-            unsettledRewards += blockRewards;
+            // precision lost
+            double rewardsPerStake = totalStake == 0 ? 0 : (double)blockRewards / totalStake;
+            accumulatedRewardsPerStake.put(blockNumber, accumulatedRewardsPerStake.getOrDefault(lastBlockProduced, 0.0) + rewardsPerStake);
             lastBlockProduced = blockNumber;
-
-            if (AUTO_SETTLEMENT) {
-                Iterator<Map.Entry<Address, Pair<Long, Long>>> itr = delegators.entrySet().iterator();
-                List<Address> addresses = new ArrayList<>();
-                while (addresses.size() < MAX_ACCOUNTS_TO_SETTLE && itr.hasNext()) {
-                    addresses.add(itr.next().getKey());
-                }
-                for (Address address : addresses) {
-                    Pair<Long, Long> p = delegators.get(address);
-                    if (blockNumber - p.first > MAX_IDLE_PERIOD) {
-                        onLeave(address, p.second);
-                        onJoin(address, blockNumber, p.second);
-                    } else {
-                        break;
-                    }
-                }
-            }
         }
     }
 

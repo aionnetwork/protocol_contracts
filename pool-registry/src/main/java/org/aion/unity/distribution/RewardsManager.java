@@ -1,4 +1,4 @@
-package org.aion.unity;
+package org.aion.unity.distribution;
 
 import avm.Address;
 

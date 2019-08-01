@@ -1,6 +1,7 @@
-package org.aion.unity;
+package org.aion.unity.distribution;
 
 import avm.Address;
+import org.aion.unity.distribution.RewardsManager;
 
 import java.util.*;
 
