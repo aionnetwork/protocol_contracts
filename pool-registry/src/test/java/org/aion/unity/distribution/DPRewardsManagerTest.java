@@ -1,17 +1,17 @@
 package org.aion.unity.distribution;
 
 import avm.Address;
-import org.aion.unity.distribution.DPRewardsManager;
 import org.junit.Ignore;
 import org.junit.Test;
-
-import static org.aion.unity.distribution.RewardsManager.*;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+
+import static org.aion.unity.distribution.RewardsManager.Event;
+import static org.aion.unity.distribution.RewardsManager.EventType;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 public class DPRewardsManagerTest {
 

@@ -3,7 +3,6 @@ package org.aion.unity;
 import avm.Address;
 import avm.Blockchain;
 import avm.Result;
-
 import org.aion.avm.tooling.abi.Callable;
 import org.aion.avm.userlib.AionList;
 import org.aion.avm.userlib.AionMap;
@@ -32,7 +31,8 @@ public class StakerRegistry {
     private static class Staker {
         private Address signingAddress;
         private Address coinbaseAddress;
-        private long lastAddressUpdate;
+
+        private long lastSigningAddressUpdate;
 
         private BigInteger totalStake;
 
@@ -42,10 +42,10 @@ public class StakerRegistry {
 
         private Set<Address> listeners;
 
-        public Staker(Address signingAddress, Address coinbaseAddress, long lastAddressUpdate) {
+        public Staker(Address signingAddress, Address coinbaseAddress, long lastSigningAddressUpdate) {
             this.signingAddress = signingAddress;
             this.coinbaseAddress = coinbaseAddress;
-            this.lastAddressUpdate = lastAddressUpdate;
+            this.lastSigningAddressUpdate = lastSigningAddressUpdate;
             this.totalStake = BigInteger.ZERO;
             this.stakes = new AionMap<>();
             this.listeners = new AionSet<>();
@@ -283,28 +283,26 @@ public class StakerRegistry {
         requireNonNull(newSigningAddress);
 
         Staker s = stakers.get(caller);
-        if (newSigningAddress.equals(s.signingAddress)) {
-            return;
-        }
+        if (!newSigningAddress.equals(s.signingAddress)) {
+            // check last update
+            long blockNumber = Blockchain.getBlockNumber();
+            require(blockNumber >= s.lastSigningAddressUpdate + ADDRESS_UPDATE_COOL_DOWN_PERIOD);
 
-        // check last update
-        long blockNumber = Blockchain.getBlockNumber();
-        require(blockNumber >= s.lastAddressUpdate + ADDRESS_UPDATE_COOL_DOWN_PERIOD);
+            // check duplicated signing address
+            require(!signingAddresses.containsKey(newSigningAddress));
 
-        // check duplicated signing address
-        require(!signingAddresses.containsKey(newSigningAddress));
+            signingAddresses.put(newSigningAddress, caller);
+            s.signingAddress = newSigningAddress;
+            s.lastSigningAddressUpdate = blockNumber;
 
-        signingAddresses.put(newSigningAddress, caller);
-        s.signingAddress = newSigningAddress;
-        s.lastAddressUpdate = blockNumber;
-
-        for (Address listener : s.listeners) {
-            byte[] data = new ABIStreamingEncoder()
-                    .encodeOneString("onSigningAddressChange")
-                    .encodeOneAddress(caller)
-                    .encodeOneAddress(newSigningAddress)
-                    .toBytes();
-            secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+            for (Address listener : s.listeners) {
+                byte[] data = new ABIStreamingEncoder()
+                        .encodeOneString("onSigningAddressChange")
+                        .encodeOneAddress(caller)
+                        .encodeOneAddress(newSigningAddress)
+                        .toBytes();
+                secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+            }
         }
     }
 
@@ -320,23 +318,17 @@ public class StakerRegistry {
         requireNonNull(newCoinbaseAddress);
 
         Staker s = stakers.get(caller);
-        if (newCoinbaseAddress.equals(s.coinbaseAddress)) {
-            return;
-        }
+        if (!newCoinbaseAddress.equals(s.coinbaseAddress)) {
+            s.coinbaseAddress = newCoinbaseAddress;
 
-        // check last update
-        long blockNumber = Blockchain.getBlockNumber();
-        require(blockNumber >= s.lastAddressUpdate + ADDRESS_UPDATE_COOL_DOWN_PERIOD);
-
-        s.coinbaseAddress = newCoinbaseAddress;
-
-        for (Address listener : s.listeners) {
-            byte[] data = new ABIStreamingEncoder()
-                    .encodeOneString("onCoinbaseAddressChange")
-                    .encodeOneAddress(caller)
-                    .encodeOneAddress(newCoinbaseAddress)
-                    .toBytes();
-            secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+            for (Address listener : s.listeners) {
+                byte[] data = new ABIStreamingEncoder()
+                        .encodeOneString("onCoinbaseAddressChange")
+                        .encodeOneAddress(caller)
+                        .encodeOneAddress(newCoinbaseAddress)
+                        .toBytes();
+                secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+            }
         }
     }
 

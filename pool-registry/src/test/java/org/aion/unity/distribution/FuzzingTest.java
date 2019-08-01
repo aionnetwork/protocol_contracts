@@ -1,10 +1,6 @@
 package org.aion.unity.distribution;
 
 import avm.Address;
-import org.aion.unity.distribution.AccRewardsManager;
-import org.aion.unity.distribution.DPRewardsManager;
-import org.aion.unity.distribution.RewardsManager;
-import org.aion.unity.distribution.SimpleRewardsManager;
 import org.junit.Test;
 
 import java.math.BigInteger;

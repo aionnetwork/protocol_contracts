@@ -6,6 +6,7 @@ import avm.Result;
 import org.aion.avm.tooling.abi.Callable;
 import org.aion.avm.tooling.abi.Initializable;
 import org.aion.avm.userlib.AionMap;
+import org.aion.avm.userlib.abi.ABIDecoder;
 import org.aion.avm.userlib.abi.ABIStreamingEncoder;
 
 import java.math.BigInteger;
@@ -27,6 +28,7 @@ public class PoolRegistry {
     // TODO: add restriction to operations based on pool state
     // TODO: add reward manager
     // TODO: add any necessary getters
+    // TODO: allow pool operator to update meta data and commission rate
 
     @Initializable
     private static Address stakerRegistry;
@@ -179,6 +181,17 @@ public class PoolRegistry {
 
     }
 
+    /**
+     * Returns pool status.
+     * @param pool the pool address.
+     * @return
+     */
+    @Callable
+    public static String getPoolStatus(Address pool) {
+        requirePool(pool);
+        return pools.get(pool).status.toString();
+    }
+
     @Callable
     public static void onSigningAddressChange(Address staker, Address newSigningAddress) {
         onlyStakerRegistry();
@@ -210,7 +223,7 @@ public class PoolRegistry {
                     .toBytes();
             Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
             require(result.isSuccess());
-            Address coinbaseAddress = new Address(result.getReturnData());
+            Address coinbaseAddress = new ABIDecoder(result.getReturnData()).decodeOneAddress();
 
             // the coinbase address has to be the reward collector
             require(coinbaseAddress.equals(ps.coinbaseAddress));
@@ -229,6 +242,7 @@ public class PoolRegistry {
             freezePool(staker);
         }
     }
+
 
     private static void freezePool(Address pool) {
         pools.get(pool).status = PoolState.Status.FREEZED;

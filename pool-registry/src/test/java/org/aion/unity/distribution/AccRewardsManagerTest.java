@@ -1,7 +1,6 @@
 package org.aion.unity.distribution;
 
 import avm.Address;
-import org.aion.unity.distribution.AccRewardsManager;
 import org.junit.Test;
 
 import java.util.Arrays;

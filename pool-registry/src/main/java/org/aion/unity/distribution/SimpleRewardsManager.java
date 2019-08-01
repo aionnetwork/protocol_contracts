@@ -1,9 +1,11 @@
 package org.aion.unity.distribution;
 
 import avm.Address;
-import org.aion.unity.distribution.RewardsManager;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
 
 public class SimpleRewardsManager extends RewardsManager {
 

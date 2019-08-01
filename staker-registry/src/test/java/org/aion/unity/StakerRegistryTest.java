@@ -234,18 +234,7 @@ public class StakerRegistryTest {
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
         ResultCode status = result.getReceiptStatus();
-        Assert.assertFalse(status.isSuccess());
-
-        tweakBlockNumber(1L + StakerRegistry.ADDRESS_UPDATE_COOL_DOWN_PERIOD);
-
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("setCoinbaseAddress")
-                .encodeOneAddress(anotherAddress)
-                .toBytes();
-        result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
-        status = result.getReceiptStatus();
         Assert.assertTrue(status.isSuccess());
-
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("getCoinbaseAddress")

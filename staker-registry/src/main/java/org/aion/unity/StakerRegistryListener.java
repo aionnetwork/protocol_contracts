@@ -2,8 +2,6 @@ package org.aion.unity;
 
 import avm.Address;
 
-import java.math.BigInteger;
-
 public interface StakerRegistryListener {
 
     // TODO: analyze listener failure model

@@ -1,14 +1,18 @@
 package org.aion.unity;
 
 import avm.Address;
-
 import org.aion.avm.core.util.ABIUtil;
 import org.aion.avm.tooling.AvmRule;
 import org.aion.avm.userlib.abi.ABIStreamingEncoder;
+import org.aion.kernel.TestingKernel;
 import org.aion.vm.api.interfaces.ResultCode;
-import org.junit.*;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 import org.spongycastle.util.encoders.Hex;
 
+import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.util.Scanner;
 
@@ -60,6 +64,60 @@ public class PoolRegistryTest {
         result = RULE.call(staker, poolRegistry, BigInteger.ZERO, txData);
 
         assertTrue(result.getReceiptStatus().isSuccess());
+    }
+
+    @Test
+    public void testPoolWorkflow() {
+        Address newPool = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+
+        // STEP-1 register a new staker
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("registerStaker")
+                .encodeOneAddress(newPool)
+                .encodeOneAddress(newPool)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(newPool, stakerRegistry, BigInteger.ZERO, txData);
+        ResultCode status = result.getReceiptStatus();
+        Assert.assertTrue(status.isSuccess());
+
+        // STEP-2 register a pool
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("registerPool")
+                .encodeOneByteArray("meta_data".getBytes())
+                .encodeOneInteger(4)
+                .toBytes();
+        result = RULE.call(newPool, poolRegistry, BigInteger.ZERO, txData);
+        status = result.getReceiptStatus();
+        Assert.assertTrue(status.isSuccess());
+        Address coinbaseAddress = (Address) result.getDecodedReturnData();
+
+        // STEP-3 set the coinbase address
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("setCoinbaseAddress")
+                .encodeOneAddress(coinbaseAddress)
+                .toBytes();
+        result = RULE.call(newPool, stakerRegistry, BigInteger.ZERO, txData);
+        status = result.getReceiptStatus();
+        Assert.assertTrue(status.isSuccess());
+
+        // STEP-4 update the listener
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("addListener")
+                .encodeOneAddress(poolRegistry)
+                .toBytes();
+        result = RULE.call(newPool, stakerRegistry, BigInteger.ZERO, txData);
+        status = result.getReceiptStatus();
+        Assert.assertTrue(status.isSuccess());
+
+        // verify now
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getPoolStatus")
+                .encodeOneAddress(newPool)
+                .toBytes();
+        result = RULE.call(newPool, poolRegistry, BigInteger.ZERO, txData);
+        status = result.getReceiptStatus();
+        Assert.assertTrue(status.isSuccess());
+        assertEquals("INITIALIZED", result.getDecodedReturnData());
     }
 
     @Test
@@ -141,6 +199,18 @@ public class PoolRegistryTest {
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
         assertEquals(stake.longValue() - unstake.longValue(), result.getDecodedReturnData());
+    }
+
+    private void tweakBlockNumber(long number) {
+        try {
+            Field f = TestingKernel.class.getDeclaredField("blockNumber");
+            f.setAccessible(true);
+
+            f.set(RULE.kernel, number);
+
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
 

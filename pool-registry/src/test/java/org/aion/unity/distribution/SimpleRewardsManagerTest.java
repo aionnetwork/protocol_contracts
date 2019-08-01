@@ -1,12 +1,11 @@
 package org.aion.unity.distribution;
 
 import avm.Address;
-import org.aion.unity.distribution.RewardsManager;
-import org.aion.unity.distribution.SimpleRewardsManager;
 import org.junit.Test;
 
 import java.math.BigInteger;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.aion.unity.distribution.RewardsManager.Event;
 import static org.aion.unity.distribution.RewardsManager.EventType;
