@@ -130,7 +130,7 @@ public class PoolRegistryTest {
                 .encodeOneAddress(staker)
                 .encodeOneLong(unstake.longValue())
                 .toBytes();
-         result = RULE.call(preminedAddress, poolRegistry, stake, txData);
+        result = RULE.call(preminedAddress, poolRegistry, stake, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()

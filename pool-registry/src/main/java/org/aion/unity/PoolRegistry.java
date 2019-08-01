@@ -14,12 +14,19 @@ import java.util.Map;
 /**
  * A stake delegation registry manages a list of registered pools, votes/un-votes on delegator's behalf, and
  * ensure the delegators receive its portion of the block rewards.
+ * <p>
+ * Workflow for pool operator:
+ * - Register a staker
+ * - Register the staker as a pool
+ * - Set the coinbase address to the one controlled by the pool registry
+ * - Regiter the pool registry as a listener to the staker
  */
 public class PoolRegistry {
 
     // TODO: replace object graph with key-value storage
     // TODO: add restriction to operations based on pool state
     // TODO: add reward manager
+    // TODO: add any necessary getters
 
     @Initializable
     private static Address stakerRegistry;
@@ -174,52 +181,68 @@ public class PoolRegistry {
 
     @Callable
     public static void onSigningAddressChange(Address staker, Address newSigningAddress) {
+        onlyStakerRegistry();
+        requireNonNull(newSigningAddress);
+
         // do nothing
     }
 
     @Callable
     public static void onCoinbaseAddressChange(Address staker, Address newCoinbaseAddress) {
-        // TODO: freeze pool when coinbase address is changed by the staker
-    }
-
-    @Callable
-    public static void onListenerAdded(Address staker, Address listener) {
-        byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("getCoinbaseAddress")
-                .encodeOneAddress(staker)
-                .toBytes();
-        Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
-        require(result.isSuccess());
-        Address coinbaseAddress = new Address(result.getReturnData());
+        onlyStakerRegistry();
+        requireNonNull(newCoinbaseAddress);
 
         PoolState ps = pools.get(staker);
-        requireNonNull(ps);
-
-        // the coinbase address has to be the reward collector
-        require(coinbaseAddress.equals(ps.coinbaseAddress));
-
-        // TODO: also check if this contract is a listener
-
-        // set the pool as activated
-        ps.initialized = true;
+        if (ps != null && !ps.coinbaseAddress.equals(newCoinbaseAddress)) {
+            freezePool(staker);
+        }
     }
 
     @Callable
-    public static void onListenerRemoved(Address staker, Address listener) {
-        // TODO: freeze pool if this contract is no longer a listener
+    public static void onListenerAdded(Address staker) {
+        onlyStakerRegistry();
+
+        PoolState ps = pools.get(staker);
+        if (ps != null && ps.status == PoolState.Status.NEW) {
+            byte[] txData = new ABIStreamingEncoder()
+                    .encodeOneString("getCoinbaseAddress")
+                    .encodeOneAddress(staker)
+                    .toBytes();
+            Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
+            require(result.isSuccess());
+            Address coinbaseAddress = new Address(result.getReturnData());
+
+            // the coinbase address has to be the reward collector
+            require(coinbaseAddress.equals(ps.coinbaseAddress));
+
+            // set the pool as activated
+            ps.status = PoolState.Status.INITIALIZED;
+        }
     }
 
-    // TODO: add bunch of getters
+    @Callable
+    public static void onListenerRemoved(Address staker) {
+        onlyStakerRegistry();
 
-    public static void require(boolean condition) {
+        PoolState ps = pools.get(staker);
+        if (ps != null) {
+            freezePool(staker);
+        }
+    }
+
+    private static void freezePool(Address pool) {
+        pools.get(pool).status = PoolState.Status.FREEZED;
+    }
+
+    private static void require(boolean condition) {
         Blockchain.require(condition);
     }
 
-    public static void requireNonNull(Object obj) {
+    private static void requireNonNull(Object obj) {
         require(obj != null);
     }
 
-    public static void requirePool(Address pool) {
+    private static void requirePool(Address pool) {
         require(pool != null && pools.containsKey(pool));
     }
 
@@ -229,6 +252,11 @@ public class PoolRegistry {
 
     private static void requirePositive(long num) {
         require(num > 0);
+    }
+
+    private static void onlyStakerRegistry() {
+        Address caller = Blockchain.getCaller();
+        require(caller.equals(stakerRegistry));
     }
 
     public static byte[] hexStringToByteArray(String s) {

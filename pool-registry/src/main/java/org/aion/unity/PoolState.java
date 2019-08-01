@@ -10,7 +10,9 @@ import java.util.Map;
  * Manages the state of a pool.
  */
 public class PoolState {
-    boolean initialized;
+    public enum Status {NEW, INITIALIZED, FREEZED};
+
+    Status status;
 
     Address stakerAddress;
     Address coinbaseAddress;
@@ -21,6 +23,7 @@ public class PoolState {
     Map<Address, BigInteger> delegators;
 
     public PoolState(Address stakerAddress, Address coinbaseAddress, byte[] metaData, int commissionRate) {
+        this.status = Status.NEW;
         this.stakerAddress = stakerAddress;
         this.coinbaseAddress = coinbaseAddress;
         this.metaData = metaData;

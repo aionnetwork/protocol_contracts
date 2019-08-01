@@ -6,6 +6,8 @@ import java.math.BigInteger;
 
 public interface StakerRegistryListener {
 
+    // TODO: analyze listener failure model
+
     /**
      * When the signing address of a staker is changed.
      *
@@ -22,7 +24,17 @@ public interface StakerRegistryListener {
      */
     void onCoinbaseAddressChange(Address staker, Address newCoinbaseAddress);
 
-    void onListenerAdded(Address staker, Address listener);
+    /**
+     * When this listener is added.
+     *
+     * @param staker the staker address
+     */
+    void onListenerAdded(Address staker);
 
-    void onListenerRemoved(Address staker, Address listener);
+    /**
+     * When this listener is removed.
+     *
+     * @param staker the staker address
+     */
+    void onListenerRemoved(Address staker);
 }

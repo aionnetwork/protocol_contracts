@@ -240,6 +240,7 @@ public class StakerRegistry {
     @Callable
     public static long getStake(Address staker, Address voter) {
         requireStaker(staker);
+        requireNonNull(voter);
 
         return getOrDefault(stakers.get(staker).stakes, voter, BigInteger.ZERO).longValue();
     }
@@ -279,11 +280,18 @@ public class StakerRegistry {
     public static void setSigningAddress(Address newSigningAddress) {
         Address caller = Blockchain.getCaller();
         requireStaker(caller);
+        requireNonNull(newSigningAddress);
 
         Staker s = stakers.get(caller);
-        long blockNumber = Blockchain.getBlockNumber();
+        if (newSigningAddress.equals(s.signingAddress)) {
+            return;
+        }
 
+        // check last update
+        long blockNumber = Blockchain.getBlockNumber();
         require(blockNumber >= s.lastAddressUpdate + ADDRESS_UPDATE_COOL_DOWN_PERIOD);
+
+        // check duplicated signing address
         require(!signingAddresses.containsKey(newSigningAddress));
 
         signingAddresses.put(newSigningAddress, caller);
@@ -309,10 +317,15 @@ public class StakerRegistry {
     public static void setCoinbaseAddress(Address newCoinbaseAddress) {
         Address caller = Blockchain.getCaller();
         requireStaker(caller);
+        requireNonNull(newCoinbaseAddress);
 
         Staker s = stakers.get(caller);
-        long blockNumber = Blockchain.getBlockNumber();
+        if (newCoinbaseAddress.equals(s.coinbaseAddress)) {
+            return;
+        }
 
+        // check last update
+        long blockNumber = Blockchain.getBlockNumber();
         require(blockNumber >= s.lastAddressUpdate + ADDRESS_UPDATE_COOL_DOWN_PERIOD);
 
         s.coinbaseAddress = newCoinbaseAddress;
@@ -333,14 +346,21 @@ public class StakerRegistry {
      * @param listener the address of the listener contract
      */
     @Callable
-    public static void registerListener(Address listener) {
+    public static void addListener(Address listener) {
         Address caller = Blockchain.getCaller();
-
         requireStaker(caller);
 
-        stakers.get(caller).listeners.add(listener);
+        Staker s = stakers.get(caller);
+        if (!s.listeners.contains(listener)) {
+            s.listeners.add(listener);
 
-        // TODO: notify listeners
+            // notify the listener
+            byte[] data = new ABIStreamingEncoder()
+                    .encodeOneString("onListenerAdded")
+                    .encodeOneAddress(caller)
+                    .toBytes();
+            secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+        }
     }
 
     /**
@@ -349,14 +369,35 @@ public class StakerRegistry {
      * @param listener the address of the listener contract
      */
     @Callable
-    public static void deregisterListener(Address listener) {
+    public static void removeListener(Address listener) {
         Address caller = Blockchain.getCaller();
-
         requireStaker(caller);
 
-        stakers.get(caller).listeners.remove(listener);
+        Staker s = stakers.get(caller);
+        if (s.listeners.contains(listener)) {
+            s.listeners.remove(listener);
 
-        // TODO: notify listeners
+            // notify the listener
+            byte[] data = new ABIStreamingEncoder()
+                    .encodeOneString("onListenerRemoved")
+                    .encodeOneAddress(caller)
+                    .toBytes();
+            secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+        }
+    }
+
+    /**
+     * Returns if the given listener is registered to the staker.
+     *
+     * @param staker   the staker address
+     * @param listener the listener address
+     */
+    @Callable
+    public static boolean isListener(Address staker, Address listener) {
+        requireStaker(staker);
+        requireNonNull(listener);
+
+        return stakers.get(staker).listeners.contains(listener);
     }
 
     private static void require(boolean condition) {
