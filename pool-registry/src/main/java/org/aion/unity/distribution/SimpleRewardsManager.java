@@ -2,10 +2,7 @@ package org.aion.unity.distribution;
 
 import avm.Address;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
+import java.util.*;
 
 public class SimpleRewardsManager extends RewardsManager {
 
@@ -26,9 +23,13 @@ public class SimpleRewardsManager extends RewardsManager {
         // 7. withdraw should not make my rewards balance negative
 
         ListIterator<Event> itr = events.listIterator();
+        HashSet<Address> addresses = new HashSet<>();
 
         while (itr.hasNext()) {
             Event x = itr.next();
+            if (x.source != null)
+                addresses.add(x.source);
+
             if (x.amount < 0)
                 throw new RuntimeException("Event amount is negative.");
 
@@ -103,14 +104,12 @@ public class SimpleRewardsManager extends RewardsManager {
             }
         }
 
-        Map<Address, Long> toReturnMap = new HashMap<>();
-        pendingRewardMap.forEach((k, v) -> {
-            if (withdrawnRewardMap.containsKey(k))
-                toReturnMap.put(k, v + withdrawnRewardMap.get(k));
-            else
-                toReturnMap.put(k, v);
-        });
-        return toReturnMap;
+        Map<Address, Long> rewards = new HashMap<>();
+        for (Address a : addresses) {
+            long v = pendingRewardMap.getOrDefault(a, 0L) + withdrawnRewardMap.getOrDefault(a, 0L);
+            rewards.put(a, v);
+        }
+        return rewards;
     }
 
     /**

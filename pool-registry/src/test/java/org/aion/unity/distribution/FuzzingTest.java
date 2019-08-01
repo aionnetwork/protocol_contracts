@@ -1,6 +1,7 @@
 package org.aion.unity.distribution;
 
 import avm.Address;
+import org.aion.unity.distribution.f1.F1RewardsManager;
 import org.junit.Test;
 
 import java.math.BigInteger;
@@ -45,13 +46,19 @@ public class FuzzingTest {
         RewardsManager acc = new AccRewardsManager();
         Map<Address, Long> r2 = acc.computeRewards(events);
 
+        RewardsManager f1 = new F1RewardsManager();
+        Map<Address, Long> r3 = f1.computeRewards(events);
+
         System.out.println(r0);
         System.out.println(r1);
         System.out.println(r2);
+        System.out.println(r3);
         double[] error1 = calcErrorSD(r0, r1);
         double[] error2 = calcErrorSD(r0, r2);
+        double[] error3 = calcErrorSD(r0, r3);
         System.out.printf("Error (DP): mean = %.2f%%, sd = %.2f%%\n", error1[0], error1[1]);
         System.out.printf("Error (Acc): mean = %.2f%%, sd = %.2f%%\n", error2[0], error2[1]);
+        System.out.printf("Error (F1): mean = %.2f%%, sd = %.2f%%\n", error3[0], error3[1]);
     }
 
     @Test
@@ -149,13 +156,19 @@ public class FuzzingTest {
         RewardsManager acc = new AccRewardsManager();
         Map<Address, Long> r2 = acc.computeRewards(events);
 
+        RewardsManager f1 = new F1RewardsManager();
+        Map<Address, Long> r3 = f1.computeRewards(events);
+
         System.out.println(r0);
         System.out.println(r1);
         System.out.println(r2);
+        System.out.println(r3);
         double[] error1 = calcErrorSD(r0, r1);
         double[] error2 = calcErrorSD(r0, r2);
+        double[] error3 = calcErrorSD(r0, r3);
         System.out.printf("Error (DP): mean = %.2f%%, sd = %.2f%%\n", error1[0], error1[1]);
         System.out.printf("Error (Acc): mean = %.2f%%, sd = %.2f%%\n", error2[0], error2[1]);
+        System.out.printf("Error (F1): mean = %.2f%%, sd = %.2f%%\n", error3[0], error3[1]);
     }
 
     private Address addressOf(int n) {
