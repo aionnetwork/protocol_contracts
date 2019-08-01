@@ -17,6 +17,9 @@ import java.util.Map;
  */
 public class PoolRegistry {
 
+    // TODO: add restriction to operations based on pool state
+    // TODO: add reward manager
+
     @Initializable
     private static Address stakerRegistry;
 
@@ -71,7 +74,20 @@ public class PoolRegistry {
      */
     @Callable
     public static void delegate(Address pool) {
+        Address caller = Blockchain.getCaller();
+        requirePool(pool);
+        BigInteger value = Blockchain.getValue();
+        requirePositive(value);
 
+        byte[] data = new ABIStreamingEncoder()
+                .encodeOneString("vote")
+                .encodeOneAddress(pool)
+                .toBytes();
+        secureCall(stakerRegistry, value, data, Blockchain.getRemainingEnergy());
+
+        PoolState ps = pools.get(pool);
+        BigInteger previousStake = getOrDefault(ps.delegators, caller, BigInteger.ZERO);
+        ps.delegators.put(caller, previousStake.add(value));
     }
 
     /**
@@ -82,7 +98,23 @@ public class PoolRegistry {
      */
     @Callable
     public static void undelegate(Address pool, long amount) {
+        Address caller = Blockchain.getCaller();
+        requirePool(pool);
+        requirePositive(amount);
 
+        PoolState ps = pools.get(pool);
+        BigInteger previousStake = getOrDefault(ps.delegators, caller, BigInteger.ZERO);
+        BigInteger amountBI = BigInteger.valueOf(amount);
+        require(previousStake.compareTo(amountBI) >= 0);
+        ps.delegators.put(caller, previousStake.subtract(amountBI));
+
+        byte[] data = new ABIStreamingEncoder()
+                .encodeOneString("unvoteTo")
+                .encodeOneAddress(pool)
+                .encodeOneLong(amount)
+                .encodeOneAddress(caller)
+                .toBytes();
+        secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
     }
 
     /**
@@ -104,7 +136,28 @@ public class PoolRegistry {
      */
     @Callable
     public static void transferStake(Address fromPool, Address toPool, long amount) {
+        Address caller = Blockchain.getCaller();
+        requirePool(fromPool);
+        requirePool(toPool);
+        requirePositive(amount);
 
+        PoolState ps1 = pools.get(fromPool);
+        BigInteger previousStake1 = getOrDefault(ps1.delegators, caller, BigInteger.ZERO);
+        PoolState ps2 = pools.get(fromPool);
+        BigInteger previousStake2 = getOrDefault(ps1.delegators, caller, BigInteger.ZERO);
+
+        BigInteger amountBI = BigInteger.valueOf(amount);
+        require(previousStake1.compareTo(amountBI) >= 0);
+        ps1.delegators.put(caller, previousStake1.subtract(amountBI));
+        ps2.delegators.put(caller, previousStake2.add(amountBI));
+
+        byte[] data = new ABIStreamingEncoder()
+                .encodeOneString("transferStake")
+                .encodeOneAddress(fromPool)
+                .encodeOneAddress(toPool)
+                .encodeOneLong(amount)
+                .toBytes();
+        secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
     }
 
     /**
@@ -120,12 +173,12 @@ public class PoolRegistry {
 
     @Callable
     public static void onSigningAddressChange(Address staker, Address newSigningAddress) {
-
+        // do nothing
     }
 
     @Callable
     public static void onCoinbaseAddressChange(Address staker, Address newCoinbaseAddress) {
-
+        // TODO: disable pool
     }
 
     @Callable
@@ -150,7 +203,7 @@ public class PoolRegistry {
 
     @Callable
     public static void onListenerRemoved(Address staker, Address listener) {
-
+        // TODO: disable pool if this contract is no longer a listener
     }
 
     // TODO: add bunch of getters
@@ -163,8 +216,20 @@ public class PoolRegistry {
         require(obj != null);
     }
 
+    public static void requirePool(Address pool) {
+        require(pool != null && pools.containsKey(pool));
+    }
+
+    private static void requirePositive(BigInteger num) {
+        require(num != null && num.compareTo(BigInteger.ZERO) > 0);
+    }
+
+    private static void requirePositive(long num) {
+        require(num > 0);
+    }
+
     public static byte[] hexStringToByteArray(String s) {
-        // make static
+        // TODO: make static
         int[] map = new int[256];
         int value = 0;
         for (char c : "0123456789abcdef".toCharArray()) {
@@ -178,5 +243,19 @@ public class PoolRegistry {
             result[i / 2] = (byte) ((map[chars[i]] << 4) + map[chars[i + 1]]);
         }
         return result;
+    }
+
+    private static void secureCall(Address targetAddress, BigInteger value, byte[] data, long energyLimit) {
+        Result result = Blockchain.call(targetAddress, value, data, energyLimit);
+        require(result.isSuccess());
+    }
+
+
+    private static <K, V> V getOrDefault(Map<K, V> map, K key, V defaultValue) {
+        if (map.containsKey(key)) {
+            return map.get(key);
+        } else {
+            return defaultValue;
+        }
     }
 }
