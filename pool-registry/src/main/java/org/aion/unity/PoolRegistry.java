@@ -209,6 +209,37 @@ public class PoolRegistry {
     }
 
     /**
+     * Returns the stake of a delegator to a pool.
+     *
+     * @param pool the pool address
+     * @param delegator the delegator address
+     * @return the amount of stake
+     */
+    @Callable
+    public static long getStake(Address pool, Address delegator) {
+        requirePool(pool);
+        requireNonNull(delegator);
+        requireNoValue();
+
+        return getOrDefault(pools.get(pool).delegators, delegator, BigInteger.ZERO).longValue();
+    }
+
+    /**
+     * Returns the outstanding rewards of a delegator.
+     *
+     * @param pool the pool address
+     * @param delegator the delegator address
+     * @return the amount of outstanding rewards
+     */
+    public static long getRewards(Address pool, Address delegator) {
+        requirePool(pool);
+        requireNonNull(delegator);
+        requireNoValue();
+
+        return pools.get(pool).rewards.getRewards(delegator, Blockchain.getBlockNumber());
+    }
+
+    /**
      * Withdraws rewards from one pool
      *
      * @param pool the pool address

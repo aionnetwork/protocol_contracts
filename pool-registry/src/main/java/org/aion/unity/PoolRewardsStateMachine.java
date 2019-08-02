@@ -115,6 +115,10 @@ public class PoolRewardsStateMachine {
     private long calculateUnsettledRewards(Address delegator, long blockNumber) {
         StartingInfo startingInfo = delegations.get(delegator);
 
+        if (startingInfo == null) {
+            return 0;
+        }
+
         // cannot calculate delegation rewards for blocks before stake was delegated
         assert (startingInfo.blockNumber <= blockNumber);
 
@@ -215,6 +219,13 @@ public class PoolRewardsStateMachine {
         outstandingRewards -= c;
 
         return c;
+    }
+
+    public long getRewards(Address delegator, long blockNumber) {
+        long unsettledRewards = calculateUnsettledRewards(delegator, blockNumber);
+        long settledRewards = getOrDefault(this.settledRewards, delegator, 0L);
+
+        return unsettledRewards + settledRewards;
     }
 
     public void onBlock(long blockNumber, long blockReward) {
