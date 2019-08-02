@@ -31,7 +31,7 @@ public class PoolRewardsStateMachine {
     Decimal prevCRR;
 
     long getWithdrawnRewards(Address delegator) {
-        return withdrawnRewards.getOrDefault(delegator, 0L);
+        return getOrDefault(withdrawnRewards, delegator, 0L);
     }
 
     // Initialize pool
@@ -58,7 +58,7 @@ public class PoolRewardsStateMachine {
         incrementPeriod();
         long rewards = calculateUnsettledRewards(delegator, blockNumber);
 
-        settledRewards.put(delegator, rewards + settledRewards.getOrDefault(delegator, 0L));
+        settledRewards.put(delegator, rewards + getOrDefault(settledRewards, delegator, 0L));
 
         StartingInfo startingInfo = delegations.get(delegator);
         long stake = startingInfo.stake;
@@ -162,13 +162,30 @@ public class PoolRewardsStateMachine {
         join(delegator, blockNumber, nextBond);
     }
 
+    public long onRevote(Address delegator, long blockNumber) {
+        long unbondedStake = 0;
+        if (delegations.containsKey(delegator)) {
+            // do a "leave-and-join"
+            unbondedStake = leave(delegator, blockNumber);
+        }
+
+        long rewards = getOrDefault(settledRewards, delegator, 0L);
+        settledRewards.remove(delegator);
+
+        if (unbondedStake + rewards > 0) {
+            join(delegator, blockNumber, unbondedStake + rewards);
+        }
+
+        return rewards;
+    }
+
     /**
      * Withdraw is all or nothing, since that is both simpler, implementation-wise and does not make
      * much sense for people to partially withdraw. The problem we run into is that if the amount requested
      * for withdraw, can be less than the amount settled, in which case, it's not obvious if we should perform
      * a settlement ("leave") or save on gas and just withdraw out the rewards.
      */
-    public void onWithdraw(Address delegator, long blockNumber) {
+    public long onWithdraw(Address delegator, long blockNumber) {
         if (delegations.containsKey(delegator)) {
             // do a "leave-and-join"
             long unbondedStake = leave(delegator, blockNumber);
@@ -178,11 +195,13 @@ public class PoolRewardsStateMachine {
         // if I don't see a delegation, then you must have been settled already.
 
         // now that all rewards owed to you are settled, you can withdraw them all at once
-        long rewards = settledRewards.getOrDefault(delegator, 0L);
+        long rewards = getOrDefault(settledRewards, delegator, 0L);
         settledRewards.remove(delegator);
 
-        withdrawnRewards.put(delegator, rewards + withdrawnRewards.getOrDefault(delegator, 0L));
+        withdrawnRewards.put(delegator, rewards + getOrDefault(withdrawnRewards, delegator, 0L));
         outstandingRewards -= rewards;
+
+        return rewards;
     }
 
     public long onWithdrawOperator() {
@@ -201,7 +220,15 @@ public class PoolRewardsStateMachine {
         accumulatedBlockRewards += blockReward;
     }
 
-    public static class StartingInfo {
+    private static <K, V> V getOrDefault(Map<K, V> map, K key, V defaultValue) {
+        if (map.containsKey(key)) {
+            return map.get(key);
+        } else {
+            return defaultValue;
+        }
+    }
+
+    private static class StartingInfo {
         public long stake;             // amount of coins being delegated
         public long blockNumber;       // block number at which delegation was created
         public Decimal crr;
