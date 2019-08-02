@@ -10,7 +10,7 @@ import java.util.Map;
  * Manages the state of a pool.
  */
 public class PoolState {
-    public enum Status {NEW, INITIALIZED, FREEZED};
+    public enum Status {NEW, INITIALIZED, FREEZED}
 
     Status status;
 
@@ -18,8 +18,9 @@ public class PoolState {
     Address coinbaseAddress;
 
     byte[] metaData;
-    int commissionRate;
 
+    // TODO: opportunity for optimization, duplicate delegator map
+    PoolRewardsStateMachine rewards;
     Map<Address, BigInteger> delegators;
 
     public PoolState(Address stakerAddress, Address coinbaseAddress, byte[] metaData, int commissionRate) {
@@ -27,9 +28,7 @@ public class PoolState {
         this.stakerAddress = stakerAddress;
         this.coinbaseAddress = coinbaseAddress;
         this.metaData = metaData;
-        this.commissionRate = commissionRate;
+        this.rewards = new PoolRewardsStateMachine(commissionRate);
         this.delegators = new AionMap<>();
     }
-
-    // TODO: implement rewards management
 }

@@ -45,8 +45,10 @@ public class PoolRegistryTest {
         }
 
         byte[] arguments = ABIUtil.encodeDeploymentArguments(stakerRegistry);
-        byte[] data = RULE.getDappBytes(PoolRegistry.class, arguments, PoolState.class);
-        poolRegistry = RULE.deploy(preminedAddress, BigInteger.ZERO, data).getDappAddress();
+        byte[] data = RULE.getDappBytes(PoolRegistry.class, arguments, PoolState.class, PoolRewardsStateMachine.class, Decimal.class);
+        AvmRule.ResultWrapper result = RULE.deploy(preminedAddress, BigInteger.ZERO, data);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        poolRegistry = result.getDappAddress();
 
         // register a staker
         staker = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
@@ -55,9 +57,8 @@ public class PoolRegistryTest {
                 .encodeOneAddress(staker)
                 .encodeOneAddress(staker)
                 .toBytes();
-        AvmRule.ResultWrapper result = RULE.call(staker, stakerRegistry, BigInteger.ZERO, txData);
-        ResultCode status = result.getReceiptStatus();
-        Assert.assertTrue(status.isSuccess());
+        result = RULE.call(staker, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue( result.getReceiptStatus().isSuccess());
 
         // register the staker as pool
         txData = ABIUtil.encodeMethodArguments("registerPool", new byte[0], 5);

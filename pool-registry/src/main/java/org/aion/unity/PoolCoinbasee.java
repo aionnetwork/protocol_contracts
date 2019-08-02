@@ -2,6 +2,7 @@ package org.aion.unity;
 
 import avm.Address;
 import avm.Blockchain;
+import avm.Result;
 import org.aion.avm.tooling.abi.Callable;
 import org.aion.avm.tooling.abi.Initializable;
 
@@ -18,16 +19,16 @@ public class PoolCoinbasee {
     private static Address poolRegistry;
 
     @Callable
-    public static void withdraw(long limit) {
-        Blockchain.require(limit > 0);
+    public static void transfer(Address recipient, long amount) {
+        // only the pool registry
         Blockchain.require(Blockchain.getCaller().equals(poolRegistry));
 
-        BigInteger toWithdraw = Blockchain.getBalance(Blockchain.getAddress());
-        BigInteger limitBI = BigInteger.valueOf(limit);
-        if (toWithdraw.compareTo(limitBI) > 0) {
-            toWithdraw = limitBI;
-        }
+        // sanity check
+        Blockchain.require(recipient != null);
+        Blockchain.require(amount > 0);
 
-        Blockchain.call(poolRegistry, toWithdraw, new byte[0], Blockchain.getRemainingEnergy());
+        // transfer
+        Result result = Blockchain.call(recipient, BigInteger.valueOf(amount), new byte[0], Blockchain.getRemainingEnergy());
+        Blockchain.require(result.isSuccess());
     }
 }
