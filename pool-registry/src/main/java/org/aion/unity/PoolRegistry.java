@@ -43,6 +43,7 @@ public class PoolRegistry {
 
     @Callable
     public static Address getStakerRegistry() {
+        requireNoValue();
         return stakerRegistry;
     }
 
@@ -58,6 +59,7 @@ public class PoolRegistry {
         // sanity check
         requireNonNull(metaData);
         require(commissionRate >= 0 && commissionRate <= 100);
+        requireNoValue();
 
         // the caller doesn't have to register a staker beforehand.
         Address caller = Blockchain.getCaller();
@@ -115,6 +117,7 @@ public class PoolRegistry {
         Address caller = Blockchain.getCaller();
         requirePool(pool);
         requirePositive(amount);
+        requireNoValue();
 
         detectBlockRewards(pool);
 
@@ -145,6 +148,7 @@ public class PoolRegistry {
     public static void redelegate(Address pool) {
         Address caller = Blockchain.getCaller();
         requirePool(pool);
+        requireNoValue();
 
         detectBlockRewards(pool);
 
@@ -176,6 +180,7 @@ public class PoolRegistry {
         requirePool(fromPool);
         requirePool(toPool);
         requirePositive(amount);
+        requireNoValue();
 
         detectBlockRewards(fromPool);
         detectBlockRewards(toPool);
@@ -212,6 +217,7 @@ public class PoolRegistry {
     public static long withdraw(Address pool) {
         Address caller = Blockchain.getCaller();
         requirePool(pool);
+        requireNoValue();
 
         detectBlockRewards(pool);
 
@@ -238,6 +244,7 @@ public class PoolRegistry {
     @Callable
     public static String getPoolStatus(Address pool) {
         requirePool(pool);
+        requireNoValue();
         return pools.get(pool).status.toString();
     }
 
@@ -245,6 +252,7 @@ public class PoolRegistry {
     public static void onSigningAddressChange(Address staker, Address newSigningAddress) {
         onlyStakerRegistry();
         requireNonNull(newSigningAddress);
+        requireNoValue();
 
         // do nothing
     }
@@ -253,6 +261,7 @@ public class PoolRegistry {
     public static void onCoinbaseAddressChange(Address staker, Address newCoinbaseAddress) {
         onlyStakerRegistry();
         requireNonNull(newCoinbaseAddress);
+        requireNoValue();
 
         PoolState ps = pools.get(staker);
         if (ps != null && !ps.coinbaseAddress.equals(newCoinbaseAddress)) {
@@ -263,6 +272,7 @@ public class PoolRegistry {
     @Callable
     public static void onListenerAdded(Address staker) {
         onlyStakerRegistry();
+        requireNoValue();
 
         PoolState ps = pools.get(staker);
         if (ps != null && ps.status == PoolState.Status.NEW) {
@@ -285,6 +295,7 @@ public class PoolRegistry {
     @Callable
     public static void onListenerRemoved(Address staker) {
         onlyStakerRegistry();
+        requireNoValue();
 
         PoolState ps = pools.get(staker);
         if (ps != null) {
@@ -303,6 +314,10 @@ public class PoolRegistry {
 
     private static void requireNonNull(Object obj) {
         require(obj != null);
+    }
+
+    private static void requireNoValue() {
+        require(Blockchain.getValue().equals(BigInteger.ZERO));
     }
 
     private static void requirePool(Address pool) {
