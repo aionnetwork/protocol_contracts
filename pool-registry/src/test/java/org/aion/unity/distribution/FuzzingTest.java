@@ -1,79 +1,67 @@
 package org.aion.unity.distribution;
 
 import avm.Address;
-import org.aion.unity.distribution.f1.F1RewardsManager;
 import org.junit.Test;
 
 import java.math.BigInteger;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import java.util.stream.DoubleStream;
+
+import static org.aion.unity.distribution.RewardsManager.Event;
+import static org.aion.unity.distribution.RewardsManager.Reward;
 
 public class FuzzingTest {
 
     @Test
     public void testVectorSimple() {
         final long REWARD = 5_000_000L;
+        final int poolFee = 2; // 2%
 
         // Generate test vector
         List<RewardsManager.Event> events = new ArrayList<>();
-        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(1), 1, 3400));
-        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(2), 1, 5700));
-        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(2), 2, 2000));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(1), 1, 3400L));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(2), 1, 5700L));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(2), 2, 2000L));
         events.add(new RewardsManager.Event(RewardsManager.EventType.BLOCK, null, 2, REWARD));
-        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(3), 3, 6000));
-        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(4), 4, 1500));
-        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(5), 4, 6000));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(3), 3, 6000L));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(4), 4, 1500L));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(5), 4, 6000L));
         events.add(new RewardsManager.Event(RewardsManager.EventType.BLOCK, null, 7, REWARD));
         events.add(new RewardsManager.Event(RewardsManager.EventType.BLOCK, null, 8, REWARD));
         events.add(new RewardsManager.Event(RewardsManager.EventType.BLOCK, null, 11, REWARD));
-        events.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, addressOf(2), 12, 8000));
-        events.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, addressOf(3), 12, 3500));
-        events.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, addressOf(4), 12, 500));
-        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(5), 12, 1200));
-        events.add(new RewardsManager.Event(RewardsManager.EventType.UNVOTE, addressOf(2), 12, 3000));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, addressOf(2), 12, null));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, addressOf(3), 12, null));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, addressOf(4), 12, null));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.VOTE, addressOf(5), 12, 1200L));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.UNVOTE, addressOf(2), 12, 3000L));
         events.add(new RewardsManager.Event(RewardsManager.EventType.BLOCK, null, 25, REWARD));
-        events.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, addressOf(5), 26, 5235));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, addressOf(5), 26, null));
         events.add(new RewardsManager.Event(RewardsManager.EventType.BLOCK, null, 32, REWARD));
-        events.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, addressOf(4), 36, 1068));
-        events.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, addressOf(5), 36, 1578));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, addressOf(4), 36, null));
+        events.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, addressOf(5), 36, null));
 
-        RewardsManager simple = new SimpleRewardsManager();
-        Map<Address, Long> r0 = simple.computeRewards(events);
-
-        RewardsManager dp = new DPRewardsManager();
-        Map<Address, Long> r1 = dp.computeRewards(events);
-
-        RewardsManager acc = new AccRewardsManager();
-        Map<Address, Long> r2 = acc.computeRewards(events);
-
-        RewardsManager f1 = new F1RewardsManager();
-        Map<Address, Long> r3 = f1.computeRewards(events);
-
-        System.out.println(r0);
-        System.out.println(r1);
-        System.out.println(r2);
-        System.out.println(r3);
-        double[] error1 = calcErrorSD(r0, r1);
-        double[] error2 = calcErrorSD(r0, r2);
-        double[] error3 = calcErrorSD(r0, r3);
-        System.out.printf("Error (DP): mean = %.2f%%, sd = %.2f%%\n", error1[0], error1[1]);
-        System.out.printf("Error (Acc): mean = %.2f%%, sd = %.2f%%\n", error2[0], error2[1]);
-        System.out.printf("Error (F1): mean = %.2f%%, sd = %.2f%%\n", error3[0], error3[1]);
+        printStats(events, poolFee);
     }
 
     @Test
     public void testVectorAutogen() {
         // generated vector
-        List<RewardsManager.Event> events = new ArrayList<>();
+        List<Event> events = new ArrayList<>();
 
         // system params
         int users = 1000;
         long maxUserBalance = 25000;
         long startBlock = 1;
-        long endBlock = 3000;
+        long endBlock = 10000;
         int maxActionsPerBlock = 3;
         long blockReward = 5_000_000L;
         float poolProbability = 0.8f; // pool's probability of winning a block.
+        int poolFee = 3; // 3%
 
         SimpleRewardsManager rm = new SimpleRewardsManager();
 
@@ -105,8 +93,7 @@ public class FuzzingTest {
                 } else {
                     // choose between withdraw, unvote or vote more, with 1/3 probability
                     int choice = getRandomInt(1, 3);
-                    Long stakedBalance = rm.getStakeMap().get(user);
-                    if (stakedBalance == null) stakedBalance = 0L;
+                    long stakedBalance = rm.getStakeMap().getOrDefault(user, 0L);
 
                     if (choice == 1) { // vote more
                         long remainingBalance = maxUserBalance - stakedBalance;
@@ -115,30 +102,22 @@ public class FuzzingTest {
                         if (stakedBalance > 0L)
                             v.add(new RewardsManager.Event(RewardsManager.EventType.UNVOTE, user, i, getRandomLong(1, stakedBalance)));
                     } else if (choice == 3 && stakedBalance > 0L) { // withdraw
-                        Long pendingRewards = rm.getPendingRewardMap().get(user);
-                        if (pendingRewards == null) pendingRewards = 0L;
+                        long pendingRewards = rm.getPendingRewardMap().getOrDefault(user, 0L);
 
-                        // with half probability, withdraw all or some fraction
-                        boolean withdrawAll = coinWithProbability(0.5f);
-                        if (pendingRewards > 0) {
-                            if (withdrawAll) {
-                                v.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, user, i, pendingRewards));
-                            } else {
-                                v.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, user, i, getRandomLong(1, pendingRewards)));
-                            }
-                        }
+                        if (pendingRewards > 0)
+                            v.add(new RewardsManager.Event(RewardsManager.EventType.WITHDRAW, user, i, null));
                     }
                 }
             }
 
             // decide if this block will be produced by this pool
-            if (coinWithProbability(poolProbability)) {
+            if (coinWithProbability(poolProbability) && rm.getTotalStake() > 0) {
                 v.add(new RewardsManager.Event(RewardsManager.EventType.BLOCK, null, i, blockReward));
             }
 
             // apply the rewards this round to the simple rewards manager
             try {
-                rm.computeRewards(v);
+                rm.computeRewards(v, poolFee);
             } catch (Exception e) {
                 System.out.println("Bad events-list constructed.");
             }
@@ -146,29 +125,26 @@ public class FuzzingTest {
             events.addAll(v);
         }
 
+        printStats(events, poolFee);
+    }
 
+    private void printStats(List<Event> events, int poolFee) {
         RewardsManager simple = new SimpleRewardsManager();
-        Map<Address, Long> r0 = simple.computeRewards(events);
+        Reward r0 = simple.computeRewards(events, poolFee);
 
-        RewardsManager dp = new DPRewardsManager();
-        Map<Address, Long> r1 = dp.computeRewards(events);
+        RewardsManager f2 = new F2RewardsManager();
+        Reward r2 = f2.computeRewards(events, poolFee);
 
-        RewardsManager acc = new AccRewardsManager();
-        Map<Address, Long> r2 = acc.computeRewards(events);
+        System.out.println("Simple Rewards Stats\n---------------------------------");
+        System.out.println(r0 + "\n");
 
-        RewardsManager f1 = new F1RewardsManager();
-        Map<Address, Long> r3 = f1.computeRewards(events);
+        System.out.println("F2 Stats\n---------------------------------");
+        System.out.println(r2 + "\n");
 
-        System.out.println(r0);
-        System.out.println(r1);
-        System.out.println(r2);
-        System.out.println(r3);
-        double[] error1 = calcErrorSD(r0, r1);
-        double[] error2 = calcErrorSD(r0, r2);
-        double[] error3 = calcErrorSD(r0, r3);
-        System.out.printf("Error (DP): mean = %.2f%%, sd = %.2f%%\n", error1[0], error1[1]);
-        System.out.printf("Error (Acc): mean = %.2f%%, sd = %.2f%%\n", error2[0], error2[1]);
-        System.out.printf("Error (F1): mean = %.2f%%, sd = %.2f%%\n", error3[0], error3[1]);
+        double[] error = calcErrorSD(r0.delegatorRewards, r2.delegatorRewards);
+
+        System.out.println("STD Comparison\n---------------------------------");
+        System.out.printf("Error (F2): mean = %.2f%%, sd = %.2f%%\n", error[0], error[1]);
     }
 
     private Address addressOf(int n) {
@@ -197,8 +173,8 @@ public class FuzzingTest {
     // assuming key sets are the same
     private double[] calcErrorSD(Map<Address, Long> base, Map<Address, Long> toCheck) {
         double[] errors = base.keySet().stream().mapToDouble(k -> {
-            Long v1 = base.getOrDefault(k, 0L);
-            Long v2 = toCheck.getOrDefault(k, 0L);
+            double v1 = base.getOrDefault(k, 0L);
+            double v2 = toCheck.getOrDefault(k, 0L);
             return 100.0 * Math.abs(v2 - v1) / v1;
         }).toArray();
 

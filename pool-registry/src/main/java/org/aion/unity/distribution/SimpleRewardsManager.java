@@ -2,7 +2,12 @@ package org.aion.unity.distribution;
 
 import avm.Address;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Set;
 
 public class SimpleRewardsManager extends RewardsManager {
 
@@ -11,8 +16,26 @@ public class SimpleRewardsManager extends RewardsManager {
     private Map<Address, Long> stakeMap = new HashMap<>();
     private Map<Address, Long> pendingRewardMap = new HashMap<>();
     private Map<Address, Long> withdrawnRewardMap = new HashMap<>();
+    Set<Address> addresses = new HashSet<>();
+    private long accumulatedCommission;
 
-    public Map<Address, Long> computeRewards(List<Event> events) throws RuntimeException {
+
+    void onWithdraw(Address source) {
+        if (!pendingRewardMap.containsKey(source))
+            return; // OK
+
+        long remaining = pendingRewardMap.get(source);
+
+        pendingRewardMap.remove(source);
+        rewardOutstanding -= remaining;
+
+        withdrawnRewardMap.put(source, withdrawnRewardMap.getOrDefault(source, 0L) + remaining);
+    }
+
+    @Override
+    public Reward computeRewards(List<Event> events, int fee) {
+        // ignore the fee for now ...
+
         // ASSUMPTIONS:
         // 1. all events are sorted by block number
         // 2. the block event is the last event for that particular block
@@ -23,18 +46,17 @@ public class SimpleRewardsManager extends RewardsManager {
         // 7. withdraw should not make my rewards balance negative
 
         ListIterator<Event> itr = events.listIterator();
-        HashSet<Address> addresses = new HashSet<>();
 
         while (itr.hasNext()) {
             Event x = itr.next();
-            if (x.source != null)
-                addresses.add(x.source);
-
-            if (x.amount < 0)
+            if (x.amount != null && x.amount < 0)
                 throw new RuntimeException("Event amount is negative.");
 
             if (itr.hasNext() && events.get(itr.nextIndex()).blockNumber < x.blockNumber)
                 throw new RuntimeException("Block numbers are NOT monotonically increasing");
+
+            if (x.type != EventType.BLOCK)
+                addresses.add(x.source);
 
             switch (x.type) {
                 case VOTE: {
@@ -58,21 +80,8 @@ public class SimpleRewardsManager extends RewardsManager {
                     break;
                 }
                 case WITHDRAW: {
-                    if (!pendingRewardMap.containsKey(x.source))
-                        throw new RuntimeException("Withdraw event called without any rewards balance.");
-
-                    long ns = pendingRewardMap.get(x.source) - x.amount;
-                    if (ns < 0) throw new RuntimeException("Un-vote event made stake balance negative.");
-
-                    pendingRewardMap.put(x.source, ns);
-                    rewardOutstanding -= x.amount;
-
-                    if (withdrawnRewardMap.containsKey(x.source)) {
-                        withdrawnRewardMap.put(x.source, withdrawnRewardMap.get(x.source) + x.amount);
-                    } else {
-                        withdrawnRewardMap.put(x.source, x.amount);
-                    }
-
+                    assert (x.amount == null);
+                    onWithdraw(x.source);
                     break;
                 }
                 case BLOCK: {
@@ -80,17 +89,23 @@ public class SimpleRewardsManager extends RewardsManager {
                         throw new RuntimeException("Block event is NOT the last event for contained in this block!");
 
                     // split the rewards for this block between the stakers who contributed to it.
-                    long blockReward = x.amount;
+                    @SuppressWarnings("ConstantConditions") long blockReward = x.amount;
+
+                    // deal with the block rewards
+                    double commission = (fee * blockReward) / 100d;
+                    double shared = blockReward - commission;
+
+                    accumulatedCommission += commission;
                     rewardOutstanding += blockReward;
 
                     // i need to compute the ratio of what is owed to each of the stakers
-                    Map<Address, Float> ratioOwed = new HashMap<>();
+                    Map<Address, Double> ratioOwed = new HashMap<>();
                     for (Map.Entry<Address, Long> s : stakeMap.entrySet()) {
-                        ratioOwed.put(s.getKey(), (float)s.getValue()/totalStake);
+                        ratioOwed.put(s.getKey(), s.getValue() / (double) totalStake);
                     }
 
-                    for (Map.Entry<Address, Float> r : ratioOwed.entrySet()) {
-                        long stakerReward = (long) Math.floor(blockReward * r.getValue());
+                    for (Map.Entry<Address, Double> r : ratioOwed.entrySet()) {
+                        long stakerReward = (long) (shared * r.getValue());
                         if (pendingRewardMap.containsKey(r.getKey())) {
                             pendingRewardMap.put(r.getKey(), pendingRewardMap.get(r.getKey()) + stakerReward);
                         } else {
@@ -104,39 +119,41 @@ public class SimpleRewardsManager extends RewardsManager {
             }
         }
 
-        Map<Address, Long> rewards = new HashMap<>();
+        Reward r = new Reward();
+
+        // finalize the owed + withdrawn rewards
+        Map<Address, Long> delegatorRewards = new HashMap<>();
         for (Address a : addresses) {
-            long v = pendingRewardMap.getOrDefault(a, 0L) + withdrawnRewardMap.getOrDefault(a, 0L);
-            rewards.put(a, v);
+            onWithdraw(a);
+            delegatorRewards.put(a, withdrawnRewardMap.getOrDefault(a, 0L));
         }
-        return rewards;
+
+        r.delegatorRewards = delegatorRewards;
+        r.outstandingRewards = rewardOutstanding;
+        r.operatorRewards = accumulatedCommission;
+
+        return r;
     }
 
-    /**
-     * @return clone of the stakeMap (local state)
-     */
     public Map<Address, Long> getStakeMap() {
         return new HashMap<>(stakeMap);
     }
 
-    /**
-     * @return clone of the pendingRewardMap (local state)
-     */
     public Map<Address, Long> getPendingRewardMap() {
         return new HashMap<>(pendingRewardMap);
     }
 
-    /**
-     * @return clone of the withdrawnRewardMap (local state)
-     */
+    @SuppressWarnings("unused")
     public Map<Address, Long> getWithdrawnRewardMap() {
         return new HashMap<>(withdrawnRewardMap);
     }
 
-    /**
-     * @return clone of the pendingRewardMap (local state)
-     */
+    @SuppressWarnings("unused")
     public long getRewardOutstanding() {
         return rewardOutstanding;
+    }
+
+    public long getTotalStake() {
+        return totalStake;
     }
 }
