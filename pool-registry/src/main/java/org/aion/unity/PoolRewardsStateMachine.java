@@ -8,7 +8,7 @@ import java.util.Map;
 
 public class PoolRewardsStateMachine {
     // pool variables
-    private final int fee; // 0-100%
+    private int fee; // 0-100%
 
     // state variables
     private long accumulatedStake; // stake accumulated in the pool
@@ -221,6 +221,12 @@ public class PoolRewardsStateMachine {
         return c;
     }
 
+    public void onBlock(long blockNumber, long blockReward) {
+        assert (blockNumber > 0 && blockReward > 0); // sanity check
+
+        accumulatedBlockRewards += blockReward;
+    }
+
     public long getRewards(Address delegator, long blockNumber) {
         long unsettledRewards = calculateUnsettledRewards(delegator, blockNumber);
         long settledRewards = getOrDefault(this.settledRewards, delegator, 0L);
@@ -228,10 +234,9 @@ public class PoolRewardsStateMachine {
         return unsettledRewards + settledRewards;
     }
 
-    public void onBlock(long blockNumber, long blockReward) {
-        assert (blockNumber > 0 && blockReward > 0); // sanity check
-
-        accumulatedBlockRewards += blockReward;
+    public void setCommissionRate(int newRate) {
+        incrementPeriod();
+        fee = newRate;
     }
 
     private static <K, V> V getOrDefault(Map<K, V> map, K key, V defaultValue) {

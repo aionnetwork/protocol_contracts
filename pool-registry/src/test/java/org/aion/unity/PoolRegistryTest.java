@@ -117,7 +117,7 @@ public class PoolRegistryTest {
         result = RULE.call(newPool, poolRegistry, BigInteger.ZERO, txData);
         status = result.getReceiptStatus();
         Assert.assertTrue(status.isSuccess());
-        assertEquals("INITIALIZED", result.getDecodedReturnData());
+        assertEquals("ACTIVE", result.getDecodedReturnData());
 
         return newPool;
     }

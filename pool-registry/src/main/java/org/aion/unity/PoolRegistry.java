@@ -20,7 +20,7 @@ import java.util.Map;
  * - Register a staker
  * - Register the staker as a pool
  * - Set the coinbase address to the one controlled by the pool registry
- * - Regiter the pool registry as a listener to the staker
+ * - Register the pool registry as a listener to the staker
  */
 public class PoolRegistry {
 
@@ -211,7 +211,7 @@ public class PoolRegistry {
     /**
      * Returns the stake of a delegator to a pool.
      *
-     * @param pool the pool address
+     * @param pool      the pool address
      * @param delegator the delegator address
      * @return the amount of stake
      */
@@ -227,7 +227,7 @@ public class PoolRegistry {
     /**
      * Returns the outstanding rewards of a delegator.
      *
-     * @param pool the pool address
+     * @param pool      the pool address
      * @param delegator the delegator address
      * @return the amount of outstanding rewards
      */
@@ -259,7 +259,7 @@ public class PoolRegistry {
             amount += ps.rewards.onWithdrawOperator();
         }
 
-        // do a transfer (TODO: limit the energy passing?)
+        // do a transfer
         if (amount > 0) {
             secureCall(caller, BigInteger.valueOf(amount), new byte[0], Blockchain.getRemainingEnergy());
         }
@@ -276,7 +276,7 @@ public class PoolRegistry {
     public static String getPoolStatus(Address pool) {
         requirePool(pool);
         requireNoValue();
-        return pools.get(pool).status.toString();
+        return pools.get(pool).isActive ? "ACTIVE" : "BROKEN";
     }
 
     @Callable
@@ -295,8 +295,18 @@ public class PoolRegistry {
         requireNoValue();
 
         PoolState ps = pools.get(staker);
-        if (ps != null && !ps.coinbaseAddress.equals(newCoinbaseAddress)) {
-            freezePool(staker);
+        if (ps != null) {
+            boolean isCoinbaseSetup = newCoinbaseAddress.equals(ps.coinbaseAddress);
+            boolean isListenerSetup = true;
+            boolean active = isCoinbaseSetup && isListenerSetup;
+
+            if (!ps.isActive && active) {
+                switchToActive(ps);
+            }
+
+            if (ps.isActive && !active) {
+                switchToBroken(ps);
+            }
         }
     }
 
@@ -306,7 +316,7 @@ public class PoolRegistry {
         requireNoValue();
 
         PoolState ps = pools.get(staker);
-        if (ps != null && ps.status == PoolState.Status.NEW) {
+        if (ps != null) {
             byte[] txData = new ABIStreamingEncoder()
                     .encodeOneString("getCoinbaseAddress")
                     .encodeOneAddress(staker)
@@ -315,11 +325,17 @@ public class PoolRegistry {
             require(result.isSuccess());
             Address coinbaseAddress = new ABIDecoder(result.getReturnData()).decodeOneAddress();
 
-            // the coinbase address has to be the reward collector
-            require(coinbaseAddress.equals(ps.coinbaseAddress));
+            boolean isCoinbaseSetup = coinbaseAddress.equals(ps.coinbaseAddress);
+            boolean isListenerSetup = true;
+            boolean active = isCoinbaseSetup && isListenerSetup;
 
-            // set the pool as activated
-            ps.status = PoolState.Status.INITIALIZED;
+            if (!ps.isActive && active) {
+                switchToActive(ps);
+            }
+
+            if (ps.isActive && !active) {
+                switchToBroken(ps);
+            }
         }
     }
 
@@ -330,13 +346,20 @@ public class PoolRegistry {
 
         PoolState ps = pools.get(staker);
         if (ps != null) {
-            freezePool(staker);
+            if (ps.isActive) {
+                switchToBroken(ps);
+            }
         }
     }
 
+    private static void switchToActive(PoolState ps) {
+        ps.isActive = true;
+        ps.rewards.setCommissionRate(ps.commissionRate);
+    }
 
-    private static void freezePool(Address pool) {
-        pools.get(pool).status = PoolState.Status.FREEZED;
+    private static void switchToBroken(PoolState ps) {
+        ps.isActive = false;
+        ps.rewards.setCommissionRate(0);
     }
 
     private static void require(boolean condition) {
