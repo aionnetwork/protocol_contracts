@@ -1,6 +1,7 @@
 package org.aion.unity;
 
 import avm.Address;
+import avm.Blockchain;
 import org.aion.avm.userlib.AionMap;
 
 import java.util.Map;
@@ -127,6 +128,8 @@ public class PoolRewardsStateMachine {
         Decimal startingCRR = startingInfo.crr;
         Decimal endingCRR = currentCRR;
         Decimal differenceCRR = endingCRR.subtract(startingCRR);
+
+        Blockchain.println("CCR: start = " + startingCRR + ", end = " + endingCRR + ", diff = " + differenceCRR);
 
         return differenceCRR.multiplyTruncate(Decimal.valueOf(stake)).getTruncated().longValueExact();
     }

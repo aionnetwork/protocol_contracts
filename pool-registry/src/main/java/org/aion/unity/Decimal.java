@@ -105,4 +105,9 @@ public class Decimal {
     private BigInteger chopPrecisionAndTruncate(BigInteger d) {
         return d.divide(precisionInt);
     }
+
+    @Override
+    public String toString() {
+        return Double.toString(value.doubleValue() / 10e18);
+    }
 }

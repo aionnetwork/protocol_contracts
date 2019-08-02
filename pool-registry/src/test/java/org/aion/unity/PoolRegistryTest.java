@@ -58,7 +58,7 @@ public class PoolRegistryTest {
                 .encodeOneAddress(staker)
                 .toBytes();
         result = RULE.call(staker, stakerRegistry, BigInteger.ZERO, txData);
-        Assert.assertTrue( result.getReceiptStatus().isSuccess());
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         // register the staker as pool
         txData = ABIUtil.encodeMethodArguments("registerPool", new byte[0], 5);
@@ -67,8 +67,7 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
     }
 
-    @Test
-    public void testPoolWorkflow() {
+    public Address setupNewPool() {
         Address newPool = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
 
         // STEP-1 register a new staker
@@ -119,6 +118,13 @@ public class PoolRegistryTest {
         status = result.getReceiptStatus();
         Assert.assertTrue(status.isSuccess());
         assertEquals("INITIALIZED", result.getDecodedReturnData());
+
+        return newPool;
+    }
+
+    @Test
+    public void testPoolWorkflow() {
+        setupNewPool();
     }
 
     @Test
@@ -200,6 +206,120 @@ public class PoolRegistryTest {
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
         assertEquals(stake.longValue() - unstake.longValue(), result.getDecodedReturnData());
+    }
+
+    @Test
+    public void testUserScenario1() {
+        Address pool = setupNewPool();
+        Address user1 = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+        Address user2 = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+
+        // User1 delegate 1 stake to the pool
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(user1, poolRegistry, BigInteger.ONE, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // User2 delegate 1 stake to the pool
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(user2, poolRegistry, BigInteger.ONE, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // The pool generates one block
+        generateBlock(pool, 5);
+
+        // User1 withdraw
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("withdraw")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(user1, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        Long amount = (Long) result.getDecodedReturnData();
+        assertEquals(2, amount.longValue());
+    }
+
+    @Test
+    public void testUserScenario2() {
+        Address pool = setupNewPool();
+        Address user1 = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+        Address user2 = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+
+        // User1 delegate 1 stake to the pool
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(user1, poolRegistry, BigInteger.ONE, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // User2 delegate 1 stake to the pool
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(user2, poolRegistry, BigInteger.ONE, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // The pool generates one block
+        generateBlock(pool, 5);
+
+        // User1 redelegate
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("redelegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(user1, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // The pool generates another block
+        generateBlock(pool, 5);
+
+        // User1 withdraw
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("withdraw")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(user1, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        Long amount = (Long) result.getDecodedReturnData();
+        assertEquals(3, amount.longValue()); // (1 + 2) / 4 * 5
+
+        // Check the stake owned by pool registry
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getStake")
+                .encodeOneAddress(pool)
+                .encodeOneAddress(poolRegistry)
+                .toBytes();
+        result = RULE.call(user1, stakerRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        Long stake = (Long) result.getDecodedReturnData();
+        assertEquals(1 + 1 + 2, stake.longValue());
+    }
+
+    private void generateBlock(Address pool, long blockRewards) {
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("getCoinbaseAddress")
+                .encodeOneAddress(pool)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        Address coinbaseAddress = (Address) result.getDecodedReturnData();
+        RULE.balanceTransfer(preminedAddress, coinbaseAddress, BigInteger.valueOf(blockRewards), 1_000_000L, 1);
+        incrementBlockNumber();
+    }
+
+    private long getBlockNumber() {
+        return RULE.kernel.getBlockNumber();
+    }
+
+    private void incrementBlockNumber() {
+        tweakBlockNumber(getBlockNumber() + 1);
     }
 
     private void tweakBlockNumber(long number) {

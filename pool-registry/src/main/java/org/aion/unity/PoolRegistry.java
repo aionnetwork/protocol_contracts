@@ -26,7 +26,6 @@ public class PoolRegistry {
 
     // TODO: replace object graph with key-value storage
     // TODO: add restriction to operations based on pool state
-    // TODO: add reward manager
     // TODO: add any necessary getters
     // TODO: allow pool operator to update meta data and commission rate
     // TODO: replace long with BigInteger
@@ -159,6 +158,8 @@ public class PoolRegistry {
                     .encodeOneAddress(pool)
                     .toBytes();
             secureCall(stakerRegistry, BigInteger.valueOf(newStake), data, Blockchain.getRemainingEnergy());
+
+            Blockchain.println("re-vote: " + newStake);
         }
     }
 
@@ -208,7 +209,7 @@ public class PoolRegistry {
      * @param pool the pool address
      */
     @Callable
-    public static void withdraw(Address pool) {
+    public static long withdraw(Address pool) {
         Address caller = Blockchain.getCaller();
         requirePool(pool);
 
@@ -225,6 +226,7 @@ public class PoolRegistry {
         if (amount > 0) {
             secureCall(caller, BigInteger.valueOf(amount), new byte[0], Blockchain.getRemainingEnergy());
         }
+        return amount;
     }
 
     /**
@@ -364,6 +366,8 @@ public class PoolRegistry {
             secureCall(ps.coinbaseAddress, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
 
             ps.rewards.onBlock(Blockchain.getBlockNumber(), balance.longValue());
+
+            Blockchain.println("New block rewards: " + balance);
         }
     }
 }
