@@ -139,7 +139,7 @@ public class PoolRegistryTest {
     @Test
     public void testPoolCoinbaseContract() {
         byte[] arguments = ABIUtil.encodeDeploymentArguments(new Address(new byte[32]));
-        byte[] data = RULE.getDappBytes(PoolCoinbasee.class, arguments);
+        byte[] data = RULE.getDappBytes(PoolCoinbase.class, arguments);
         System.out.println(Hex.toHexString(data));
         System.out.println(data.length);
     }

@@ -1,6 +1,6 @@
 # Aion Unity Contracts
 
-This is a reference implementation of smart contracts for Aion Unitys.
+This is a reference implementation of smart contracts for Aion Unity.
 
 
 ## To Build

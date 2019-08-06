@@ -11,7 +11,7 @@ import java.math.BigInteger;
 /**
  * A dummy contract to collect block rewards.
  */
-public class PoolCoinbasee {
+public class PoolCoinbase {
 
     // TODO: replace long with BigInteger
 
