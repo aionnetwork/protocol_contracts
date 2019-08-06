@@ -24,7 +24,7 @@ import java.util.Map;
  */
 public class PoolRegistry {
 
-    // TODO: replace object graph with key-value storage
+    // TODO: replace object graph-based collections with key-value storage
     // TODO: add restriction to operations based on pool state
     // TODO: add any necessary getters
     // TODO: allow pool operator to update meta data and commission rate
@@ -230,7 +230,7 @@ public class PoolRegistry {
     /**
      * Returns the owner's stake to a pool.
      *
-     * @param pool      the pool address
+     * @param pool the pool address
      * @return the amount of stake
      */
     @Callable
@@ -245,7 +245,7 @@ public class PoolRegistry {
     /**
      * Returns the total stake of a pool.
      *
-     * @param pool      the pool address
+     * @param pool the pool address
      * @return the amount of stake
      */
     @Callable
@@ -283,8 +283,23 @@ public class PoolRegistry {
         secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
     }
 
+    /**
+     * Returns the auto-redelegation fee set by the delegator, or -1 if not set.
+     *
+     * @param pool      the pool's address
+     * @param delegator the delegator's address
+     * @return the fee in percentage, or -1
+     */
     @Callable
-    public static void enableAutoDelegation(Address pool, int feePercentage) {
+    public static int getAutoRedelegationFee(Address pool, Address delegator) {
+        requirePool(pool);
+        requireNoValue();
+
+        return getOrDefault(pools.get(pool).autoDelegator, delegator, -1);
+    }
+
+    @Callable
+    public static void enableAutoRedelegation(Address pool, int feePercentage) {
         requirePool(pool);
         require(feePercentage >= 0 && feePercentage <= 100);
         requireNoValue();
@@ -293,7 +308,7 @@ public class PoolRegistry {
     }
 
     @Callable
-    public static void disableAutoDelegation(Address pool) {
+    public static void disableAutoRedelegation(Address pool) {
         requirePool(pool);
         requireNoValue();
 
@@ -301,7 +316,7 @@ public class PoolRegistry {
     }
 
     @Callable
-    public static void autoDelegate(Address pool, Address delegator) {
+    public static void autoRedelegate(Address pool, Address delegator) {
         requirePool(pool);
         requireNonNull(delegator);
         requireNoValue();

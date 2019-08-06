@@ -223,7 +223,7 @@ public class PoolRegistryTest {
 
         // enable auto delegation with 50% fee
         txData = new ABIStreamingEncoder()
-                .encodeOneString("enableAutoDelegation")
+                .encodeOneString("enableAutoRedelegation")
                 .encodeOneAddress(pool)
                 .encodeOneInteger(20)
                 .toBytes();
@@ -236,7 +236,7 @@ public class PoolRegistryTest {
         // some third party triggers the auto delegation
         Address random = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
         txData = new ABIStreamingEncoder()
-                .encodeOneString("autoDelegate")
+                .encodeOneString("autoRedelegate")
                 .encodeOneAddress(pool)
                 .encodeOneAddress(preminedAddress)
                 .toBytes();

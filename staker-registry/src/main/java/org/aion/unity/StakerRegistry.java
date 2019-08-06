@@ -23,7 +23,7 @@ public class StakerRegistry {
     // TODO: replace long with BigInteger once the ABI supports it.
     // TODO: add stake vs nAmp conversion.
     // TODO: implement MIN_STAKE to prevent attacker from trying multiple keys to get eligible for free.
-    // TODO: replace hash graph with key-value storage for dynamic collections.
+    // TODO: replace object graph-based collections with key-value storage.
 
     public static final long STAKE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
     public static final long ADDRESS_UPDATE_COOL_DOWN_PERIOD = 6 * 60 * 24 * 7;
@@ -149,7 +149,7 @@ public class StakerRegistry {
 
     /**
      * Transfers stake from one staker to another staker.
-     *
+     * <p>
      * TODO: attack vector - attacker may move their stake between accounts to maximize the profits
      *
      * @param fromStaker the address of the staker to transfer stake from
