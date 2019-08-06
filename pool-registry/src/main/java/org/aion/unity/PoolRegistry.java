@@ -85,9 +85,12 @@ public class PoolRegistry {
      */
     @Callable
     public static void delegate(Address pool) {
+        delegate(pool, Blockchain.getValue());
+    }
+
+    private static void delegate(Address pool, BigInteger value) {
         Address caller = Blockchain.getCaller();
         requirePool(pool);
-        BigInteger value = Blockchain.getValue();
         requirePositive(value);
 
         detectBlockRewards(pool);
@@ -250,6 +253,7 @@ public class PoolRegistry {
     public static void releaseStake(Address owner, int limit) {
         requireNonNull(owner);
         requirePositive(limit);
+        requireNoValue();
 
         byte[] data = new ABIStreamingEncoder()
                 .encodeOneString("releaseStake")
@@ -257,6 +261,56 @@ public class PoolRegistry {
                 .encodeOneInteger(limit)
                 .toBytes();
         secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+    }
+
+    @Callable
+    public static void enableAutoDelegation(Address pool, int feePercentage) {
+        requirePool(pool);
+        require(feePercentage >= 0 && feePercentage <= 100);
+        requireNoValue();
+
+        pools.get(pool).autoDelegator.put(Blockchain.getCaller(), feePercentage);
+    }
+
+    @Callable
+    public static void disableAutoDelegation(Address pool) {
+        requirePool(pool);
+        requireNoValue();
+
+        pools.get(pool).autoDelegator.remove(Blockchain.getCaller());
+    }
+
+    @Callable
+    public static void autoDelegate(Address pool, Address delegator) {
+        requirePool(pool);
+        requireNonNull(delegator);
+        requireNoValue();
+
+        detectBlockRewards(pool);
+
+        PoolState ps = pools.get(pool);
+        require(ps.autoDelegator.containsKey(delegator));
+
+        // do a withdraw
+        long amount = ps.rewards.onWithdraw(delegator, Blockchain.getBlockNumber());
+        if (delegator.equals(ps.stakerAddress)) {
+            amount += ps.rewards.onWithdrawOperator();
+        }
+
+        Blockchain.println("Auto delegation: rewards = " + amount);
+
+        if (amount > 0) {
+            long fee = amount * ps.autoDelegator.get(delegator) / 100;
+            long remaining = amount - fee;
+
+            Blockchain.println("Auto delegation: fee = " + fee + ", remaining = " + remaining);
+
+            // transfer fee to the caller
+            secureCall(Blockchain.getCaller(), BigInteger.valueOf(fee), new byte[0], Blockchain.getRemainingEnergy());
+
+            // use the remaining rewards to delegate
+            delegate(pool, BigInteger.valueOf(remaining));
+        }
     }
 
     /**

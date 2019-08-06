@@ -150,6 +150,8 @@ public class StakerRegistry {
     /**
      * Transfers stake from one staker to another staker.
      *
+     * TODO: attack vector - attacker may move their stake between accounts to maximize the profits
+     *
      * @param fromStaker the address of the staker to transfer stake from
      * @param toStaker   the address of the staker to transfer stake to
      * @param amount     the amount of stake

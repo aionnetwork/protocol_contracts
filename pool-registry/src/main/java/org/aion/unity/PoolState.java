@@ -22,6 +22,7 @@ public class PoolState {
     // TODO: opportunity for optimization, duplicate delegator map
     PoolRewardsStateMachine rewards;
     Map<Address, BigInteger> delegators;
+    Map<Address, Integer> autoDelegator;
 
     public PoolState(Address stakerAddress, Address coinbaseAddress, byte[] metaData, int commissionRate) {
         this.isActive = false;
@@ -32,5 +33,6 @@ public class PoolState {
 
         this.rewards = new PoolRewardsStateMachine(0);
         this.delegators = new AionMap<>();
+        this.autoDelegator = new AionMap<>();
     }
 }

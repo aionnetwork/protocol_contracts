@@ -67,7 +67,7 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
     }
 
-    public Address setupNewPool() {
+    public Address setupNewPool(int fee) {
         Address newPool = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
 
         // STEP-1 register a new staker
@@ -84,7 +84,7 @@ public class PoolRegistryTest {
         txData = new ABIStreamingEncoder()
                 .encodeOneString("registerPool")
                 .encodeOneByteArray("meta_data".getBytes())
-                .encodeOneInteger(4)
+                .encodeOneInteger(fee)
                 .toBytes();
         result = RULE.call(newPool, poolRegistry, BigInteger.ZERO, txData);
         status = result.getReceiptStatus();
@@ -124,7 +124,7 @@ public class PoolRegistryTest {
 
     @Test
     public void testPoolWorkflow() {
-        setupNewPool();
+        setupNewPool(10);
     }
 
     @Test
@@ -209,8 +209,54 @@ public class PoolRegistryTest {
     }
 
     @Test
+    public void testAutoDelegate() {
+        Address pool = setupNewPool(4);
+        BigInteger stake = BigInteger.TEN;
+
+        // delegate 10 stake
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(preminedAddress, poolRegistry, stake, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // enable auto delegation with 50% fee
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("enableAutoDelegation")
+                .encodeOneAddress(pool)
+                .encodeOneInteger(20)
+                .toBytes();
+        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // produce a block
+        generateBlock(pool, 100);
+
+        // some third party triggers the auto delegation
+        Address random = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("autoDelegate")
+                .encodeOneAddress(pool)
+                .encodeOneAddress(preminedAddress)
+                .toBytes();
+        result = RULE.call(random, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // query the stake of the delegator
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getStake")
+                .encodeOneAddress(pool)
+                .encodeOneAddress(poolRegistry)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        assertEquals(10L + (96 - 96 * 20 / 100), result.getDecodedReturnData());
+    }
+
+    @Test
     public void testUserScenario1() {
-        Address pool = setupNewPool();
+        Address pool = setupNewPool(4);
         Address user1 = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
         Address user2 = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
 
@@ -246,7 +292,7 @@ public class PoolRegistryTest {
 
     @Test
     public void testUserScenario2() {
-        Address pool = setupNewPool();
+        Address pool = setupNewPool(4);
         Address user1 = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
         Address user2 = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
 
