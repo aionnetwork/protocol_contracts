@@ -243,6 +243,26 @@ public class PoolRegistry {
     }
 
     /**
+     * Returns the total stake of a pool.
+     *
+     * @param pool      the pool address
+     * @return the amount of stake
+     */
+    @Callable
+    public static long getTotalStake(Address pool) {
+        requirePool(pool);
+        requireNoValue();
+
+        byte[] data = new ABIStreamingEncoder()
+                .encodeOneString("getStakeByStakerAddress")
+                .encodeOneAddress(pool)
+                .toBytes();
+        Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+        require(result.isSuccess());
+        return new ABIDecoder(result.getReturnData()).decodeOneLong();
+    }
+
+    /**
      * Releases the stake (locked coin) to the owner.
      *
      * @param owner the owner address

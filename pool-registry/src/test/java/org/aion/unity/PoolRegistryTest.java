@@ -348,6 +348,83 @@ public class PoolRegistryTest {
         assertEquals(1 + 1 + 2, stake.longValue());
     }
 
+    @Test
+    public void testSelfStake() {
+        Address pool = setupNewPool(4);
+        Address delegator = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+
+        // delegator stake 1 wei
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(delegator, poolRegistry, BigInteger.ONE, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // pool stake 1 wei
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, BigInteger.ONE, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // query the total stake of the pool
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getTotalStake")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        Long stake = (Long) result.getDecodedReturnData();
+        assertEquals(2L, stake.longValue());
+
+        // query the self stake of the pool
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getSelfStake")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+          stake = (Long) result.getDecodedReturnData();
+        assertEquals(1L, stake.longValue());
+    }
+
+    @Test
+    public void testTearDownPool() {
+        Address pool = setupNewPool(5);
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("removeListener")
+                .encodeOneAddress(poolRegistry)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(pool, stakerRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getPoolStatus")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        assertEquals("BROKEN", result.getDecodedReturnData());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("addListener")
+                .encodeOneAddress(poolRegistry)
+                .toBytes();
+        result = RULE.call(pool, stakerRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getPoolStatus")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        assertEquals("ACTIVE", result.getDecodedReturnData());
+    }
+
     private void generateBlock(Address pool, long blockRewards) {
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("getCoinbaseAddress")

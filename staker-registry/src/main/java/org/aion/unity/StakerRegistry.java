@@ -248,6 +248,16 @@ public class StakerRegistry {
     }
 
     /**
+     * Returns the stake from the staker itself.
+     *
+     * @param staker the address of staker
+     * @return the amount of stake
+     */
+    public static long getSelfStake(Address staker) {
+        return getStake(staker, staker);
+    }
+
+    /**
      * Returns the signing address of a staker.
      *
      * @param staker the address of the staker.
