@@ -225,6 +225,41 @@ public class PoolRegistry {
     }
 
     /**
+     * Returns the owner's stake to a pool.
+     *
+     * @param pool      the pool address
+     * @return the amount of stake
+     */
+    @Callable
+    public static long getSelfStake(Address pool) {
+        requirePool(pool);
+        requireNoValue();
+
+        PoolState ps = pools.get(pool);
+        return getOrDefault(ps.delegators, ps.stakerAddress, BigInteger.ZERO).longValue();
+    }
+
+    /**
+     * Releases the stake (locked coin) to the owner.
+     *
+     * @param owner the owner address
+     * @param limit the max number of limited coins to process
+     * @return the number of locked coins released, not the amount
+     */
+    @Callable
+    public static void releaseStake(Address owner, int limit) {
+        requireNonNull(owner);
+        requirePositive(limit);
+
+        byte[] data = new ABIStreamingEncoder()
+                .encodeOneString("releaseStake")
+                .encodeOneAddress(owner)
+                .encodeOneInteger(limit)
+                .toBytes();
+        secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+    }
+
+    /**
      * Returns the outstanding rewards of a delegator.
      *
      * @param pool      the pool address
