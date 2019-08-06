@@ -21,7 +21,7 @@ import java.util.Set;
 public class StakerRegistry {
 
     // TODO: replace long with BigInteger once the ABI supports it.
-    // TODO: add stake vs nAmp conversion.
+    // TODO: add stake vs nAmp conversion, presumably 1 AION = 1 STAKE.
     // TODO: implement MIN_STAKE to prevent attacker from trying multiple keys to get eligible for free.
     // TODO: replace object graph-based collections with key-value storage.
 
@@ -206,6 +206,20 @@ public class StakerRegistry {
         }
 
         return count;
+    }
+
+    @Callable
+    public static long getUnvotingStake(Address owner) {
+        requireNonNull(owner);
+
+        List<LockedCoin> coins = getOrDefault(lockedCoins, owner, new AionList<>());
+
+        BigInteger total = BigInteger.ZERO;
+        for (LockedCoin coin : coins) {
+            total = total.add(coin.value);
+        }
+
+        return total.longValue();
     }
 
     /**
