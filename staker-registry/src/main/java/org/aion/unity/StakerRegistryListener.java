@@ -35,4 +35,12 @@ public interface StakerRegistryListener {
      * @param staker the staker address
      */
     void onListenerRemoved(Address staker);
+
+    /**
+     * When a slashing is applied to a staker.
+     *
+     * @param staker the staker's address
+     * @param stake the amount of stake being slashed
+     */
+    void onSlashing(Address staker, long stake);
 }

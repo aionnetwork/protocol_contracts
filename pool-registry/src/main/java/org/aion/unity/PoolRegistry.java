@@ -476,6 +476,12 @@ public class PoolRegistry {
         }
     }
 
+    @Callable
+    public static void onSlashing(Address staker, long stake) {
+
+    }
+
+
     private static void switchToActive(PoolState ps) {
         ps.isActive = true;
         ps.rewards.setCommissionRate(ps.commissionRate);
