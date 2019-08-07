@@ -369,6 +369,16 @@ public class PoolRegistry {
         }
     }
 
+    @Callable
+    public static void delegateAndEnableAutoRedelegation(Address pool, int fee) {
+        requirePool(pool);
+        requirePositive(Blockchain.getValue());
+        require(fee >= 0 && fee <= 100);
+
+        delegate(pool, Blockchain.getValue());
+        enableAutoRedelegation(pool, fee);
+    }
+
     /**
      * Returns the outstanding rewards of a delegator.
      *
