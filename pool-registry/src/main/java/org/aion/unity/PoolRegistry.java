@@ -265,19 +265,19 @@ public class PoolRegistry {
     /**
      * Finalize up to {@code limit} number of un-vote operations, for the given address
      *
-     * @param owner the owner's address
-     * @param limit the max number of un-vote operations
+     * @param delegator the delegator's address
+     * @param limit     the max number of un-vote operations
      * @return the number of un-votes finalized
      */
     @Callable
-    public static void finalizeUnvote(Address owner, int limit) {
-        requireNonNull(owner);
+    public static void finalizeUnvote(Address delegator, int limit) {
+        requireNonNull(delegator);
         requirePositive(limit);
         requireNoValue();
 
         byte[] data = new ABIStreamingEncoder()
                 .encodeOneString("finalizeUnvote")
-                .encodeOneAddress(owner)
+                .encodeOneAddress(delegator)
                 .encodeOneInteger(limit)
                 .toBytes();
         secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());

@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A staker registry manages the staker registration, and provides an interface for coin-holders
+ * A staker registry manages the staker registration, and provides an interface for voters
  * to vote/unvote for a staker.
  */
 public class StakerRegistry {
@@ -66,9 +66,9 @@ public class StakerRegistry {
     private static Map<Address, Staker> stakers = new AionMap<>();
     private static Map<Address, Address> signingAddresses = new AionMap<>();
 
-    // Map: coin-holder -> un-vote(s)
+    // Map: voter -> un-vote(s)
     private static Map<Address, List<TimestampedValue>> pendingUnvotes = new AionMap<>();
-    // Map: coin-holder -> staker -> transfer(s)
+    // Map: voter -> staker -> transfer(s)
     private static Map<Address, Map<Address, List<TimestampedValue>>> pendingTransfers = new AionMap<>();
 
     /**
@@ -113,7 +113,7 @@ public class StakerRegistry {
 
     /**
      * Unvotes for a staker. After a successful unvote, the locked coins will be released
-     * to the original owners, subject to lock-up period.
+     * to the original voters, subject to lock-up period.
      *
      * @param staker the address of the staker
      * @param amount the amount of stake
@@ -190,16 +190,16 @@ public class StakerRegistry {
     /**
      * Finalize up to {@code limit} un-vote operations, for the given address
      *
-     * @param owner the owner address
+     * @param voter the voter address
      * @param limit the max number of un-votes
      * @return the number of un-votes finalized
      */
     @Callable
-    public static int finalizeUnvote(Address owner, int limit) {
-        requireNonNull(owner);
+    public static int finalizeUnvote(Address voter, int limit) {
+        requireNonNull(voter);
         requirePositive(limit);
 
-        List<TimestampedValue> unvotes = getOrDefault(pendingUnvotes, owner, new AionList<>());
+        List<TimestampedValue> unvotes = getOrDefault(pendingUnvotes, voter, new AionList<>());
         long blockNumber = Blockchain.getBlockNumber();
 
         int count = 0;
@@ -207,7 +207,7 @@ public class StakerRegistry {
             TimestampedValue unvote = unvotes.get(i);
 
             if (blockNumber >= unvote.createdAt + UNVOTE_LOCK_UP_PERIOD) {
-                secureCall(owner, unvote.value, new byte[0], Blockchain.getRemainingEnergy());
+                secureCall(voter, unvote.value, new byte[0], Blockchain.getRemainingEnergy());
                 count++;
             } else {
                 break;
@@ -253,14 +253,30 @@ public class StakerRegistry {
 
 
     @Callable
-    public static long getUnvotingStake(Address owner) {
-        requireNonNull(owner);
+    public static long getUnvotingStake(Address voter) {
+        requireNonNull(voter);
 
-        List<TimestampedValue> coins = getOrDefault(pendingUnvotes, owner, new AionList<>());
+        List<TimestampedValue> unvotes = getOrDefault(pendingUnvotes, voter, new AionList<>());
 
         BigInteger total = BigInteger.ZERO;
-        for (TimestampedValue coin : coins) {
-            total = total.add(coin.value);
+        for (TimestampedValue unvote : unvotes) {
+            total = total.add(unvote.value);
+        }
+
+        return total.longValue();
+    }
+
+    @Callable
+    public static long getTransferingStake(Address staker) {
+        Address caller = Blockchain.getCaller();
+        requireStaker(staker);
+
+        Map<Address, List<TimestampedValue>> transfersMap = getOrDefault(pendingTransfers, caller, new AionMap<>());
+        List<TimestampedValue> transfers = getOrDefault(transfersMap, staker, new AionList<>());
+
+        BigInteger total = BigInteger.ZERO;
+        for (TimestampedValue transfer : transfers) {
+            total = total.add(transfer.value);
         }
 
         return total.longValue();
