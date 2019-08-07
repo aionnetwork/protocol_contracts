@@ -168,6 +168,7 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         status = result.getReceiptStatus();
+        long id = (long) result.getDecodedReturnData();
         Assert.assertTrue(status.isSuccess());
 
         // tweak the block number to skip the TRANSFER_LOCK_UP_PERIOD
@@ -176,8 +177,7 @@ public class StakerRegistryTest {
         // the recipient staker needs to finalize the transfer
         txData = new ABIStreamingEncoder()
                 .encodeOneString("finalizeTransfer")
-                .encodeOneAddress(stakerAddress2)
-                .encodeOneInteger(Integer.MAX_VALUE)
+                .encodeOneLong(id)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         status = result.getReceiptStatus();
@@ -288,19 +288,17 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         status = result.getReceiptStatus();
+        long id = (long) result.getDecodedReturnData();
         Assert.assertTrue(status.isSuccess());
-
 
         // now try to release
         txData = new ABIStreamingEncoder()
                 .encodeOneString("finalizeUnvote")
-                .encodeOneAddress(preminedAddress)
-                .encodeOneInteger(100)
+                .encodeOneLong(id)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         status = result.getReceiptStatus();
-        Assert.assertTrue(status.isSuccess());
-        Assert.assertEquals(0, result.getDecodedReturnData());
+        Assert.assertFalse(status.isSuccess());
 
         // tweak the block number
         tweakBlockNumber(1L + StakerRegistry.UNVOTE_LOCK_UP_PERIOD);
@@ -308,13 +306,11 @@ public class StakerRegistryTest {
         // and, query again
         txData = new ABIStreamingEncoder()
                 .encodeOneString("finalizeUnvote")
-                .encodeOneAddress(preminedAddress)
-                .encodeOneInteger(100)
+                .encodeOneLong(id)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         status = result.getReceiptStatus();
         Assert.assertTrue(status.isSuccess());
-        Assert.assertEquals(1, result.getDecodedReturnData());
     }
 
     public void tweakBlockNumber(long number) {

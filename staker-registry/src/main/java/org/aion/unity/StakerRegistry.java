@@ -4,13 +4,11 @@ import avm.Address;
 import avm.Blockchain;
 import avm.Result;
 import org.aion.avm.tooling.abi.Callable;
-import org.aion.avm.userlib.AionList;
 import org.aion.avm.userlib.AionMap;
 import org.aion.avm.userlib.AionSet;
 import org.aion.avm.userlib.abi.ABIStreamingEncoder;
 
 import java.math.BigInteger;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -53,23 +51,39 @@ public class StakerRegistry {
         }
     }
 
-    private static class TimestampedValue {
+    private static class PendingUnvote {
+        private Address to;
         private BigInteger value;
-        private long createdAt;
+        private long blockNumber;
 
-        public TimestampedValue(BigInteger value, long createdAt) {
+        public PendingUnvote(Address to, BigInteger value, long blockNumber) {
+            this.to = to;
             this.value = value;
-            this.createdAt = createdAt;
+            this.blockNumber = blockNumber;
+        }
+    }
+
+    private static class PendingTransfer {
+        private Address from;
+        private Address to;
+        private BigInteger value;
+        private long blockNumber;
+
+        public PendingTransfer(Address from, Address to, BigInteger value, long blockNumber) {
+            this.from = from;
+            this.to = to;
+            this.value = value;
+            this.blockNumber = blockNumber;
         }
     }
 
     private static Map<Address, Staker> stakers = new AionMap<>();
     private static Map<Address, Address> signingAddresses = new AionMap<>();
 
-    // Map: voter -> un-vote(s)
-    private static Map<Address, List<TimestampedValue>> pendingUnvotes = new AionMap<>();
-    // Map: voter -> staker -> transfer(s)
-    private static Map<Address, Map<Address, List<TimestampedValue>>> pendingTransfers = new AionMap<>();
+    private static long nextUnvote = 0;
+    private static Map<Long, PendingUnvote> pendingUnvotes = new AionMap<>();
+    private static long nextTransfer = 0;
+    private static Map<Long, PendingTransfer> pendingTransfers = new AionMap<>();
 
     /**
      * Registers a staker. The caller address will be the identification
@@ -117,10 +131,11 @@ public class StakerRegistry {
      *
      * @param staker the address of the staker
      * @param amount the amount of stake
+     * @return a pending unvote identity
      */
     @Callable
-    public static void unvote(Address staker, long amount) {
-        unvoteTo(staker, amount, Blockchain.getCaller());
+    public static long unvote(Address staker, long amount) {
+        return unvoteTo(staker, amount, Blockchain.getCaller());
     }
 
     /**
@@ -129,9 +144,10 @@ public class StakerRegistry {
      * @param staker   the address of the staker
      * @param amount   the amount of stake
      * @param receiver the receiving addresss
+     * @return a pending unvote identifier
      */
     @Callable
-    public static void unvoteTo(Address staker, long amount, Address receiver) {
+    public static long unvoteTo(Address staker, long amount, Address receiver) {
         Address caller = Blockchain.getCaller();
 
         requireStaker(staker);
@@ -147,9 +163,11 @@ public class StakerRegistry {
         s.totalStake = s.totalStake.subtract(amountBI);
         putOrRemove(s.stakes, caller, previousStake.subtract(amountBI));
 
-        List<TimestampedValue> unvotes = getOrDefault(pendingUnvotes, receiver, new AionList<>());
-        unvotes.add(new TimestampedValue(amountBI, Blockchain.getBlockNumber()));
-        pendingUnvotes.put(receiver, unvotes);
+        long id = nextUnvote++;
+        PendingUnvote unvote = new PendingUnvote(receiver, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
+        pendingUnvotes.put(id, unvote);
+
+        return id;
     }
 
     /**
@@ -160,126 +178,75 @@ public class StakerRegistry {
      * @param fromStaker the address of the staker to transfer stake from
      * @param toStaker   the address of the staker to transfer stake to
      * @param amount     the amount of stake
+     * @return a pending transfer identifier
      */
     @Callable
-    public static void transferStake(Address fromStaker, Address toStaker, long amount) {
+    public static long transferStake(Address fromStaker, Address toStaker, long amount) {
         Address caller = Blockchain.getCaller();
 
         requireStaker(fromStaker);
         requireStaker(toStaker);
         requirePositive(amount);
 
-        Staker s1 = stakers.get(fromStaker);
-        Staker s2 = stakers.get(toStaker);
-        BigInteger previousStake1 = getOrDefault(s1.stakes, caller, BigInteger.ZERO);
-        BigInteger previousStake2 = getOrDefault(s2.stakes, caller, BigInteger.ZERO);
+        Staker s = stakers.get(fromStaker);
+        BigInteger previousStake = getOrDefault(s.stakes, caller, BigInteger.ZERO);
         BigInteger amountBI = BigInteger.valueOf(amount);
 
-        require(amountBI.compareTo(previousStake1) <= 0);
+        require(amountBI.compareTo(previousStake) <= 0);
 
-        s1.totalStake = s1.totalStake.subtract(amountBI);
-        putOrRemove(s1.stakes, caller, previousStake1.subtract(amountBI));
+        s.totalStake = s.totalStake.subtract(amountBI);
+        putOrRemove(s.stakes, caller, previousStake.subtract(amountBI));
 
-        Map<Address, List<TimestampedValue>> transfersMap = getOrDefault(pendingTransfers, caller, new AionMap<>());
-        List<TimestampedValue> transfers = getOrDefault(transfersMap, toStaker, new AionList<>());
-        transfers.add(new TimestampedValue(amountBI, Blockchain.getBlockNumber()));
-        transfersMap.put(toStaker, transfers);
-        pendingTransfers.put(caller, transfersMap);
+        long id = nextTransfer++;
+        PendingTransfer transfer = new PendingTransfer(caller, toStaker, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
+        pendingTransfers.put(id, transfer);
+
+        return id;
     }
 
     /**
-     * Finalize up to {@code limit} un-vote operations, for the given address
+     * Finalizes an un-vote operations.
      *
-     * @param voter the voter address
-     * @param limit the max number of un-votes
-     * @return the number of un-votes finalized
+     * @param id pending unvote identifier
      */
     @Callable
-    public static int finalizeUnvote(Address voter, int limit) {
-        requireNonNull(voter);
-        requirePositive(limit);
+    public static void finalizeUnvote(long id) {
+        PendingUnvote unvote = pendingUnvotes.get(id);
+        requireNonNull(unvote);
 
-        List<TimestampedValue> unvotes = getOrDefault(pendingUnvotes, voter, new AionList<>());
-        long blockNumber = Blockchain.getBlockNumber();
+        // lock-up period check
+        require(Blockchain.getBlockNumber() >= unvote.blockNumber + UNVOTE_LOCK_UP_PERIOD);
 
-        int count = 0;
-        for (int i = 0; i < unvotes.size() && i < limit; i++) {
-            TimestampedValue unvote = unvotes.get(i);
+        pendingUnvotes.remove(id);
 
-            if (blockNumber >= unvote.createdAt + UNVOTE_LOCK_UP_PERIOD) {
-                secureCall(voter, unvote.value, new byte[0], Blockchain.getRemainingEnergy());
-                count++;
-            } else {
-                break;
-            }
-        }
-
-        return count;
+        // do a transfer
+        secureCall(unvote.to, unvote.value, new byte[0], Blockchain.getRemainingEnergy());
     }
 
     /**
-     * Finalize up to {@code limit} transfer operations, to the given staker, for the caller.
+     * Finalizes a transfer operations.
      *
-     * @param limit the max number of transfers to finalize
-     * @return the number of transfers finalized
+     * @param id pending transfer identifier
      */
     @Callable
-    public static int finalizeTransfer(Address staker, int limit) {
-        Address caller = Blockchain.getCaller();
-        requireStaker(staker);
-        requirePositive(limit);
+    public static void finalizeTransfer(long id) {
+        PendingTransfer transfer = pendingTransfers.get(id);
+        requireNonNull(transfer);
 
-        Map<Address, List<TimestampedValue>> transfersMap = getOrDefault(pendingTransfers, caller, new AionMap<>());
-        List<TimestampedValue> transfers = getOrDefault(transfersMap, staker, new AionList<>());
-        long blockNumber = Blockchain.getBlockNumber();
+        // only the sender can finalize the transfer, mainly because
+        // the pool registry needs to keep track of this.
+        // more consideration is required.
+        require(Blockchain.getCaller().equals(transfer.from));
 
-        Staker s = stakers.get(staker);
-        int count = 0;
-        for (int i = 0; i < transfers.size() && i < limit; i++) {
-            TimestampedValue transfer = transfers.get(i);
+        // lock-up period check
+        require(Blockchain.getBlockNumber() >= transfer.blockNumber + TRANSFER_LOCK_UP_PERIOD);
 
-            if (blockNumber >= transfer.createdAt + TRANSFER_LOCK_UP_PERIOD) {
-                BigInteger previousStake = getOrDefault(s.stakes, caller, BigInteger.ZERO);
-                s.totalStake = s.totalStake.add(transfer.value);
-                putOrRemove(s.stakes, caller, previousStake.add(transfer.value));
-                count++;
-            } else {
-                break;
-            }
-        }
+        pendingTransfers.remove(id);
 
-        return count;
-    }
-
-
-    @Callable
-    public static long getUnvotingStake(Address voter) {
-        requireNonNull(voter);
-
-        List<TimestampedValue> unvotes = getOrDefault(pendingUnvotes, voter, new AionList<>());
-
-        BigInteger total = BigInteger.ZERO;
-        for (TimestampedValue unvote : unvotes) {
-            total = total.add(unvote.value);
-        }
-
-        return total.longValue();
-    }
-
-    @Callable
-    public static long getTransferingStake(Address staker) {
-        Address caller = Blockchain.getCaller();
-        requireStaker(staker);
-
-        Map<Address, List<TimestampedValue>> transfersMap = getOrDefault(pendingTransfers, caller, new AionMap<>());
-        List<TimestampedValue> transfers = getOrDefault(transfersMap, staker, new AionList<>());
-
-        BigInteger total = BigInteger.ZERO;
-        for (TimestampedValue transfer : transfers) {
-            total = total.add(transfer.value);
-        }
-
-        return total.longValue();
+        Staker s = stakers.get(transfer.to);
+        BigInteger previousStake = getOrDefault(s.stakes, transfer.from, BigInteger.ZERO);
+        s.totalStake = s.totalStake.add(transfer.value);
+        putOrRemove(s.stakes, transfer.from, previousStake.add(transfer.value));
     }
 
     /**

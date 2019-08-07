@@ -116,7 +116,7 @@ public class PoolRegistry {
      * @param amount the amount of stake to undelegate
      */
     @Callable
-    public static void undelegate(Address pool, long amount) {
+    public static long undelegate(Address pool, long amount) {
         Address caller = Blockchain.getCaller();
         requirePool(pool);
         requirePositive(amount);
@@ -136,10 +136,14 @@ public class PoolRegistry {
                 .encodeOneLong(amount)
                 .encodeOneAddress(caller)
                 .toBytes();
-        secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+        Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+        require(result.isSuccess());
+        long id = new ABIDecoder(result.getReturnData()).decodeOneLong();
 
         // update rewards state machine
         ps.rewards.onUnvote(caller, Blockchain.getBlockNumber(), amount);
+
+        return id;
     }
 
     /**
@@ -170,15 +174,30 @@ public class PoolRegistry {
         }
     }
 
+    private static class Transfer {
+        Address from;
+        Address to;
+        long amount;
+
+        public Transfer(Address from, Address to, long amount) {
+            this.from = from;
+            this.to = to;
+            this.amount = amount;
+        }
+    }
+
+    private static Map<Long, Transfer> transfers = new AionMap<>();
+
     /**
      * Transfers stake from one pool to another.
      *
      * @param fromPool the from pool address
      * @param toPool   the to pool address
      * @param amount   the amount of stake to transfer
+     * @return the pending transfer id
      */
     @Callable
-    public static void transferStake(Address fromPool, Address toPool, long amount) {
+    public static long transferStake(Address fromPool, Address toPool, long amount) {
         Address caller = Blockchain.getCaller();
         requirePool(fromPool);
         requirePool(toPool);
@@ -188,15 +207,15 @@ public class PoolRegistry {
         detectBlockRewards(fromPool);
         detectBlockRewards(toPool);
 
-        PoolState ps1 = pools.get(fromPool);
-        BigInteger previousStake1 = getOrDefault(ps1.delegators, caller, BigInteger.ZERO);
-        PoolState ps2 = pools.get(fromPool);
-        BigInteger previousStake2 = getOrDefault(ps1.delegators, caller, BigInteger.ZERO);
+        PoolState ps = pools.get(fromPool);
+        BigInteger previousStake1 = getOrDefault(ps.delegators, caller, BigInteger.ZERO);
 
         BigInteger amountBI = BigInteger.valueOf(amount);
         require(previousStake1.compareTo(amountBI) >= 0);
-        ps1.delegators.put(caller, previousStake1.subtract(amountBI));
-        ps2.delegators.put(caller, previousStake2.add(amountBI));
+        ps.delegators.put(caller, previousStake1.subtract(amountBI));
+
+        // update rewards state machine
+        ps.rewards.onUnvote(caller, Blockchain.getBlockNumber(), amount);
 
         byte[] data = new ABIStreamingEncoder()
                 .encodeOneString("transferStake")
@@ -204,11 +223,13 @@ public class PoolRegistry {
                 .encodeOneAddress(toPool)
                 .encodeOneLong(amount)
                 .toBytes();
-        secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+        Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+        require(result.isSuccess());
 
-        // update rewards state machine
-        ps1.rewards.onUnvote(caller, Blockchain.getBlockNumber(), amount);
-        ps2.rewards.onVote(caller, Blockchain.getBlockNumber(), amount);
+        long id = new ABIDecoder(result.getReturnData()).decodeOneLong();
+        transfers.put(id, new Transfer(caller, toPool, amount));
+
+        return id;
     }
 
     /**
@@ -263,45 +284,45 @@ public class PoolRegistry {
     }
 
     /**
-     * Finalize up to {@code limit} number of un-vote operations, for the given address
+     * Finalizes an un-vote operation
      *
-     * @param delegator the delegator's address
-     * @param limit     the max number of un-vote operations
-     * @return the number of un-votes finalized
+     * @param id pending unvote id
      */
     @Callable
-    public static void finalizeUnvote(Address delegator, int limit) {
-        requireNonNull(delegator);
-        requirePositive(limit);
+    public static void finalizeUnvote(long id) {
         requireNoValue();
 
         byte[] data = new ABIStreamingEncoder()
                 .encodeOneString("finalizeUnvote")
-                .encodeOneAddress(delegator)
-                .encodeOneInteger(limit)
+                .encodeOneLong(id)
                 .toBytes();
         secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
     }
 
     /**
-     * Finalize up to {@code limit} transfer operations, for the caller.
+     * Finalizes a transfer operation
      *
-     * @param pool  the pool's address
-     * @param limit the max number of transfers to finalize
-     * @return the number of transfers finalized
+     * @param id pending transfer id
      */
     @Callable
-    public static void finalizeTransfer(Address pool, int limit) {
-        requirePool(pool);
-        requirePositive(limit);
+    public static void finalizeTransfer(long id) {
         requireNoValue();
+
+        require(transfers.containsKey(id));
+
+        Transfer transfer = transfers.remove(id);
 
         byte[] data = new ABIStreamingEncoder()
                 .encodeOneString("finalizeTransfer")
-                .encodeOneAddress(pool)
-                .encodeOneInteger(limit)
+                .encodeOneLong(id)
                 .toBytes();
         secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+
+        PoolState ps = pools.get(transfer.to);
+        BigInteger previousStake = getOrDefault(ps.delegators, transfer.from, BigInteger.ZERO);
+        ps.delegators.put(transfer.from, previousStake.add(BigInteger.valueOf(transfer.amount)));
+
+        ps.rewards.onVote(transfer.from, Blockchain.getBlockNumber(), transfer.amount);
     }
 
     /**

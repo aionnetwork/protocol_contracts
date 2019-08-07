@@ -196,6 +196,7 @@ public class PoolRegistryTest {
                 .encodeOneLong(unstake.longValue())
                 .toBytes();
         result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
+        long id = (long) result.getDecodedReturnData();
         assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()
@@ -206,6 +207,16 @@ public class PoolRegistryTest {
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
         assertEquals(stake.longValue() - unstake.longValue(), result.getDecodedReturnData());
+
+        tweakBlockNumber(getBlockNumber() +  6 * 60 * 24 * 7);
+
+        // release the pending unvote
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("finalizeUnvote")
+                .encodeOneLong(id)
+                .toBytes();
+        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
     }
 
     @Test
@@ -229,15 +240,15 @@ public class PoolRegistryTest {
                 .encodeOneAddress(pool2)
                 .encodeOneLong(1)
                 .toBytes();
-         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        long id = (long) result.getDecodedReturnData();
         assertTrue(result.getReceiptStatus().isSuccess());
 
         // bump block number and finalize the transfer
         tweakBlockNumber(1 + 6 * 10);
         txData = new ABIStreamingEncoder()
                 .encodeOneString("finalizeTransfer")
-                .encodeOneAddress(pool2)
-                .encodeOneInteger(Integer.MAX_VALUE)
+                .encodeOneLong(id)
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
@@ -433,7 +444,7 @@ public class PoolRegistryTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
-          stake = (Long) result.getDecodedReturnData();
+        stake = (Long) result.getDecodedReturnData();
         assertEquals(1L, stake.longValue());
     }
 
