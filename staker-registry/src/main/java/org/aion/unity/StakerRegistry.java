@@ -25,8 +25,9 @@ public class StakerRegistry {
     // TODO: implement MIN_STAKE to prevent attacker from trying multiple keys to get eligible for free.
     // TODO: replace object graph-based collections with key-value storage.
 
-    public static final long STAKE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
-    public static final long ADDRESS_UPDATE_COOL_DOWN_PERIOD = 6 * 60 * 24 * 7;
+    public static final long SIGNING_ADDRESS_COOL_DOWN_PERIOD = 6 * 60 * 24 * 7;
+    public static final long UNVOTE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
+    public static final long TRANSFER_LOCK_UP_PERIOD = 6 * 10;
 
     private static class Staker {
         private Address signingAddress;
@@ -52,11 +53,11 @@ public class StakerRegistry {
         }
     }
 
-    private static class LockedCoin {
+    private static class TimestampedValue {
         private BigInteger value;
         private long createdAt;
 
-        public LockedCoin(BigInteger value, long createdAt) {
+        public TimestampedValue(BigInteger value, long createdAt) {
             this.value = value;
             this.createdAt = createdAt;
         }
@@ -64,7 +65,11 @@ public class StakerRegistry {
 
     private static Map<Address, Staker> stakers = new AionMap<>();
     private static Map<Address, Address> signingAddresses = new AionMap<>();
-    private static Map<Address, List<LockedCoin>> lockedCoins = new AionMap<>();
+
+    // Map: coin-holder -> un-vote(s)
+    private static Map<Address, List<TimestampedValue>> pendingUnvotes = new AionMap<>();
+    // Map: coin-holder -> staker -> transfer(s)
+    private static Map<Address, Map<Address, List<TimestampedValue>>> pendingTransfers = new AionMap<>();
 
     /**
      * Registers a staker. The caller address will be the identification
@@ -142,9 +147,9 @@ public class StakerRegistry {
         s.totalStake = s.totalStake.subtract(amountBI);
         putOrRemove(s.stakes, caller, previousStake.subtract(amountBI));
 
-        List<LockedCoin> coins = getOrDefault(lockedCoins, receiver, new AionList<>());
-        coins.add(new LockedCoin(amountBI, Blockchain.getBlockNumber()));
-        lockedCoins.put(receiver, coins);
+        List<TimestampedValue> unvotes = getOrDefault(pendingUnvotes, receiver, new AionList<>());
+        unvotes.add(new TimestampedValue(amountBI, Blockchain.getBlockNumber()));
+        pendingUnvotes.put(receiver, unvotes);
     }
 
     /**
@@ -175,30 +180,34 @@ public class StakerRegistry {
         s1.totalStake = s1.totalStake.subtract(amountBI);
         putOrRemove(s1.stakes, caller, previousStake1.subtract(amountBI));
 
-        s2.totalStake = s2.totalStake.add(amountBI);
-        putOrRemove(s2.stakes, caller, previousStake2.add(amountBI));
+        Map<Address, List<TimestampedValue>> transfersMap = getOrDefault(pendingTransfers, caller, new AionMap<>());
+        List<TimestampedValue> transfers = getOrDefault(transfersMap, toStaker, new AionList<>());
+        transfers.add(new TimestampedValue(amountBI, Blockchain.getBlockNumber()));
+        transfersMap.put(toStaker, transfers);
+        pendingTransfers.put(caller, transfersMap);
     }
 
     /**
-     * Releases the stake (locked coin) to the owner.
+     * Finalize up to {@code limit} un-vote operations, for the given address
      *
      * @param owner the owner address
-     * @param limit the max number of limited coins to process
-     * @return the number of locked coins released, not the amount
+     * @param limit the max number of un-votes
+     * @return the number of un-votes finalized
      */
     @Callable
-    public static int releaseStake(Address owner, int limit) {
+    public static int finalizeUnvote(Address owner, int limit) {
         requireNonNull(owner);
         requirePositive(limit);
 
-        List<LockedCoin> coins = getOrDefault(lockedCoins, owner, new AionList<>());
+        List<TimestampedValue> unvotes = getOrDefault(pendingUnvotes, owner, new AionList<>());
         long blockNumber = Blockchain.getBlockNumber();
 
         int count = 0;
-        for (int i = 0; i < coins.size() && i < limit; i++) {
-            LockedCoin coin = coins.get(i);
-            if (blockNumber >= coin.createdAt + STAKE_LOCK_UP_PERIOD) {
-                secureCall(owner, coin.value, new byte[0], Blockchain.getRemainingEnergy());
+        for (int i = 0; i < unvotes.size() && i < limit; i++) {
+            TimestampedValue unvote = unvotes.get(i);
+
+            if (blockNumber >= unvote.createdAt + UNVOTE_LOCK_UP_PERIOD) {
+                secureCall(owner, unvote.value, new byte[0], Blockchain.getRemainingEnergy());
                 count++;
             } else {
                 break;
@@ -208,14 +217,49 @@ public class StakerRegistry {
         return count;
     }
 
+    /**
+     * Finalize up to {@code limit} transfer operations, to the given staker, for the caller.
+     *
+     * @param limit the max number of transfers to finalize
+     * @return the number of transfers finalized
+     */
+    @Callable
+    public static int finalizeTransfer(Address staker, int limit) {
+        Address caller = Blockchain.getCaller();
+        requireStaker(staker);
+        requirePositive(limit);
+
+        Map<Address, List<TimestampedValue>> transfersMap = getOrDefault(pendingTransfers, caller, new AionMap<>());
+        List<TimestampedValue> transfers = getOrDefault(transfersMap, staker, new AionList<>());
+        long blockNumber = Blockchain.getBlockNumber();
+
+        Staker s = stakers.get(staker);
+        int count = 0;
+        for (int i = 0; i < transfers.size() && i < limit; i++) {
+            TimestampedValue transfer = transfers.get(i);
+
+            if (blockNumber >= transfer.createdAt + TRANSFER_LOCK_UP_PERIOD) {
+                BigInteger previousStake = getOrDefault(s.stakes, caller, BigInteger.ZERO);
+                s.totalStake = s.totalStake.add(transfer.value);
+                putOrRemove(s.stakes, caller, previousStake.add(transfer.value));
+                count++;
+            } else {
+                break;
+            }
+        }
+
+        return count;
+    }
+
+
     @Callable
     public static long getUnvotingStake(Address owner) {
         requireNonNull(owner);
 
-        List<LockedCoin> coins = getOrDefault(lockedCoins, owner, new AionList<>());
+        List<TimestampedValue> coins = getOrDefault(pendingUnvotes, owner, new AionList<>());
 
         BigInteger total = BigInteger.ZERO;
-        for (LockedCoin coin : coins) {
+        for (TimestampedValue coin : coins) {
             total = total.add(coin.value);
         }
 
@@ -312,7 +356,7 @@ public class StakerRegistry {
         if (!newSigningAddress.equals(s.signingAddress)) {
             // check last update
             long blockNumber = Blockchain.getBlockNumber();
-            require(blockNumber >= s.lastSigningAddressUpdate + ADDRESS_UPDATE_COOL_DOWN_PERIOD);
+            require(blockNumber >= s.lastSigningAddressUpdate + SIGNING_ADDRESS_COOL_DOWN_PERIOD);
 
             // check duplicated signing address
             require(!signingAddresses.containsKey(newSigningAddress));

@@ -209,6 +209,53 @@ public class PoolRegistryTest {
     }
 
     @Test
+    public void testTransferStake() {
+        Address pool1 = setupNewPool(10);
+        Address pool2 = setupNewPool(10);
+        Address delegator = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+
+        // delegate 2 stake
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool1)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(delegator, poolRegistry, BigInteger.TWO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // transfer 1 stake
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("transferStake")
+                .encodeOneAddress(pool1)
+                .encodeOneAddress(pool2)
+                .encodeOneLong(1)
+                .toBytes();
+         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // bump block number and finalize the transfer
+        tweakBlockNumber(1 + 6 * 10);
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("finalizeTransfer")
+                .encodeOneAddress(pool2)
+                .encodeOneInteger(Integer.MAX_VALUE)
+                .toBytes();
+        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // now, query the stake of the pool2 from the staker registry
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getStake")
+                .encodeOneAddress(pool2)
+                .encodeOneAddress(poolRegistry)
+                .encodeOneInteger(Integer.MAX_VALUE)
+                .toBytes();
+        result = RULE.call(delegator, stakerRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        long stake = (Long) result.getDecodedReturnData();
+        assertEquals(1L, stake);
+    }
+
+    @Test
     public void testAutoDelegate() {
         Address pool = setupNewPool(4);
         BigInteger stake = BigInteger.TEN;

@@ -9,6 +9,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.spongycastle.util.encoders.Hex;
 
 import java.lang.reflect.Field;
 import java.math.BigInteger;
@@ -169,6 +170,19 @@ public class StakerRegistryTest {
         status = result.getReceiptStatus();
         Assert.assertTrue(status.isSuccess());
 
+        // tweak the block number to skip the TRANSFER_LOCK_UP_PERIOD
+        tweakBlockNumber(1 + StakerRegistry.TRANSFER_LOCK_UP_PERIOD);
+
+        // the recipient staker needs to finalize the transfer
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("finalizeTransfer")
+                .encodeOneAddress(stakerAddress2)
+                .encodeOneInteger(Integer.MAX_VALUE)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        status = result.getReceiptStatus();
+        Assert.assertTrue(status.isSuccess());
+
         // query the stake to the first staker
         txData = new ABIStreamingEncoder()
                 .encodeOneString("getStake")
@@ -204,7 +218,7 @@ public class StakerRegistryTest {
         ResultCode status = result.getReceiptStatus();
         Assert.assertFalse(status.isSuccess());
 
-        tweakBlockNumber(1L + StakerRegistry.ADDRESS_UPDATE_COOL_DOWN_PERIOD);
+        tweakBlockNumber(1L + StakerRegistry.SIGNING_ADDRESS_COOL_DOWN_PERIOD);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("setSigningAddress")
@@ -247,8 +261,9 @@ public class StakerRegistryTest {
     }
 
     @Test
-    public void testListener() {
-
+    public void testPrintJarInHex() {
+        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null);
+        System.out.println(Hex.toHexString(jar));
     }
 
     @Test
@@ -278,7 +293,7 @@ public class StakerRegistryTest {
 
         // now try to release
         txData = new ABIStreamingEncoder()
-                .encodeOneString("releaseStake")
+                .encodeOneString("finalizeUnvote")
                 .encodeOneAddress(preminedAddress)
                 .encodeOneInteger(100)
                 .toBytes();
@@ -288,11 +303,11 @@ public class StakerRegistryTest {
         Assert.assertEquals(0, result.getDecodedReturnData());
 
         // tweak the block number
-        tweakBlockNumber(1L + StakerRegistry.STAKE_LOCK_UP_PERIOD);
+        tweakBlockNumber(1L + StakerRegistry.UNVOTE_LOCK_UP_PERIOD);
 
         // and, query again
         txData = new ABIStreamingEncoder()
-                .encodeOneString("releaseStake")
+                .encodeOneString("finalizeUnvote")
                 .encodeOneAddress(preminedAddress)
                 .encodeOneInteger(100)
                 .toBytes();
