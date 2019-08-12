@@ -30,6 +30,8 @@ public class PoolRegistry {
     // TODO: allow pool operator to update meta data and commission rate
     // TODO: replace long with BigInteger
 
+    public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
+
     @Initializable
     private static Address stakerRegistry;
 
@@ -85,28 +87,34 @@ public class PoolRegistry {
      */
     @Callable
     public static void delegate(Address pool) {
-        delegate(pool, Blockchain.getValue());
+        delegate( Blockchain.getCaller(), pool, Blockchain.getValue(), false);
     }
 
-    private static void delegate(Address pool, BigInteger value) {
-        Address caller = Blockchain.getCaller();
+    private static void delegate(Address from, Address pool, BigInteger value, boolean fromTransfer) {
         requirePool(pool);
         requirePositive(value);
 
         detectBlockRewards(pool);
 
+        if (!fromTransfer) {
         byte[] data = new ABIStreamingEncoder()
                 .encodeOneString("vote")
                 .encodeOneAddress(pool)
                 .toBytes();
         secureCall(stakerRegistry, value, data, Blockchain.getRemainingEnergy());
+        }
 
         PoolState ps = pools.get(pool);
-        BigInteger previousStake = getOrDefault(ps.delegators, caller, BigInteger.ZERO);
-        ps.delegators.put(caller, previousStake.add(value));
+        BigInteger previousStake = getOrDefault(ps.delegators, from, BigInteger.ZERO);
+        ps.delegators.put(from, previousStake.add(value));
 
         // update rewards state machine
-        ps.rewards.onVote(caller, Blockchain.getBlockNumber(), value.longValue());
+        ps.rewards.onVote(from, Blockchain.getBlockNumber(), value.longValue());
+
+        // possible pool state change
+        if (from.equals(ps.stakerAddress)) {
+            checkPoolState(ps.stakerAddress);
+        }
     }
 
     /**
@@ -143,6 +151,11 @@ public class PoolRegistry {
         // update rewards state machine
         ps.rewards.onUnvote(caller, Blockchain.getBlockNumber(), amount);
 
+        // possible pool state change
+        if (caller.equals(ps.stakerAddress)) {
+            checkPoolState(ps.stakerAddress);
+        }
+
         return id;
     }
 
@@ -171,6 +184,11 @@ public class PoolRegistry {
             secureCall(stakerRegistry, BigInteger.valueOf(newStake), data, Blockchain.getRemainingEnergy());
 
             Blockchain.println("re-vote: " + newStake);
+
+            // possible pool state change
+            if (caller.equals(ps.stakerAddress)) {
+                checkPoolState(ps.stakerAddress);
+            }
         }
     }
 
@@ -228,6 +246,11 @@ public class PoolRegistry {
 
         long id = new ABIDecoder(result.getReturnData()).decodeOneLong();
         transfers.put(id, new Transfer(caller, toPool, amount));
+
+        // possible pool state change
+        if (caller.equals(ps.stakerAddress)) {
+            checkPoolState(ps.stakerAddress);
+        }
 
         return id;
     }
@@ -318,11 +341,7 @@ public class PoolRegistry {
                 .toBytes();
         secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
 
-        PoolState ps = pools.get(transfer.to);
-        BigInteger previousStake = getOrDefault(ps.delegators, transfer.from, BigInteger.ZERO);
-        ps.delegators.put(transfer.from, previousStake.add(BigInteger.valueOf(transfer.amount)));
-
-        ps.rewards.onVote(transfer.from, Blockchain.getBlockNumber(), transfer.amount);
+        delegate(transfer.from, transfer.to, BigInteger.valueOf(transfer.amount), true);
     }
 
     /**
@@ -386,7 +405,7 @@ public class PoolRegistry {
             secureCall(Blockchain.getCaller(), BigInteger.valueOf(fee), new byte[0], Blockchain.getRemainingEnergy());
 
             // use the remaining rewards to delegate
-            delegate(pool, BigInteger.valueOf(remaining));
+            delegate(Blockchain.getCaller(), pool, BigInteger.valueOf(remaining), false);
         }
     }
 
@@ -396,7 +415,7 @@ public class PoolRegistry {
         requirePositive(Blockchain.getValue());
         require(fee >= 0 && fee <= 100);
 
-        delegate(pool, Blockchain.getValue());
+        delegate(Blockchain.getCaller(), pool, Blockchain.getValue(), false);
         enableAutoRedelegation(pool, fee);
     }
 
@@ -457,9 +476,6 @@ public class PoolRegistry {
 
     @Callable
     public static void onSigningAddressChange(Address staker, Address newSigningAddress) {
-        onlyStakerRegistry();
-        requireNonNull(newSigningAddress);
-        requireNoValue();
 
         // do nothing
     }
@@ -470,20 +486,7 @@ public class PoolRegistry {
         requireNonNull(newCoinbaseAddress);
         requireNoValue();
 
-        PoolState ps = pools.get(staker);
-        if (ps != null) {
-            boolean isCoinbaseSetup = newCoinbaseAddress.equals(ps.coinbaseAddress);
-            boolean isListenerSetup = true;
-            boolean active = isCoinbaseSetup && isListenerSetup;
-
-            if (!ps.isActive && active) {
-                switchToActive(ps);
-            }
-
-            if (ps.isActive && !active) {
-                switchToBroken(ps);
-            }
-        }
+        checkPoolState(staker);
     }
 
     @Callable
@@ -491,28 +494,7 @@ public class PoolRegistry {
         onlyStakerRegistry();
         requireNoValue();
 
-        PoolState ps = pools.get(staker);
-        if (ps != null) {
-            byte[] txData = new ABIStreamingEncoder()
-                    .encodeOneString("getCoinbaseAddress")
-                    .encodeOneAddress(staker)
-                    .toBytes();
-            Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
-            require(result.isSuccess());
-            Address coinbaseAddress = new ABIDecoder(result.getReturnData()).decodeOneAddress();
-
-            boolean isCoinbaseSetup = coinbaseAddress.equals(ps.coinbaseAddress);
-            boolean isListenerSetup = true;
-            boolean active = isCoinbaseSetup && isListenerSetup;
-
-            if (!ps.isActive && active) {
-                switchToActive(ps);
-            }
-
-            if (ps.isActive && !active) {
-                switchToBroken(ps);
-            }
-        }
+        checkPoolState(staker);
     }
 
     @Callable
@@ -520,17 +502,65 @@ public class PoolRegistry {
         onlyStakerRegistry();
         requireNoValue();
 
-        PoolState ps = pools.get(staker);
-        if (ps != null) {
-            if (ps.isActive) {
-                switchToBroken(ps);
-            }
-        }
+        checkPoolState(staker);
     }
 
     @Callable
     public static void onSlashing(Address staker, long stake) {
 
+    }
+
+    private static void checkPoolState(Address pool) {
+        PoolState ps = pools.get(pool);
+        if (ps != null) {
+            boolean active = isActive(pool);
+            if (ps.isActive && !active) {
+                switchToBroken(ps);
+            }
+            if (!ps.isActive && active) {
+                switchToActive(ps);
+            }
+        }
+    }
+
+    private static boolean isActive(Address pool) {
+        return isCoinbaseSetup(pool) && isListenerSetup(pool) && isSelfStakeSatisfied(pool);
+    }
+
+    private static boolean isCoinbaseSetup(Address pool) {
+        requirePool(pool);
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("getCoinbaseAddress")
+                .encodeOneAddress(pool)
+                .toBytes();
+        Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
+        require(result.isSuccess());
+        Address coinbaseAddress = new ABIDecoder(result.getReturnData()).decodeOneAddress();
+
+        PoolState ps = pools.get(pool);
+        return ps.coinbaseAddress.equals(coinbaseAddress);
+    }
+
+    private static boolean isListenerSetup(Address pool) {
+        requirePool(pool);
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("isListener")
+                .encodeOneAddress(pool)
+                .encodeOneAddress(Blockchain.getAddress())
+                .toBytes();
+        Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
+        require(result.isSuccess());
+        return new ABIDecoder(result.getReturnData()).decodeOneBoolean();
+    }
+
+    private static boolean isSelfStakeSatisfied(Address pool) {
+        requirePool(pool);
+
+        PoolState ps = pools.get(pool);
+        BigInteger stake = getOrDefault(ps.delegators, ps.stakerAddress, BigInteger.ZERO);
+        return stake.compareTo(MIN_SELF_STAKE) >= 0;
     }
 
 

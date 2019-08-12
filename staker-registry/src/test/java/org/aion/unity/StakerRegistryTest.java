@@ -267,7 +267,7 @@ public class StakerRegistryTest {
 
     @Test
     public void testPrintJarInHex() {
-        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null);
+        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null, AionBlockHeader.class, RlpDecoder.class, RlpEncoder.class, RlpList.class, RlpString.class, RlpType.class, Arrays.class);
         System.out.println(Hex.toHexString(jar));
     }
 

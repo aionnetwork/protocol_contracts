@@ -60,6 +60,15 @@ public class AionBlockHeader {
         this.solution = ((RlpString) (header.get(14))).getBytes();
     }
 
+    public byte[] getEncoded() {
+        return getEncoded(true, true);
+    }
+
+    public byte[] getEncoded(boolean includeNonce, boolean includeSolution) {
+
+        return null;
+    }
+
     @Override
     public String toString() {
         return "AionBlockHeader{" +

@@ -20,12 +20,13 @@ public class StakerRegistry {
 
     // TODO: replace long with BigInteger once the ABI supports it.
     // TODO: add stake vs nAmp conversion, presumably 1 AION = 1 STAKE.
-    // TODO: implement MIN_STAKE to prevent attacker from trying multiple keys to get eligible for free.
     // TODO: replace object graph-based collections with key-value storage.
 
     public static final long SIGNING_ADDRESS_COOL_DOWN_PERIOD = 6 * 60 * 24 * 7;
     public static final long UNVOTE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
     public static final long TRANSFER_LOCK_UP_PERIOD = 6 * 10;
+
+    public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
 
     private static class Staker {
         private Address signingAddress;
@@ -302,13 +303,16 @@ public class StakerRegistry {
     }
 
     /**
-     * Returns the stake from the staker itself.
+     * Returns whether the staker is active, subject to pre-defined rules, e.g. min_self_stake.s
+     *
+     * It's the kernel's responsibility to call this method before validating the block
+     * production eligibility of a staker.
      *
      * @param staker the address of staker
-     * @return the amount of stake
+     * @return true if active, otherwise false
      */
-    public static long getSelfStake(Address staker) {
-        return getStake(staker, staker);
+    public static boolean isActive(Address staker) {
+        return BigInteger.valueOf(getStake(staker, staker)).compareTo(MIN_SELF_STAKE) >= 0;
     }
 
     /**
