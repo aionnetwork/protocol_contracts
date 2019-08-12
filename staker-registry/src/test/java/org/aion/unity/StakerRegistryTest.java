@@ -10,6 +10,11 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.spongycastle.util.encoders.Hex;
+import org.web3j.rlp.RlpDecoder;
+import org.web3j.rlp.RlpEncoder;
+import org.web3j.rlp.RlpList;
+import org.web3j.rlp.RlpString;
+import org.web3j.rlp.RlpType;
 
 import java.lang.reflect.Field;
 import java.math.BigInteger;
@@ -40,7 +45,7 @@ public class StakerRegistryTest {
         coinbaseAddress = RULE.getRandomAddress(BigInteger.ZERO);
 
         // deploy the staker registry contract
-        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null);
+        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null, AionBlockHeader.class, RlpDecoder.class, RlpEncoder.class, RlpList.class, RlpString.class, RlpType.class, Arrays.class);
         stakerRegistry = RULE.deploy(preminedAddress, BigInteger.ZERO, jar).getDappAddress();
 
         // register the staker

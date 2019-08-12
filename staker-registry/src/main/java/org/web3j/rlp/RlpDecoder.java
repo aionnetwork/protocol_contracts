@@ -12,7 +12,7 @@
  */
 package org.web3j.rlp;
 
-import java.util.ArrayList;
+import org.aion.avm.userlib.AionList;
 
 /**
  * Recursive Length Prefix (RLP) decoder.
@@ -61,7 +61,7 @@ public class RlpDecoder {
      * @return recursive RLP structure
      */
     public static RlpList decode(byte[] rlpEncoded) {
-        RlpList rlpList = new RlpList(new ArrayList<>());
+        RlpList rlpList = new RlpList(new AionList<>());
         traverse(rlpEncoded, 0, rlpEncoded.length, rlpList);
         return rlpList;
     }
@@ -135,7 +135,7 @@ public class RlpDecoder {
 
                     byte listLen = (byte) (prefix - OFFSET_SHORT_LIST);
 
-                    RlpList newLevelList = new RlpList(new ArrayList<>());
+                    RlpList newLevelList = new RlpList(new AionList<>());
                     traverse(data, startPos + 1, startPos + listLen + 1, newLevelList);
                     rlpList.getValues().add(newLevelList);
 
@@ -153,7 +153,7 @@ public class RlpDecoder {
                     byte lenOfListLen = (byte) (prefix - OFFSET_LONG_LIST);
                     int listLen = calcLength(lenOfListLen, data, startPos);
 
-                    RlpList newLevelList = new RlpList(new ArrayList<>());
+                    RlpList newLevelList = new RlpList(new AionList<>());
                     traverse(
                             data,
                             startPos + lenOfListLen + 1,

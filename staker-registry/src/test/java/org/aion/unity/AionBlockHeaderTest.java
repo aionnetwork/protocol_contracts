@@ -1,37 +1,13 @@
 package org.aion.unity;
 
-import avm.Address;
-import org.aion.avm.tooling.AvmRule;
-import org.junit.Rule;
 import org.junit.Test;
 import org.spongycastle.util.encoders.Hex;
-import org.web3j.rlp.RlpDecoder;
-import org.web3j.rlp.RlpEncoder;
-import org.web3j.rlp.RlpList;
-import org.web3j.rlp.RlpString;
-import org.web3j.rlp.RlpType;
 
 import java.math.BigInteger;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 public class AionBlockHeaderTest {
-
-
-    private static BigInteger ENOUGH_BALANCE_TO_TRANSACT = BigInteger.TEN.pow(18 + 5);
-
-    @Rule
-    public AvmRule RULE = new AvmRule(true);
-
-    private Address preminedAddress;
-
-    private Address stakerAddress;
-    private Address signingAddress;
-    private Address coinbaseAddress;
-
-    private Address stakerRegistry;
-
 
     // header dump from Aion Java Kernel
     //
@@ -72,21 +48,5 @@ public class AionBlockHeaderTest {
         assertEquals(6, header.timestamp);
         assertEquals("7061727431", Hex.toHexString(header.nonce));
         assertEquals("7061727432", Hex.toHexString(header.solution));
-    }
-
-
-    @Test
-    public void testDeploy() {
-        // setup accounts
-        preminedAddress = RULE.getPreminedAccount();
-
-        stakerAddress = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
-        signingAddress = RULE.getRandomAddress(BigInteger.ZERO);
-        coinbaseAddress = RULE.getRandomAddress(BigInteger.ZERO);
-
-        // deploy the staker registry contract
-        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null, AionBlockHeader.class, RlpDecoder.class, RlpEncoder.class, RlpList.class, RlpString.class, RlpType.class);
-        AvmRule.ResultWrapper result = RULE.deploy(preminedAddress, BigInteger.ZERO, jar);
-        assertTrue(result.getReceiptStatus().isSuccess());
     }
 }

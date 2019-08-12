@@ -12,7 +12,8 @@
  */
 package org.web3j.rlp;
 
-import java.util.Arrays;
+import org.aion.unity.Arrays;
+
 import java.util.List;
 
 /** RLP list type. */

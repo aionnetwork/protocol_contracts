@@ -251,6 +251,11 @@ public class StakerRegistry {
 
     @Callable
     public static void slash(int type, byte[] header1, byte[] header2) {
+        AionBlockHeader h1 = new AionBlockHeader(header1);
+        AionBlockHeader h2 = new AionBlockHeader(header2);
+        require(h1.number == 2);
+        require(h2.number == 2);
+
         // 1. prove header1 and header2 are PoS block headers
         // 2. prove header1.signer = header2.signer
         // 3. prove header1.number = header2.number

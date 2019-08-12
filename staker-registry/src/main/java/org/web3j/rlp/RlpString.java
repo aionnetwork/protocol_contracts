@@ -12,8 +12,9 @@
  */
 package org.web3j.rlp;
 
+import org.aion.unity.Arrays;
+
 import java.math.BigInteger;
-import java.util.Arrays;
 
 /** RLP string type. */
 public class RlpString implements RlpType {
