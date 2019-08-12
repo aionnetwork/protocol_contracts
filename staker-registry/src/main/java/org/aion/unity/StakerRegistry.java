@@ -249,6 +249,14 @@ public class StakerRegistry {
         putOrRemove(s.stakes, transfer.from, previousStake.add(transfer.value));
     }
 
+    @Callable
+    public static void slash(int type, byte[] header1, byte[] header2) {
+        // 1. prove header1 and header2 are PoS block headers
+        // 2. prove header1.signer = header2.signer
+        // 3. prove header1.number = header2.number
+        // 4. prove header1.hash != header2.hash
+    }
+
     /**
      * Returns the total stake associated with a staker.
      *
