@@ -21,6 +21,7 @@ public class StakerRegistry {
     // TODO: replace long with BigInteger once the ABI supports it.
     // TODO: add stake vs nAmp conversion, presumably 1 AION = 1 STAKE.
     // TODO: replace object graph-based collections with key-value storage.
+    // TODO: add events
 
     public static final long SIGNING_ADDRESS_COOL_DOWN_PERIOD = 6 * 60 * 24 * 7;
     public static final long UNVOTE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
@@ -53,26 +54,30 @@ public class StakerRegistry {
     }
 
     private static class PendingUnvote {
-        private Address to;
+        private Address initiator;
+        private Address recipient;
         private BigInteger value;
         private long blockNumber;
 
-        public PendingUnvote(Address to, BigInteger value, long blockNumber) {
-            this.to = to;
+        public PendingUnvote(Address initiator, Address recipient, BigInteger value, long blockNumber) {
+            this.initiator = initiator;
+            this.recipient = recipient;
             this.value = value;
             this.blockNumber = blockNumber;
         }
     }
 
     private static class PendingTransfer {
-        private Address from;
-        private Address to;
+        private Address initiator;
+        private Address fromStaker;
+        private Address toStaker;
         private BigInteger value;
         private long blockNumber;
 
-        public PendingTransfer(Address from, Address to, BigInteger value, long blockNumber) {
-            this.from = from;
-            this.to = to;
+        public PendingTransfer(Address initiator, Address fromStaker, Address toStaker, BigInteger value, long blockNumber) {
+            this.initiator = initiator;
+            this.fromStaker = fromStaker;
+            this.toStaker = toStaker;
             this.value = value;
             this.blockNumber = blockNumber;
         }
@@ -144,16 +149,16 @@ public class StakerRegistry {
      *
      * @param staker   the address of the staker
      * @param amount   the amount of stake
-     * @param receiver the receiving addresss
+     * @param recipient the receiving addresss
      * @return a pending unvote identifier
      */
     @Callable
-    public static long unvoteTo(Address staker, long amount, Address receiver) {
+    public static long unvoteTo(Address staker, long amount, Address recipient) {
         Address caller = Blockchain.getCaller();
 
         requireStaker(staker);
         requirePositive(amount);
-        requireNonNull(receiver);
+        requireNonNull(recipient);
 
         Staker s = stakers.get(staker);
         BigInteger previousStake = getOrDefault(stakers.get(staker).stakes, caller, BigInteger.ZERO);
@@ -165,7 +170,7 @@ public class StakerRegistry {
         putOrRemove(s.stakes, caller, previousStake.subtract(amountBI));
 
         long id = nextUnvote++;
-        PendingUnvote unvote = new PendingUnvote(receiver, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
+        PendingUnvote unvote = new PendingUnvote(caller, recipient, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
         pendingUnvotes.put(id, unvote);
 
         return id;
@@ -188,6 +193,7 @@ public class StakerRegistry {
         requireStaker(fromStaker);
         requireStaker(toStaker);
         requirePositive(amount);
+        require(!fromStaker.equals(toStaker));
 
         Staker s = stakers.get(fromStaker);
         BigInteger previousStake = getOrDefault(s.stakes, caller, BigInteger.ZERO);
@@ -199,7 +205,7 @@ public class StakerRegistry {
         putOrRemove(s.stakes, caller, previousStake.subtract(amountBI));
 
         long id = nextTransfer++;
-        PendingTransfer transfer = new PendingTransfer(caller, toStaker, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
+        PendingTransfer transfer = new PendingTransfer(caller, fromStaker, toStaker, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
         pendingTransfers.put(id, transfer);
 
         return id;
@@ -221,7 +227,7 @@ public class StakerRegistry {
         pendingUnvotes.remove(id);
 
         // do a transfer
-        secureCall(unvote.to, unvote.value, new byte[0], Blockchain.getRemainingEnergy());
+        secureCall(unvote.recipient, unvote.value, new byte[0], Blockchain.getRemainingEnergy());
     }
 
     /**
@@ -234,20 +240,20 @@ public class StakerRegistry {
         PendingTransfer transfer = pendingTransfers.get(id);
         requireNonNull(transfer);
 
-        // only the sender can finalize the transfer, mainly because
-        // the pool registry needs to keep track of this.
+        // only the initiator can finalize the transfer, mainly because
+        // the pool registry needs to keep track of stake transfers.
         // more consideration is required.
-        require(Blockchain.getCaller().equals(transfer.from));
+        require(Blockchain.getCaller().equals(transfer.initiator));
 
         // lock-up period check
         require(Blockchain.getBlockNumber() >= transfer.blockNumber + TRANSFER_LOCK_UP_PERIOD);
 
         pendingTransfers.remove(id);
 
-        Staker s = stakers.get(transfer.to);
-        BigInteger previousStake = getOrDefault(s.stakes, transfer.from, BigInteger.ZERO);
+        Staker s = stakers.get(transfer.toStaker);
+        BigInteger previousStake = getOrDefault(s.stakes, transfer.initiator, BigInteger.ZERO);
         s.totalStake = s.totalStake.add(transfer.value);
-        putOrRemove(s.stakes, transfer.from, previousStake.add(transfer.value));
+        putOrRemove(s.stakes, transfer.initiator, previousStake.add(transfer.value));
     }
 
     @Callable

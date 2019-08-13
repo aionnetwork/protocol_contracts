@@ -12,9 +12,9 @@ import avm.Blockchain;
 import avm.Result;
 
 /**
- * A contract designated for holding the stake from pool owners.
+ * A contract designated for taking care of the stake from a pool owner.
  */
-public class PoolSlashableStake {
+public class PoolCustodian {
 
     // TODO: replace long with BigInteger
 
@@ -23,18 +23,6 @@ public class PoolSlashableStake {
 
     @Initializable
     private static Address stakerRegistry;
-
-    @Callable
-    public static void transfer(Address recipient, long amount) {
-        requirePoolRegistry();
-
-        // sanity check
-        require(recipient != null);
-        require(amount > 0);
-
-        // transfer
-        secureCall(recipient, BigInteger.valueOf(amount), new byte[0], Blockchain.getRemainingEnergy());
-    }
 
     @Callable
     public static void vote(Address staker, long amount) {
@@ -50,24 +38,6 @@ public class PoolSlashableStake {
                 .encodeOneAddress(staker)
                 .toBytes();
         secureCall(stakerRegistry, BigInteger.valueOf(amount), data, Blockchain.getRemainingEnergy());
-    }
-
-    @Callable
-    public static long unvote(Address staker, long amount) {
-        requirePoolRegistry();
-
-        // sanity check
-        require(staker != null);
-        require(amount > 0);
-
-        // unvote
-        byte[] data = new ABIStreamingEncoder()
-                .encodeOneString("vote")
-                .encodeOneAddress(staker)
-                .encodeOneLong(amount)
-                .toBytes();
-        Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-        return new ABIDecoder(result.getReturnData()).decodeOneLong();
     }
 
     @Callable
@@ -108,6 +78,18 @@ public class PoolSlashableStake {
                 .toBytes();
         Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
         return new ABIDecoder(result.getReturnData()).decodeOneLong();
+    }
+
+    @Callable
+    public static void finalizeTransfer(long id) {
+        requirePoolRegistry();
+
+        // finalize transfer
+        byte[] data = new ABIStreamingEncoder()
+                .encodeOneString("finalizeTransfer")
+                .encodeOneLong(id)
+                .toBytes();
+        secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
     }
 
     private static void require(boolean condition) {

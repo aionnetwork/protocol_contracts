@@ -13,8 +13,9 @@ public class PoolState {
 
     public boolean isActive;
 
-    Address stakerAddress;
+    Address stakerAddress; // a.k.a. owner address
     Address coinbaseAddress;
+    Address custodianAddress;
 
     byte[] metaData;
     int commissionRate; // TODO: add max commission rate?
@@ -24,10 +25,11 @@ public class PoolState {
     Map<Address, BigInteger> delegators;
     Map<Address, Integer> autoRedelegationDelegators;
 
-    public PoolState(Address stakerAddress, Address coinbaseAddress, byte[] metaData, int commissionRate) {
+    public PoolState(Address stakerAddress, Address coinbaseAddress, Address custodianAddress, byte[] metaData, int commissionRate) {
         this.isActive = false;
         this.stakerAddress = stakerAddress;
         this.coinbaseAddress = coinbaseAddress;
+        this.custodianAddress = custodianAddress;
         this.metaData = metaData;
         this.commissionRate = commissionRate;
 

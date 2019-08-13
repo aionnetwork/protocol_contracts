@@ -155,9 +155,9 @@ public class PoolRegistryTest {
 
 
     @Test
-    public void testPoolSlashableStakeContract() {
+    public void testPoolCustodianContract() {
         byte[] arguments = ABIUtil.encodeDeploymentArguments(new Address(new byte[32]), new Address(new byte[32]));
-        byte[] data = RULE.getDappBytes(PoolSlashableStake.class, arguments);
+        byte[] data = RULE.getDappBytes(PoolCustodian.class, arguments);
         System.out.println(Hex.toHexString(data));
         System.out.println(data.length);
     }
@@ -281,7 +281,7 @@ public class PoolRegistryTest {
         result = RULE.call(delegator, stakerRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
         long stake = (Long) result.getDecodedReturnData();
-        assertEquals(nStake(1).longValue() + 1L, stake);
+        assertEquals(1L, stake);
     }
 
     @Test
@@ -317,7 +317,7 @@ public class PoolRegistryTest {
                 .encodeOneAddress(delegator)
                 .toBytes();
         // FIXME: high energy cost
-        result = RULE.call(random, poolRegistry, BigInteger.ZERO, txData, 4_000_000L, 1L);
+        result = RULE.call(random, poolRegistry, BigInteger.ZERO, txData, 5_000_000L, 1L);
         assertTrue(result.getReceiptStatus().isSuccess());
 
         // query the stake of the delegator
@@ -329,7 +329,7 @@ public class PoolRegistryTest {
         result = RULE.call(delegator, stakerRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
         long reward = (100 - 4) / 2;
-        assertEquals(nStake(1 + 1).longValue() + (reward - reward * 20 / 100), result.getDecodedReturnData());
+        assertEquals(nStake(1).longValue() + (reward - reward * 20 / 100), result.getDecodedReturnData());
     }
 
     @Test
@@ -390,7 +390,8 @@ public class PoolRegistryTest {
                 .encodeOneString("redelegate")
                 .encodeOneAddress(pool)
                 .toBytes();
-        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        // FIXME: optimize energy usage
+        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData, 5_000_000L, 1);
         assertTrue(result.getReceiptStatus().isSuccess());
 
         // The pool generates another block
@@ -415,7 +416,7 @@ public class PoolRegistryTest {
         result = RULE.call(delegator, stakerRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
         Long stake = (Long) result.getDecodedReturnData();
-        assertEquals(2450, stake.longValue());
+        assertEquals(1450, stake.longValue());
     }
 
     @Test

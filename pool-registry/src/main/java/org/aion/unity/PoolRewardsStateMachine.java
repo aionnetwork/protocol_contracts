@@ -169,23 +169,6 @@ public class PoolRewardsStateMachine {
         join(delegator, blockNumber, nextBond);
     }
 
-    public long onRevote(Address delegator, long blockNumber) {
-        long unbondedStake = 0;
-        if (delegations.containsKey(delegator)) {
-            // do a "leave-and-join"
-            unbondedStake = leave(delegator, blockNumber);
-        }
-
-        long rewards = getOrDefault(settledRewards, delegator, 0L);
-        settledRewards.remove(delegator);
-
-        if (unbondedStake + rewards > 0) {
-            join(delegator, blockNumber, unbondedStake + rewards);
-        }
-
-        return rewards;
-    }
-
     /**
      * Withdraw is all or nothing, since that is both simpler, implementation-wise and does not make
      * much sense for people to partially withdraw. The problem we run into is that if the amount requested
@@ -225,6 +208,7 @@ public class PoolRewardsStateMachine {
         assert (blockNumber > 0 && blockReward > 0); // sanity check
 
         accumulatedBlockRewards += blockReward;
+        Blockchain.println("ACC_BLOCK_REWARDS: " + accumulatedBlockRewards);
     }
 
     public long getRewards(Address delegator, long blockNumber) {
