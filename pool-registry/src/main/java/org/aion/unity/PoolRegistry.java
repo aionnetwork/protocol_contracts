@@ -105,6 +105,8 @@ public class PoolRegistry {
         requirePool(pool);
         requirePositive(value);
 
+        detectBlockRewards(pool);
+
         // transfers the value to the custodian contract if it's from the pool owner.
         // The reason for this is to make the stake (value) in case the pool misbehaves.
         PoolState ps = pools.get(pool);
@@ -118,8 +120,6 @@ public class PoolRegistry {
     private static void delegate(Address delegator, Address pool, BigInteger value, boolean isFromTransfer) {
         requirePool(pool);
         requirePositive(value);
-
-        detectBlockRewards(pool);
 
         PoolState ps = pools.get(pool);
 

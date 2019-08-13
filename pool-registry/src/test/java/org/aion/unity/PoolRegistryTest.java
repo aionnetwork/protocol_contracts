@@ -316,8 +316,7 @@ public class PoolRegistryTest {
                 .encodeOneAddress(pool)
                 .encodeOneAddress(delegator)
                 .toBytes();
-        // FIXME: high energy cost
-        result = RULE.call(random, poolRegistry, BigInteger.ZERO, txData, 5_000_000L, 1L);
+        result = RULE.call(random, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
 
         // query the stake of the delegator
@@ -390,8 +389,7 @@ public class PoolRegistryTest {
                 .encodeOneString("redelegate")
                 .encodeOneAddress(pool)
                 .toBytes();
-        // FIXME: optimize energy usage
-        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData, 5_000_000L, 1);
+        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
 
         // The pool generates another block

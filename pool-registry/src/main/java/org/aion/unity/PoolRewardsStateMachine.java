@@ -85,6 +85,8 @@ public class PoolRewardsStateMachine {
      * ----------------------------------------------------------------------*/
 
     private void incrementPeriod() {
+        Blockchain.println("Increment period: acc_rewards = " + accumulatedBlockRewards);
+
         // deal with the block rewards
         long commission = Decimal.valueOf(fee * accumulatedBlockRewards)
                 .divideTruncate(Decimal.valueOf(100))
@@ -208,7 +210,6 @@ public class PoolRewardsStateMachine {
         assert (blockNumber > 0 && blockReward > 0); // sanity check
 
         accumulatedBlockRewards += blockReward;
-        Blockchain.println("ACC_BLOCK_REWARDS: " + accumulatedBlockRewards);
     }
 
     public long getRewards(Address delegator, long blockNumber) {
