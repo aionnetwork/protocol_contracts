@@ -97,11 +97,11 @@ public class PoolRegistry {
         detectBlockRewards(pool);
 
         if (!fromTransfer) {
-        byte[] data = new ABIStreamingEncoder()
-                .encodeOneString("vote")
-                .encodeOneAddress(pool)
-                .toBytes();
-        secureCall(stakerRegistry, value, data, Blockchain.getRemainingEnergy());
+            byte[] data = new ABIStreamingEncoder()
+                    .encodeOneString("vote")
+                    .encodeOneAddress(pool)
+                    .toBytes();
+            secureCall(stakerRegistry, value, data, Blockchain.getRemainingEnergy());
         }
 
         PoolState ps = pools.get(pool);
@@ -144,8 +144,7 @@ public class PoolRegistry {
                 .encodeOneLong(amount)
                 .encodeOneAddress(caller)
                 .toBytes();
-        Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-        require(result.isSuccess());
+        Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
         long id = new ABIDecoder(result.getReturnData()).decodeOneLong();
 
         // update rewards state machine
@@ -241,8 +240,7 @@ public class PoolRegistry {
                 .encodeOneAddress(toPool)
                 .encodeOneLong(amount)
                 .toBytes();
-        Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-        require(result.isSuccess());
+        Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
 
         long id = new ABIDecoder(result.getReturnData()).decodeOneLong();
         transfers.put(id, new Transfer(caller, toPool, amount));
@@ -301,8 +299,7 @@ public class PoolRegistry {
                 .encodeOneString("getStakeByStakerAddress")
                 .encodeOneAddress(pool)
                 .toBytes();
-        Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-        require(result.isSuccess());
+        Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
         return new ABIDecoder(result.getReturnData()).decodeOneLong();
     }
 
@@ -534,8 +531,7 @@ public class PoolRegistry {
                 .encodeOneString("getCoinbaseAddress")
                 .encodeOneAddress(pool)
                 .toBytes();
-        Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
-        require(result.isSuccess());
+        Result result = secureCall(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
         Address coinbaseAddress = new ABIDecoder(result.getReturnData()).decodeOneAddress();
 
         PoolState ps = pools.get(pool);
@@ -550,8 +546,7 @@ public class PoolRegistry {
                 .encodeOneAddress(pool)
                 .encodeOneAddress(Blockchain.getAddress())
                 .toBytes();
-        Result result = Blockchain.call(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
-        require(result.isSuccess());
+        Result result = secureCall(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
         return new ABIDecoder(result.getReturnData()).decodeOneBoolean();
     }
 
@@ -620,9 +615,10 @@ public class PoolRegistry {
         return result;
     }
 
-    private static void secureCall(Address targetAddress, BigInteger value, byte[] data, long energyLimit) {
+    private static Result secureCall(Address targetAddress, BigInteger value, byte[] data, long energyLimit) {
         Result result = Blockchain.call(targetAddress, value, data, energyLimit);
         require(result.isSuccess());
+        return result;
     }
 
 
