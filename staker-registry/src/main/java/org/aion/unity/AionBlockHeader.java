@@ -1,5 +1,7 @@
 package org.aion.unity;
 
+import avm.Address;
+import avm.Blockchain;
 import org.web3j.rlp.RlpDecoder;
 import org.web3j.rlp.RlpList;
 import org.web3j.rlp.RlpString;
@@ -65,7 +67,16 @@ public class AionBlockHeader {
     }
 
     public byte[] getEncoded(boolean includeNonce, boolean includeSolution) {
+        // FIXME: implement the header codec
+        return "header".getBytes();
+    }
 
+    public byte[] getHash() {
+        return Blockchain.blake2b(getEncoded());
+    }
+
+    public Address getSigner() {
+        // FIXME: extract signer from the header
         return null;
     }
 

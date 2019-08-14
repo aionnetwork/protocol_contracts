@@ -586,6 +586,7 @@ public class PoolRegistry {
     }
 
     private static boolean isActive(Address pool) {
+        // TODO: optimize, checking all three condition every time consumes too much energy
         return isCoinbaseSetup(pool) && isListenerSetup(pool) && isSelfStakeSatisfied(pool);
     }
 

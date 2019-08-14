@@ -28,6 +28,7 @@ public class StakerRegistry {
     public static final long TRANSFER_LOCK_UP_PERIOD = 6 * 10;
 
     public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
+    public static final BigInteger SLASHING_AMOUNT = BigInteger.valueOf(100L);
 
     private static class Staker {
         private Address signingAddress;
@@ -277,18 +278,38 @@ public class StakerRegistry {
         putOrRemove(s.stakes, transfer.recipient, previousStake.add(transfer.value));
     }
 
+    private static Set<ByteArrayWrapper> slashedHeaders = new AionSet<>();
+
     @Callable
-    public static void slash(int type, byte[] header1, byte[] header2) {
-        AionBlockHeader h1 = new AionBlockHeader(header1);
-        AionBlockHeader h2 = new AionBlockHeader(header2);
-        require(h1.number == 2);
-        require(h2.number == 2);
+    public static void slash(int type, byte[] ...headers) {
+        switch(type) {
+            // Here, I'm implementing one slashing condition, dunkle, to test
+            // the slashing workflow. Please replace with whatever conditions
+            // the team eventually decides.
+            case 1:
+                require(headers.length == 1);
+                AionBlockHeader header = new AionBlockHeader(headers[0]);
+                byte[] hash = header.getHash();
+                byte[] correctHash = "test".getBytes(); // FIXME: use `Blockchain.getBlockHash(header.number)`;
 
-        // 1. prove header1 and header2 are PoS block headers
-        // 2. prove header1.signer = header2.signer
-        // 3. prove header1.number = header2.number
-        // 4. prove header1.hash != header2.hash
+                if (!Arrays.equals(hash, correctHash)) {
+                    // find the staker
+                    Address staker = stakers.keySet().iterator().next(); // FIXME: use `signingAddresses.get(header.getSigner())`;
+                    requireNonNull(staker);
 
+                    slash(staker);
+                }
+                break;
+        }
+    }
+
+    public static void slash(Address staker) {
+        Staker s = stakers.get(staker);
+
+        // slash
+        BigInteger selfStake = getOrDefault(s.stakes, staker, BigInteger.ZERO);
+        require(selfStake.compareTo(SLASHING_AMOUNT) >= 0);
+        s.stakes.put(staker, selfStake.min(SLASHING_AMOUNT));
 
         // NOTE: when calling the onSlash callback, cap the energy limit and ignore
         // the call results. Otherwise, a staker can set up a energy sucker as listener
@@ -299,6 +320,22 @@ public class StakerRegistry {
 
         // In conclusion, we need to make sure the listener get executed with enough
         // energy and prevent a listener from stopping a slashing event.
+
+        long remainingEnergy = Blockchain.getRemainingEnergy();
+        require(remainingEnergy > 2_000_000L * s.listeners.size() + 100_000L);
+
+        // TODO: limit the max number of listeners per staker
+        // otherwise, staker can register many listeners to prevent slashing.
+
+        for (Address listener : s.listeners) {
+            byte[] data = new ABIStreamingEncoder()
+                    .encodeOneString("onSlashing")
+                    .encodeOneAddress(staker)
+                    .encodeOneLong(SLASHING_AMOUNT.longValue())
+                    .toBytes();
+            // FIXME: reduce this number after optimizing the energy usage in pool registry.
+            Blockchain.call(listener, BigInteger.ZERO, data, 2_000_000L);
+        }
     }
 
 

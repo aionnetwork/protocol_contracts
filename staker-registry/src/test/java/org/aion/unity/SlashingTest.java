@@ -20,6 +20,8 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.math.BigInteger;
 
+import static org.junit.Assert.assertEquals;
+
 
 public class SlashingTest {
 
@@ -63,19 +65,35 @@ public class SlashingTest {
     @Test
     public void testSlash() {
         int type = 1;
-        byte[] header1 = Hex.decode("f8dd0102a06068a128093216a3c0bd9b8cecea132731b8d4fca67de87020b42965fd32a581a0bee628af072dde474c426e5062b2c5ad6888ad3221fe949a1962df918159ded2a0f2953aeb18a5bcb88220ecc0f2c5e222d932f09cc7a26f724276c67fb1c301a5a02e5def03d03e5e6a1b2b22c8185263920b36e056d4e7b1a0d9318764ce0758f3a090685796aa5ee0da1a7d27b5d43b7d52e9f8f2199f5d579489431524170d9828a00000000000000000000000000000000000000000000000000000000000000000038464617461040506857061727431857061727432");
-        byte[] header2 = Hex.decode("f8dd0102a06068a128093216a3c0bd9b8cecea132731b8d4fca67de87020b42965fd32a581a0bee628af072dde474c426e5062b2c5ad6888ad3221fe949a1962df918159ded2a0f2953aeb18a5bcb88220ecc0f2c5e222d932f09cc7a26f724276c67fb1c301a5a02e5def03d03e5e6a1b2b22c8185263920b36e056d4e7b1a0d9318764ce0758f3a090685796aa5ee0da1a7d27b5d43b7d52e9f8f2199f5d579489431524170d9828a00000000000000000000000000000000000000000000000000000000000000000038464617461040506857061727431857061727432");
+        byte[] header = Hex.decode("f8dd0102a06068a128093216a3c0bd9b8cecea132731b8d4fca67de87020b42965fd32a581a0bee628af072dde474c426e5062b2c5ad6888ad3221fe949a1962df918159ded2a0f2953aeb18a5bcb88220ecc0f2c5e222d932f09cc7a26f724276c67fb1c301a5a02e5def03d03e5e6a1b2b22c8185263920b36e056d4e7b1a0d9318764ce0758f3a090685796aa5ee0da1a7d27b5d43b7d52e9f8f2199f5d579489431524170d9828a00000000000000000000000000000000000000000000000000000000000000000038464617461040506857061727431857061727432");
+        byte[][] headers = {header};
 
+        // do a self-bond
         byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("vote")
+                .encodeOneAddress(stakerAddress)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, StakerRegistry.MIN_SELF_STAKE, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        // submit a proof
+        txData = new ABIStreamingEncoder()
                 .encodeOneString("slash")
                 .encodeOneInteger(type)
-                .encodeOneByteArray(header1)
-                .encodeOneByteArray(header2)
+                .encodeOne2DByteArray(headers)
                 .toBytes();
-        AvmRule.ResultWrapper result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
-        ResultCode status = result.getReceiptStatus();
-        Assert.assertTrue(status.isSuccess());
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
+        // query the stake
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getStake")
+                .encodeOneAddress(stakerAddress)
+                .encodeOneAddress(stakerAddress)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        assertEquals(StakerRegistry.MIN_SELF_STAKE.min(StakerRegistry.SLASHING_AMOUNT).longValue(), result.getDecodedReturnData());
     }
 
 }
