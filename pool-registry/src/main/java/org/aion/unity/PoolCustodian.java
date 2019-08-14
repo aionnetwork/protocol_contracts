@@ -61,20 +61,22 @@ public class PoolCustodian {
     }
 
     @Callable
-    public static long transferStake(Address from, Address to, long amount) {
+    public static long transferStakeTo(Address from, Address to, long amount, Address recipient) {
         requirePoolRegistry();
 
         // sanity check
         require(from != null);
         require(to != null);
         require(amount > 0);
+        require(recipient != null);
 
         // transfer staker
         byte[] data = new ABIStreamingEncoder()
-                .encodeOneString("transferStake")
+                .encodeOneString("transferStakeTo")
                 .encodeOneAddress(from)
                 .encodeOneAddress(to)
                 .encodeOneLong(amount)
+                .encodeOneAddress(recipient)
                 .toBytes();
         Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
         return new ABIDecoder(result.getReturnData()).decodeOneLong();

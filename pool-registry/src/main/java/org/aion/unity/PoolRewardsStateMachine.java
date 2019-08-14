@@ -27,7 +27,6 @@ public class PoolRewardsStateMachine {
 
     private Map<Address, StartingInfo> delegations; // total delegations per delegator
 
-    // TODO: can't use arbitrary precision real numbers here :(
     Decimal currentCRR;
     Decimal prevCRR;
 
@@ -85,7 +84,7 @@ public class PoolRewardsStateMachine {
      * ----------------------------------------------------------------------*/
 
     private void incrementPeriod() {
-        Blockchain.println("Increment period: acc_rewards = " + accumulatedBlockRewards);
+        // Blockchain.println("Increment period: acc_rewards = " + accumulatedBlockRewards);
 
         // deal with the block rewards
         long commission = Decimal.valueOf(fee * accumulatedBlockRewards)

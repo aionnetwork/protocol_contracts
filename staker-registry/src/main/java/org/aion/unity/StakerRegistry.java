@@ -71,13 +71,15 @@ public class StakerRegistry {
         private Address initiator;
         private Address fromStaker;
         private Address toStaker;
+        private Address recipient;
         private BigInteger value;
         private long blockNumber;
 
-        public PendingTransfer(Address initiator, Address fromStaker, Address toStaker, BigInteger value, long blockNumber) {
+        public PendingTransfer(Address initiator, Address fromStaker, Address toStaker, Address recipient, BigInteger value, long blockNumber) {
             this.initiator = initiator;
             this.fromStaker = fromStaker;
             this.toStaker = toStaker;
+            this.recipient = recipient;
             this.value = value;
             this.blockNumber = blockNumber;
         }
@@ -178,8 +180,6 @@ public class StakerRegistry {
 
     /**
      * Transfers stake from one staker to another staker.
-     * <p>
-     * TODO: attack vector - attacker may move their stake between accounts to maximize the profits
      *
      * @param fromStaker the address of the staker to transfer stake from
      * @param toStaker   the address of the staker to transfer stake to
@@ -188,6 +188,20 @@ public class StakerRegistry {
      */
     @Callable
     public static long transferStake(Address fromStaker, Address toStaker, long amount) {
+        return transferStakeTo(fromStaker, toStaker, amount, Blockchain.getCaller());
+    }
+
+    /**
+     * Transfers stake from one staker to another staker, and changes the owner of the stake.
+     *
+     * @param fromStaker the address of the staker to transfer stake from
+     * @param toStaker   the address of the staker to transfer stake to
+     * @param amount     the amount of stake
+     * @param recipient  the new owner of the stake being transferred
+     * @return a pending transfer identifier
+     */
+    @Callable
+    public static long transferStakeTo(Address fromStaker, Address toStaker, long amount, Address recipient) {
         Address caller = Blockchain.getCaller();
 
         requireStaker(fromStaker);
@@ -205,7 +219,7 @@ public class StakerRegistry {
         putOrRemove(s.stakes, caller, previousStake.subtract(amountBI));
 
         long id = nextTransfer++;
-        PendingTransfer transfer = new PendingTransfer(caller, fromStaker, toStaker, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
+        PendingTransfer transfer = new PendingTransfer(caller, fromStaker, toStaker, recipient, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
         pendingTransfers.put(id, transfer);
 
         return id;
@@ -251,9 +265,9 @@ public class StakerRegistry {
         pendingTransfers.remove(id);
 
         Staker s = stakers.get(transfer.toStaker);
-        BigInteger previousStake = getOrDefault(s.stakes, transfer.initiator, BigInteger.ZERO);
+        BigInteger previousStake = getOrDefault(s.stakes, transfer.recipient, BigInteger.ZERO);
         s.totalStake = s.totalStake.add(transfer.value);
-        putOrRemove(s.stakes, transfer.initiator, previousStake.add(transfer.value));
+        putOrRemove(s.stakes, transfer.recipient, previousStake.add(transfer.value));
     }
 
     @Callable
