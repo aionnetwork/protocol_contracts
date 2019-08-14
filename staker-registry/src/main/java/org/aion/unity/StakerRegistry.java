@@ -281,6 +281,17 @@ public class StakerRegistry {
         // 2. prove header1.signer = header2.signer
         // 3. prove header1.number = header2.number
         // 4. prove header1.hash != header2.hash
+
+
+        // NOTE: when calling the onSlash callback, cap the energy limit and ignore
+        // the call results. Otherwise, a staker can set up a energy sucker as listener
+        // to prevent a slashing.
+
+        // Also, to make sure the pool registry have enough energy to execute
+        // its internal logic, we should check the remaining energy here.
+
+        // In conclusion, we need to make sure the listener get executed with enough
+        // energy and prevent a listener from stopping a slashing event.
     }
 
     /**

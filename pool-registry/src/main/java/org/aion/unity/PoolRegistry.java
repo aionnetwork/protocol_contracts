@@ -114,16 +114,13 @@ public class PoolRegistry {
             secureCall(ps.custodianAddress, value, new byte[0], Blockchain.getRemainingEnergy());
         }
 
-        delegate(caller, pool, Blockchain.getValue(), false);
+        delegate(caller, pool, Blockchain.getValue(), true);
     }
 
-    private static void delegate(Address delegator, Address pool, BigInteger value, boolean isFromTransfer) {
-        requirePool(pool);
-        requirePositive(value);
-
+    private static void delegate(Address delegator, Address pool, BigInteger value, boolean doVote) {
         PoolState ps = pools.get(pool);
 
-        if (!isFromTransfer) {
+        if (doVote) {
             if (delegator.equals(pool)) {
                 byte[] data = new ABIStreamingEncoder()
                         .encodeOneString("vote")
@@ -160,35 +157,42 @@ public class PoolRegistry {
      */
     @Callable
     public static long undelegate(Address pool, long amount) {
-        Address caller = Blockchain.getCaller();
         requirePool(pool);
         requirePositive(amount);
         requireNoValue();
 
         detectBlockRewards(pool);
 
+        return undelegate(Blockchain.getCaller(), pool, amount, true);
+    }
+
+    private static long undelegate(Address delegator, Address pool, long amount, boolean doUnvote) {
         PoolState ps = pools.get(pool);
-        BigInteger previousStake = getOrDefault(ps.delegators, caller, BigInteger.ZERO);
+
+        BigInteger previousStake = getOrDefault(ps.delegators, delegator, BigInteger.ZERO);
         BigInteger amountBI = BigInteger.valueOf(amount);
         require(previousStake.compareTo(amountBI) >= 0);
-        ps.delegators.put(caller, previousStake.subtract(amountBI));
+        ps.delegators.put(delegator, previousStake.subtract(amountBI));
 
-        byte[] data = new ABIStreamingEncoder()
-                .encodeOneString("unvoteTo")
-                .encodeOneAddress(pool)
-                .encodeOneLong(amount)
-                .encodeOneAddress(caller)
-                .toBytes();
-        Result result = secureCall(
-                caller.equals(pool) ? ps.custodianAddress : stakerRegistry,
-                BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-        long id = new ABIDecoder(result.getReturnData()).decodeOneLong();
+        long id = -1;
+        if (doUnvote) {
+            byte[] data = new ABIStreamingEncoder()
+                    .encodeOneString("unvoteTo")
+                    .encodeOneAddress(pool)
+                    .encodeOneLong(amount)
+                    .encodeOneAddress(delegator)
+                    .toBytes();
+            Result result = secureCall(
+                    delegator.equals(pool) ? ps.custodianAddress : stakerRegistry,
+                    BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+            id = new ABIDecoder(result.getReturnData()).decodeOneLong();
+        }
 
         // update rewards state machine
-        ps.rewards.onUnvote(caller, Blockchain.getBlockNumber(), amount);
+        ps.rewards.onUnvote(delegator, Blockchain.getBlockNumber(), amount);
 
         // possible pool state change
-        if (caller.equals(ps.stakerAddress)) {
+        if (delegator.equals(ps.stakerAddress)) {
             checkPoolState(ps.stakerAddress);
         }
 
@@ -222,7 +226,7 @@ public class PoolRegistry {
                 secureCall(ps.custodianAddress, BigInteger.valueOf(amount), new byte[0], Blockchain.getRemainingEnergy());
             }
 
-            delegate(caller, pool, BigInteger.valueOf(amount), false);
+            delegate(caller, pool, BigInteger.valueOf(amount), true);
         }
     }
 
@@ -386,7 +390,7 @@ public class PoolRegistry {
                 transfer.initiator.equals(transfer.fromPool) ? pools.get(transfer.fromPool).custodianAddress : stakerRegistry,
                 BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
 
-        delegate(transfer.initiator, transfer.toPool, BigInteger.valueOf(transfer.amount), true);
+        delegate(transfer.initiator, transfer.toPool, BigInteger.valueOf(transfer.amount), false);
     }
 
     /**
@@ -453,17 +457,17 @@ public class PoolRegistry {
             if (delegator.equals(pool)) {
                 secureCall(ps.custodianAddress, BigInteger.valueOf(remaining), new byte[0], Blockchain.getRemainingEnergy());
             }
-            delegate(delegator, pool, BigInteger.valueOf(remaining), false);
+            delegate(delegator, pool, BigInteger.valueOf(remaining), true);
         }
     }
 
     @Callable
     public static void delegateAndEnableAutoRedelegation(Address pool, int fee) {
         requirePool(pool);
-        requirePositive(Blockchain.getValue());
         require(fee >= 0 && fee <= 100);
+        requirePositive(Blockchain.getValue());
 
-        delegate(Blockchain.getCaller(), pool, Blockchain.getValue(), false);
+        delegate(Blockchain.getCaller(), pool, Blockchain.getValue(), true);
         enableAutoRedelegation(pool, fee);
     }
 
@@ -554,14 +558,24 @@ public class PoolRegistry {
     }
 
     @Callable
-    public static void onSlashing(Address staker, long stake) {
+    public static void onSlashing(Address staker, long amount) {
+        PoolState ps = pools.get(staker);
+        if (ps != null) {
+            // the slashing amount should be greater than the stake
+            require(getStake(staker, staker) >= amount);
 
+            // do a un-delegate
+            undelegate(staker, staker, amount, false);
+
+            // check pool state
+            checkPoolState(staker);
+        }
     }
 
-    private static void checkPoolState(Address pool) {
-        PoolState ps = pools.get(pool);
+    private static void checkPoolState(Address staker) {
+        PoolState ps = pools.get(staker);
         if (ps != null) {
-            boolean active = isActive(pool);
+            boolean active = isActive(staker);
             if (ps.isActive && !active) {
                 switchToBroken(ps);
             }
