@@ -106,6 +106,7 @@ public class StakerRegistry {
 
         requireNonNull(signingAddress);
         requireNonNull(coinbaseAddress);
+        requireNoValue();
 
         require(!signingAddresses.containsKey(signingAddress));
         require(!stakers.containsKey(caller));
@@ -161,6 +162,7 @@ public class StakerRegistry {
         requireStaker(staker);
         requirePositive(amount);
         requireNonNull(recipient);
+        requireNoValue();
 
         Staker s = stakers.get(staker);
         BigInteger previousStake = getOrDefault(stakers.get(staker).stakes, caller, BigInteger.ZERO);
@@ -208,6 +210,7 @@ public class StakerRegistry {
         requireStaker(toStaker);
         requirePositive(amount);
         require(!fromStaker.equals(toStaker));
+        requireNoValue();
 
         Staker s = stakers.get(fromStaker);
         BigInteger previousStake = getOrDefault(s.stakes, caller, BigInteger.ZERO);
@@ -232,6 +235,8 @@ public class StakerRegistry {
      */
     @Callable
     public static void finalizeUnvote(long id) {
+        requireNoValue();
+
         PendingUnvote unvote = pendingUnvotes.get(id);
         requireNonNull(unvote);
 
@@ -251,6 +256,8 @@ public class StakerRegistry {
      */
     @Callable
     public static void finalizeTransfer(long id) {
+        requireNoValue();
+
         PendingTransfer transfer = pendingTransfers.get(id);
         requireNonNull(transfer);
 
@@ -294,17 +301,38 @@ public class StakerRegistry {
         // energy and prevent a listener from stopping a slashing event.
     }
 
+
     /**
-     * Returns the total stake associated with a staker.
+     * Returns the effective stake, after conversion and status check.
      *
-     * @param staker the address of the staker
-     * @return the total amount of stake
+     * Designed for kernel usage only.
+     *
+     * @param signingAddress
+     * @return
      */
     @Callable
-    public static long getStakeByStakerAddress(Address staker) {
-        requireStaker(staker);
+    public static long getEffectiveStake(Address signingAddress) {
+        requireNonNull(signingAddress);
+        requireNoValue();
 
-        return stakers.get(staker).totalStake.longValue();
+        // if not a staker
+        Address staker = signingAddresses.get(signingAddress);
+        if (staker == null) {
+            return 0;
+        }
+
+        // if not active
+        if (!isActive(staker)) {
+            return 0;
+        }
+
+        // query total stake
+        long totalStake = getTotalStake(staker);
+
+        // FIXME: define the conversion
+        long effectiveStake = totalStake / 1;
+
+        return effectiveStake;
     }
 
     /**
@@ -314,8 +342,24 @@ public class StakerRegistry {
      * @return the total amount of stake
      */
     @Callable
-    public static long getStakeBySigningAddress(Address staker) {
-        return getStakeByStakerAddress(signingAddresses.get(staker));
+    public static long getTotalStake(Address staker) {
+        requireStaker(staker);
+        requireNoValue();
+
+        return stakers.get(staker).totalStake.longValue();
+    }
+
+    /**
+     * Returns the stake of owner of a staker
+     *
+     * @param staker the address of the staker
+     * @return the total amount of stake
+     */
+    @Callable
+    public static long getSelfStake(Address staker) {
+        requireNoValue();
+
+        return getStake(staker, staker);
     }
 
     /**
@@ -329,20 +373,23 @@ public class StakerRegistry {
     public static long getStake(Address staker, Address voter) {
         requireStaker(staker);
         requireNonNull(voter);
+        requireNoValue();
 
         return getOrDefault(stakers.get(staker).stakes, voter, BigInteger.ZERO).longValue();
     }
 
     /**
-     * Returns whether the staker is active, subject to pre-defined rules, e.g. min_self_stake.s
-     *
-     * It's the kernel's responsibility to call this method before validating the block
-     * production eligibility of a staker.
+     * Returns whether the staker is active, subject to pre-defined rules, e.g. min_self_stake
+     * and slashing rules.
      *
      * @param staker the address of staker
      * @return true if active, otherwise false
      */
+    @Callable
     public static boolean isActive(Address staker) {
+        requireNonNull(staker);
+        requireNoValue();
+
         return BigInteger.valueOf(getStake(staker, staker)).compareTo(MIN_SELF_STAKE) >= 0;
     }
 
@@ -355,6 +402,7 @@ public class StakerRegistry {
     @Callable
     public static Address getSigningAddress(Address staker) {
         requireStaker(staker);
+        requireNoValue();
 
         return stakers.get(staker).signingAddress;
     }
@@ -368,6 +416,7 @@ public class StakerRegistry {
     @Callable
     public static Address getCoinbaseAddress(Address staker) {
         requireStaker(staker);
+        requireNoValue();
 
         return stakers.get(staker).coinbaseAddress;
     }
@@ -382,6 +431,7 @@ public class StakerRegistry {
         Address caller = Blockchain.getCaller();
         requireStaker(caller);
         requireNonNull(newSigningAddress);
+        requireNoValue();
 
         Staker s = stakers.get(caller);
         if (!newSigningAddress.equals(s.signingAddress)) {
@@ -417,6 +467,7 @@ public class StakerRegistry {
         Address caller = Blockchain.getCaller();
         requireStaker(caller);
         requireNonNull(newCoinbaseAddress);
+        requireNoValue();
 
         Staker s = stakers.get(caller);
         if (!newCoinbaseAddress.equals(s.coinbaseAddress)) {
@@ -442,6 +493,7 @@ public class StakerRegistry {
     public static void addListener(Address listener) {
         Address caller = Blockchain.getCaller();
         requireStaker(caller);
+        requireNoValue();
 
         Staker s = stakers.get(caller);
         if (!s.listeners.contains(listener)) {
@@ -465,6 +517,7 @@ public class StakerRegistry {
     public static void removeListener(Address listener) {
         Address caller = Blockchain.getCaller();
         requireStaker(caller);
+        requireNoValue();
 
         Staker s = stakers.get(caller);
         if (s.listeners.contains(listener)) {
@@ -489,6 +542,7 @@ public class StakerRegistry {
     public static boolean isListener(Address staker, Address listener) {
         requireStaker(staker);
         requireNonNull(listener);
+        requireNoValue();
 
         return stakers.get(staker).listeners.contains(listener);
     }
@@ -512,6 +566,10 @@ public class StakerRegistry {
 
     private static void requireNonNull(Object obj) {
         require(obj != null);
+    }
+
+    private static void requireNoValue() {
+        require(Blockchain.getValue().equals(BigInteger.ZERO));
     }
 
     private static <K, V extends BigInteger> void putOrRemove(Map<K, V> map, K key, V value) {

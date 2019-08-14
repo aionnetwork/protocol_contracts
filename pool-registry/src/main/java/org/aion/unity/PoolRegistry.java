@@ -346,7 +346,7 @@ public class PoolRegistry {
         requireNoValue();
 
         byte[] data = new ABIStreamingEncoder()
-                .encodeOneString("getStakeByStakerAddress")
+                .encodeOneString("getTotalStake")
                 .encodeOneAddress(pool)
                 .toBytes();
         Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());

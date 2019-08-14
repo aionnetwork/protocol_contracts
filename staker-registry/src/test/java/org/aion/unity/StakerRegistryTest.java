@@ -120,22 +120,56 @@ public class StakerRegistryTest {
 
         // query the total stake of staker
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getStakeByStakerAddress")
+                .encodeOneString("getTotalStake")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         status = result.getReceiptStatus();
         Assert.assertTrue(status.isSuccess());
         Assert.assertEquals(voteAmount - unvoteAmount, result.getDecodedReturnData());
+    }
 
+    @Test
+    public void testGetEffectiveStake() {
+        BigInteger halfMinStake = StakerRegistry.MIN_SELF_STAKE.divide(BigInteger.valueOf(2));
+
+        // vote first
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("vote")
+                .encodeOneAddress(stakerAddress)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, halfMinStake, txData);
+        ResultCode status = result.getReceiptStatus();
+        Assert.assertTrue(status.isSuccess());
+
+        // query the effective stake
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getStakeBySigningAddress")
+                .encodeOneString("getEffectiveStake")
                 .encodeOneAddress(signingAddress)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         status = result.getReceiptStatus();
         Assert.assertTrue(status.isSuccess());
-        Assert.assertEquals(voteAmount - unvoteAmount, result.getDecodedReturnData());
+        Assert.assertEquals(0L, result.getDecodedReturnData());
+
+        // then unvote
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("vote")
+                .encodeOneAddress(stakerAddress)
+                .toBytes();
+        result = RULE.call(stakerAddress, stakerRegistry, halfMinStake, txData);
+        status = result.getReceiptStatus();
+        Assert.assertTrue(status.isSuccess());
+
+        // query the effective stake again
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getEffectiveStake")
+                .encodeOneAddress(signingAddress)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        status = result.getReceiptStatus();
+        Assert.assertTrue(status.isSuccess());
+        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE.longValue(), result.getDecodedReturnData());
     }
 
     @Test

@@ -273,7 +273,7 @@ public class PoolRegistryTest {
 
         // now, query the stake of the pool1 and pool2 from the staker registry
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getStakeByStakerAddress")
+                .encodeOneString("getTotalStake")
                 .encodeOneAddress(pool1)
                 .toBytes();
         result = RULE.call(delegator, stakerRegistry, BigInteger.ZERO, txData);
@@ -281,7 +281,7 @@ public class PoolRegistryTest {
         long stake = (Long) result.getDecodedReturnData();
         assertEquals(nStake(1).longValue() + 1L, stake);
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getStakeByStakerAddress")
+                .encodeOneString("getTotalStake")
                 .encodeOneAddress(pool2)
                 .toBytes();
         result = RULE.call(delegator, stakerRegistry, BigInteger.ZERO, txData);
