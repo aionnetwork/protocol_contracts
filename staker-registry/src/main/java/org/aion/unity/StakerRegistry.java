@@ -308,16 +308,22 @@ public class StakerRegistry {
      * Designed for kernel usage only.
      *
      * @param signingAddress
+     * @param coinbaseAddress
      * @return
      */
     @Callable
-    public static long getEffectiveStake(Address signingAddress) {
+    public static long getEffectiveStake(Address signingAddress, Address coinbaseAddress) {
         requireNonNull(signingAddress);
         requireNoValue();
 
         // if not a staker
         Address staker = signingAddresses.get(signingAddress);
         if (staker == null) {
+            return 0;
+        }
+
+        // if coinbase addresses do not match
+        if (!stakers.get(staker).coinbaseAddress.equals(coinbaseAddress)) {
             return 0;
         }
 

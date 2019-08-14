@@ -146,6 +146,7 @@ public class StakerRegistryTest {
         txData = new ABIStreamingEncoder()
                 .encodeOneString("getEffectiveStake")
                 .encodeOneAddress(signingAddress)
+                .encodeOneAddress(coinbaseAddress)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         status = result.getReceiptStatus();
@@ -165,6 +166,7 @@ public class StakerRegistryTest {
         txData = new ABIStreamingEncoder()
                 .encodeOneString("getEffectiveStake")
                 .encodeOneAddress(signingAddress)
+                .encodeOneAddress(coinbaseAddress)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         status = result.getReceiptStatus();
