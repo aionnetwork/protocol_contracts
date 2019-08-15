@@ -306,10 +306,13 @@ public class StakerRegistry {
     public static void slash(Address staker) {
         Staker s = stakers.get(staker);
 
-        // slash
+        // deduct the stake of the staker
         BigInteger selfStake = getOrDefault(s.stakes, staker, BigInteger.ZERO);
         require(selfStake.compareTo(SLASHING_AMOUNT) >= 0);
         s.stakes.put(staker, selfStake.min(SLASHING_AMOUNT));
+
+        // transfer the slashed stake to the submitter
+        secureCall(Blockchain.getCaller(), SLASHING_AMOUNT, new byte[0], Blockchain.getRemainingEnergy());
 
         // NOTE: when calling the onSlash callback, cap the energy limit and ignore
         // the call results. Otherwise, a staker can set up a energy sucker as listener
