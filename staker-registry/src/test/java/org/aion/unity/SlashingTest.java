@@ -3,7 +3,6 @@ package org.aion.unity;
 import avm.Address;
 import org.aion.avm.tooling.AvmRule;
 import org.aion.avm.userlib.abi.ABIStreamingEncoder;
-import org.aion.kernel.TestingKernel;
 import org.aion.vm.api.interfaces.ResultCode;
 import org.junit.Assert;
 import org.junit.Before;
@@ -16,8 +15,6 @@ import org.web3j.rlp.RlpList;
 import org.web3j.rlp.RlpString;
 import org.web3j.rlp.RlpType;
 
-import java.lang.reflect.Array;
-import java.lang.reflect.Field;
 import java.math.BigInteger;
 
 import static org.junit.Assert.assertEquals;
@@ -93,7 +90,7 @@ public class SlashingTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        assertEquals(StakerRegistry.MIN_SELF_STAKE.min(StakerRegistry.SLASHING_AMOUNT).longValue(), result.getDecodedReturnData());
+        assertEquals(StakerRegistry.MIN_SELF_STAKE.min(StakerRegistry.PENALTY_AMOUNT).longValue(), result.getDecodedReturnData());
     }
 
 }

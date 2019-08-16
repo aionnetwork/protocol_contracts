@@ -259,7 +259,7 @@ public class StakerRegistryTest {
         ResultCode status = result.getReceiptStatus();
         Assert.assertFalse(status.isSuccess());
 
-        tweakBlockNumber(1L + StakerRegistry.SIGNING_ADDRESS_COOL_DOWN_PERIOD);
+        tweakBlockNumber(1L + StakerRegistry.SIGNING_ADDRESS_COOLING_PERIOD);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("setSigningAddress")

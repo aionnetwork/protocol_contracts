@@ -13,22 +13,21 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A staker registry manages the staker registration, and provides an interface for voters
+ * A staker registry manages the staker database, and provides an interface for voters
  * to vote/unvote for a staker.
  */
 public class StakerRegistry {
 
     // TODO: replace long with BigInteger once the ABI supports it.
-    // TODO: add stake vs nAmp conversion, presumably 1 AION = 1 STAKE.
     // TODO: replace object graph-based collections with key-value storage.
-    // TODO: add events
+    // TODO: add events.
 
-    public static final long SIGNING_ADDRESS_COOL_DOWN_PERIOD = 6 * 60 * 24 * 7;
+    public static final long SIGNING_ADDRESS_COOLING_PERIOD = 6 * 60 * 24 * 7;
     public static final long UNVOTE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
     public static final long TRANSFER_LOCK_UP_PERIOD = 6 * 10;
 
     public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
-    public static final BigInteger SLASHING_AMOUNT = BigInteger.valueOf(100L);
+    public static final BigInteger PENALTY_AMOUNT = BigInteger.valueOf(100L);
 
     private static class Staker {
         private Address signingAddress;
@@ -96,10 +95,10 @@ public class StakerRegistry {
 
     /**
      * Registers a staker. The caller address will be the identification
-     * address of a registered staker.
+     * address of the new staker.
      *
-     * @param signingAddress  the address of key used for signing a PoS block
-     * @param coinbaseAddress the address of key used for collecting block rewards
+     * @param signingAddress  the address of the key used for signing PoS blocks
+     * @param coinbaseAddress the address of the key used for collecting block rewards
      */
     @Callable
     public static void registerStaker(Address signingAddress, Address coinbaseAddress) {
@@ -113,6 +112,7 @@ public class StakerRegistry {
         require(!stakers.containsKey(caller));
 
         signingAddresses.put(signingAddress, caller);
+
         stakers.put(caller, new Staker(signingAddress, coinbaseAddress, Blockchain.getBlockNumber()));
     }
 
@@ -169,11 +169,14 @@ public class StakerRegistry {
         BigInteger previousStake = getOrDefault(stakers.get(staker).stakes, caller, BigInteger.ZERO);
         BigInteger amountBI = BigInteger.valueOf(amount);
 
+        // check previous stake
         require(amountBI.compareTo(previousStake) <= 0);
 
+        // update stake
         s.totalStake = s.totalStake.subtract(amountBI);
         putOrRemove(s.stakes, caller, previousStake.subtract(amountBI));
 
+        // create pending unvote
         long id = nextUnvote++;
         PendingUnvote unvote = new PendingUnvote(caller, recipient, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
         pendingUnvotes.put(id, unvote);
@@ -195,7 +198,7 @@ public class StakerRegistry {
     }
 
     /**
-     * Transfers stake from one staker to another staker, and changes the owner of the stake.
+     * Transfers stake from one staker to another staker, and designates a new owner of the stake.
      *
      * @param fromStaker the address of the staker to transfer stake from
      * @param toStaker   the address of the staker to transfer stake to
@@ -217,11 +220,14 @@ public class StakerRegistry {
         BigInteger previousStake = getOrDefault(s.stakes, caller, BigInteger.ZERO);
         BigInteger amountBI = BigInteger.valueOf(amount);
 
+        // check previous stake
         require(amountBI.compareTo(previousStake) <= 0);
 
+        // update stake
         s.totalStake = s.totalStake.subtract(amountBI);
         putOrRemove(s.stakes, caller, previousStake.subtract(amountBI));
 
+        // create pending transfer
         long id = nextTransfer++;
         PendingTransfer transfer = new PendingTransfer(caller, fromStaker, toStaker, recipient, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
         pendingTransfers.put(id, transfer);
@@ -230,23 +236,25 @@ public class StakerRegistry {
     }
 
     /**
-     * Finalizes an un-vote operations.
+     * Finalizes an un-vote operation, specified by id.
      *
-     * @param id pending unvote identifier
+     * @param id the pending unvote identifier
      */
     @Callable
     public static void finalizeUnvote(long id) {
         requireNoValue();
 
+        // check existence
         PendingUnvote unvote = pendingUnvotes.get(id);
         requireNonNull(unvote);
 
         // lock-up period check
         require(Blockchain.getBlockNumber() >= unvote.blockNumber + UNVOTE_LOCK_UP_PERIOD);
 
+        // remove the unvote
         pendingUnvotes.remove(id);
 
-        // do a transfer
+        // do a value transfer
         secureCall(unvote.recipient, unvote.value, new byte[0], Blockchain.getRemainingEnergy());
     }
 
@@ -259,19 +267,22 @@ public class StakerRegistry {
     public static void finalizeTransfer(long id) {
         requireNoValue();
 
+        // check existence
         PendingTransfer transfer = pendingTransfers.get(id);
         requireNonNull(transfer);
 
         // only the initiator can finalize the transfer, mainly because
         // the pool registry needs to keep track of stake transfers.
-        // more consideration is required.
+        // TODO: a more elegant way would be using listener?
         require(Blockchain.getCaller().equals(transfer.initiator));
 
         // lock-up period check
         require(Blockchain.getBlockNumber() >= transfer.blockNumber + TRANSFER_LOCK_UP_PERIOD);
 
+        // remvoe the transfer
         pendingTransfers.remove(id);
 
+        // credit the stake to the designated pool of the recipient
         Staker s = stakers.get(transfer.toStaker);
         BigInteger previousStake = getOrDefault(s.stakes, transfer.recipient, BigInteger.ZERO);
         s.totalStake = s.totalStake.add(transfer.value);
@@ -288,9 +299,14 @@ public class StakerRegistry {
             // the team eventually decides.
             case 1:
                 require(headers.length == 1);
+
+                // decode block header
                 AionBlockHeader header = new AionBlockHeader(headers[0]);
                 byte[] hash = header.getHash();
                 byte[] correctHash = "test".getBytes(); // FIXME: use `Blockchain.getBlockHash(header.number)`;
+
+                // avoid double-slashing
+                require(!slashedHeaders.contains(new ByteArrayWrapper(hash)));
 
                 if (!Arrays.equals(hash, correctHash)) {
                     // find the staker
@@ -303,16 +319,16 @@ public class StakerRegistry {
         }
     }
 
-    public static void slash(Address staker) {
+    private static void slash(Address staker) {
         Staker s = stakers.get(staker);
 
         // deduct the stake of the staker
         BigInteger selfStake = getOrDefault(s.stakes, staker, BigInteger.ZERO);
-        require(selfStake.compareTo(SLASHING_AMOUNT) >= 0);
-        s.stakes.put(staker, selfStake.min(SLASHING_AMOUNT));
+        require(selfStake.compareTo(PENALTY_AMOUNT) >= 0);
+        s.stakes.put(staker, selfStake.min(PENALTY_AMOUNT));
 
-        // transfer the slashed stake to the submitter
-        secureCall(Blockchain.getCaller(), SLASHING_AMOUNT, new byte[0], Blockchain.getRemainingEnergy());
+        // transfer the slashed stake to the reporter TODO: Yao has different view on this
+        secureCall(Blockchain.getCaller(), PENALTY_AMOUNT, new byte[0], Blockchain.getRemainingEnergy());
 
         // NOTE: when calling the onSlash callback, cap the energy limit and ignore
         // the call results. Otherwise, a staker can set up a energy sucker as listener
@@ -324,32 +340,33 @@ public class StakerRegistry {
         // In conclusion, we need to make sure the listener get executed with enough
         // energy and prevent a listener from stopping a slashing event.
 
+        // FIXME: reduce this number after optimizing the energy usage in pool registry.
+        long energyForListener = 2_000_000L;
         long remainingEnergy = Blockchain.getRemainingEnergy();
-        require(remainingEnergy > 2_000_000L * s.listeners.size() + 100_000L);
+        require(remainingEnergy > energyForListener * s.listeners.size() + 100_000L);
 
-        // TODO: limit the max number of listeners per staker
+        // FIXME: limit the max number of listeners per staker
         // otherwise, staker can register many listeners to prevent slashing.
 
         for (Address listener : s.listeners) {
             byte[] data = new ABIStreamingEncoder()
                     .encodeOneString("onSlashing")
                     .encodeOneAddress(staker)
-                    .encodeOneLong(SLASHING_AMOUNT.longValue())
+                    .encodeOneLong(PENALTY_AMOUNT.longValue())
                     .toBytes();
-            // FIXME: reduce this number after optimizing the energy usage in pool registry.
-            Blockchain.call(listener, BigInteger.ZERO, data, 2_000_000L);
+            Blockchain.call(listener, BigInteger.ZERO, data, energyForListener);
         }
     }
 
 
     /**
-     * Returns the effective stake, after conversion and status check.
+     * Returns the effective stake, after conversion and status check, of a staker.
      *
      * Designed for kernel usage only.
      *
-     * @param signingAddress
-     * @param coinbaseAddress
-     * @return
+     * @param signingAddress the signing address extracted from block header
+     * @param coinbaseAddress the coinbase address extracted from block header
+     * @return the effective stake of the staker
      */
     @Callable
     public static long getEffectiveStake(Address signingAddress, Address coinbaseAddress) {
@@ -375,14 +392,14 @@ public class StakerRegistry {
         // query total stake
         long totalStake = getTotalStake(staker);
 
-        // FIXME: define the conversion
+        // FIXME: define the conversion, presumably 1 AION = 1 stake
         long effectiveStake = totalStake / 1;
 
         return effectiveStake;
     }
 
     /**
-     * Returns the total stake associated with a staker.
+     * Returns the total stake of a staker.
      *
      * @param staker the address of the staker
      * @return the total amount of stake
@@ -396,15 +413,13 @@ public class StakerRegistry {
     }
 
     /**
-     * Returns the stake of owner of a staker
+     * Returns the self-bond stake of a staker
      *
      * @param staker the address of the staker
-     * @return the total amount of stake
+     * @return the amount of self-bond stake
      */
     @Callable
     public static long getSelfStake(Address staker) {
-        requireNoValue();
-
         return getStake(staker, staker);
     }
 
@@ -412,7 +427,7 @@ public class StakerRegistry {
      * Returns the stake from a voter to a staker.
      *
      * @param staker the address of the staker
-     * @param voter  the address of the staker
+     * @param voter  the address of the voter
      * @return the amount of stake
      */
     @Callable
@@ -425,7 +440,7 @@ public class StakerRegistry {
     }
 
     /**
-     * Returns whether the staker is active, subject to pre-defined rules, e.g. min_self_stake
+     * Returns whether a staker is active, subject to pre-defined rules, e.g. min_self_stake
      * and slashing rules.
      *
      * @param staker the address of staker
@@ -475,6 +490,7 @@ public class StakerRegistry {
     @Callable
     public static void setSigningAddress(Address newSigningAddress) {
         Address caller = Blockchain.getCaller();
+
         requireStaker(caller);
         requireNonNull(newSigningAddress);
         requireNoValue();
@@ -483,7 +499,7 @@ public class StakerRegistry {
         if (!newSigningAddress.equals(s.signingAddress)) {
             // check last update
             long blockNumber = Blockchain.getBlockNumber();
-            require(blockNumber >= s.lastSigningAddressUpdate + SIGNING_ADDRESS_COOL_DOWN_PERIOD);
+            require(blockNumber >= s.lastSigningAddressUpdate + SIGNING_ADDRESS_COOLING_PERIOD);
 
             // check duplicated signing address
             require(!signingAddresses.containsKey(newSigningAddress));
@@ -511,6 +527,7 @@ public class StakerRegistry {
     @Callable
     public static void setCoinbaseAddress(Address newCoinbaseAddress) {
         Address caller = Blockchain.getCaller();
+
         requireStaker(caller);
         requireNonNull(newCoinbaseAddress);
         requireNoValue();
@@ -531,9 +548,9 @@ public class StakerRegistry {
     }
 
     /**
-     * Registers a listener. Owner only.
+     * Registers a listener to a staker. Owner only.
      *
-     * @param listener the address of the listener contract
+     * @param listener the address of the listener
      */
     @Callable
     public static void addListener(Address listener) {
@@ -555,13 +572,14 @@ public class StakerRegistry {
     }
 
     /**
-     * Deregisters a listener. Owner only.
+     * Removes a listener of a staker. Owner only.
      *
      * @param listener the address of the listener contract
      */
     @Callable
     public static void removeListener(Address listener) {
         Address caller = Blockchain.getCaller();
+
         requireStaker(caller);
         requireNoValue();
 

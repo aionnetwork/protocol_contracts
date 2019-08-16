@@ -13,22 +13,20 @@ import java.math.BigInteger;
 import java.util.Map;
 
 /**
- * A stake delegation registry manages a list of registered pools, votes/un-votes on delegator's behalf, and
- * ensure the delegators receive its portion of the block rewards.
+ * A stake delegation registry manages a list of registered pools, is the endpoint
+ * for delegators/pool owners to interact with different pools.
  * <p>
  * Workflow for pool operator:
- * - Register a staker
- * - Register the staker as a pool
- * - Set the coinbase address to the one controlled by the pool registry
- * - Register the pool registry as a listener to the staker
+ * - Register a staker;
+ * - Register the staker as a pool;
+ * - Add the pool registry as a listener to the staker;
+ * - Set the coinbase address to the address of the pool coinbase contract.
  */
 public class PoolRegistry {
 
     // TODO: replace object graph-based collections with key-value storage
-    // TODO: add restriction to operations based on pool state
-    // TODO: add any necessary getters
-    // TODO: allow pool operator to update meta data and commission rate
     // TODO: replace long with BigInteger
+    // TODO: add meta data and commission rate setters/getters
     // TODO: add events
 
     public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
@@ -53,7 +51,7 @@ public class PoolRegistry {
     }
 
     /**
-     * Register a pool in the registry.
+     * Registers a pool in the registry.
      *
      * @param metaData       the pool meta data
      * @param commissionRate the pool commission rate
@@ -150,7 +148,7 @@ public class PoolRegistry {
     }
 
     /**
-     * Cancels stake to a pool.
+     * Revokes stake to a pool.
      *
      * @param pool   the pool address
      * @param amount the amount of stake to undelegate
@@ -200,7 +198,7 @@ public class PoolRegistry {
     }
 
     /**
-     * Delegate to a pool using block rewards from the pool
+     * Delegates block rewards to a pool
      *
      * @param pool the pool address
      */
@@ -249,7 +247,7 @@ public class PoolRegistry {
     private static Map<Long, StakeTransfer> transfers = new AionMap<>();
 
     /**
-     * Transfers stake from one pool to another.
+     * Transfers stake from one pool to another pool.
      *
      * @param fromPool the from pool address
      * @param toPool   the to pool address
@@ -320,7 +318,7 @@ public class PoolRegistry {
     }
 
     /**
-     * Returns the owner's stake to a pool.
+     * Returns the self-bond stake to a pool.
      *
      * @param pool the pool address
      * @return the amount of stake
@@ -354,7 +352,7 @@ public class PoolRegistry {
     }
 
     /**
-     * Finalizes an un-vote operation
+     * Finalizes an un-vote operation.
      *
      * @param id pending unvote id
      */
@@ -370,7 +368,7 @@ public class PoolRegistry {
     }
 
     /**
-     * Finalizes a transfer operation. This can be called by any one.
+     * Finalizes a transfer operation.
      *
      * @param id pending transfer id
      */
@@ -394,7 +392,7 @@ public class PoolRegistry {
     }
 
     /**
-     * Returns the auto-redelegation fee set by the delegator, or -1 if not set.
+     * Returns the auto-redelegation fee set by a delegator, or -1 if not set.
      *
      * @param pool      the pool's address
      * @param delegator the delegator's address
@@ -408,6 +406,12 @@ public class PoolRegistry {
         return getOrDefault(pools.get(pool).autoRedelegationDelegators, delegator, -1);
     }
 
+    /**
+     * Enables auto-redelegation on a pool.
+     *
+     * @param pool the pool address
+     * @param feePercentage the auto-redelegation fee
+     */
     @Callable
     public static void enableAutoRedelegation(Address pool, int feePercentage) {
         requirePool(pool);
@@ -417,6 +421,11 @@ public class PoolRegistry {
         pools.get(pool).autoRedelegationDelegators.put(Blockchain.getCaller(), feePercentage);
     }
 
+    /**
+     * Disables auto-redelegation on a pool.
+     *
+     * @param pool the pool address
+     */
     @Callable
     public static void disableAutoRedelegation(Address pool) {
         requirePool(pool);
@@ -425,6 +434,13 @@ public class PoolRegistry {
         pools.get(pool).autoRedelegationDelegators.remove(Blockchain.getCaller());
     }
 
+    /**
+     * Delegates one delegator's block rewards to the pool. The caller
+     * gets the auto-redelegation fee.
+     *
+     * @param pool the pool address
+     * @param delegator the delegator address
+     */
     @Callable
     public static void autoRedelegate(Address pool, Address delegator) {
         requirePool(pool);
@@ -433,6 +449,7 @@ public class PoolRegistry {
 
         detectBlockRewards(pool);
 
+        // check auto-redelegation authorization
         PoolState ps = pools.get(pool);
         require(ps.autoRedelegationDelegators.containsKey(delegator));
 
@@ -461,6 +478,12 @@ public class PoolRegistry {
         }
     }
 
+    /**
+     * Delegates to a pool and enables auto-redelegation.
+     *
+     * @param pool the pool address
+     * @param fee the auto-redelegation fee
+     */
     @Callable
     public static void delegateAndEnableAutoRedelegation(Address pool, int fee) {
         requirePool(pool);
@@ -487,7 +510,7 @@ public class PoolRegistry {
     }
 
     /**
-     * Withdraws rewards from one pool
+     * Withdraws block rewards from one pool.
      *
      * @param pool the pool address
      */
@@ -514,7 +537,7 @@ public class PoolRegistry {
     }
 
     /**
-     * Returns pool status.
+     * Returns the status of a pool.
      *
      * @param pool the pool address.
      * @return
@@ -586,7 +609,7 @@ public class PoolRegistry {
     }
 
     private static boolean isActive(Address pool) {
-        // TODO: optimize, checking all three condition every time consumes too much energy
+        // TODO: optimize - checking all three condition each time costs too much energy
         return isCoinbaseSetup(pool) && isListenerSetup(pool) && isSelfStakeSatisfied(pool);
     }
 
@@ -664,8 +687,8 @@ public class PoolRegistry {
         require(caller.equals(stakerRegistry));
     }
 
-    public static byte[] hexStringToByteArray(String s) {
-        // TODO: make static
+    private static byte[] hexStringToByteArray(String s) {
+        // TODO: use static variable
         int[] map = new int[256];
         int value = 0;
         for (char c : "0123456789abcdef".toCharArray()) {
