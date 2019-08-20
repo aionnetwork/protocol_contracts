@@ -29,7 +29,7 @@ import java.math.BigInteger;
  * Assuming the AVM data-word limit of 128-bit unsigned integer, the number of precision places required
  * is ceil(log_10(2^128 - 1)) = ceil(38.53) = 39 ~ 40.
  * <p>
- * We pick 20 precision places as the "precision" in this proof of concept.
+ * We pick 18 precision places as the "precision" in this proof of concept, since it fits inside a Long.
  * <p>
  * Under such a precision regime:
  * > All additions and subtractions can be computed without precision loss
@@ -44,9 +44,11 @@ public class Decimal {
 
     // class settings
     // ==============
-    private final static int precision = 20;
-
-    private static BigInteger precisionInt = BigInteger.TEN.pow(precision);
+    private final static int precision = 18;
+    /* TODO: The value of precisionInt should be tied to the value of precision (defined above) directly; initially
+        this was implemented like so: BigInteger.TEN.pow(precision). We need a better was of initializing this
+        BigInteger (maybe using a String instead of a Long), since more than 20 decimals will overflow Long. */
+    private static BigInteger precisionInt = BigInteger.valueOf(1_000_000_000_000_000_000L);
     private final BigInteger value;
 
     private Decimal(BigInteger v) {
