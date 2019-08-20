@@ -65,8 +65,9 @@ public class PoolRegistryTest {
         // STEP-2 register a pool
         txData = new ABIStreamingEncoder()
                 .encodeOneString("registerPool")
-                .encodeOneByteArray("meta_data".getBytes())
                 .encodeOneInteger(fee)
+                .encodeOneByteArray("url".getBytes())
+                .encodeOneByteArray("contentHash".getBytes())
                 .toBytes();
         result = RULE.call(newPool, poolRegistry, BigInteger.ZERO, txData);
         status = result.getReceiptStatus();
@@ -148,8 +149,9 @@ public class PoolRegistryTest {
     public void testRegister() {
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("registerPool")
-                .encodeOneByteArray("test".getBytes())
                 .encodeOneInteger(5)
+                .encodeOneByteArray("url".getBytes())
+                .encodeOneByteArray("contentHash".getBytes())
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
 

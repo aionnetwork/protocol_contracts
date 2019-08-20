@@ -53,16 +53,15 @@ public class PoolRegistry {
     /**
      * Registers a pool in the registry.
      *
-     * @param metaData       the pool meta data
      * @param commissionRate the pool commission rate
      * @return the pool coinbase address
      */
     @Callable
-    public static Address registerPool(byte[] metaData, int commissionRate) {
+    public static Address registerPool(int commissionRate, byte[] metaDataUrl, byte[] metaDataContentHash) {
         // sanity check
-        requireNonNull(metaData);
         require(commissionRate >= 0 && commissionRate <= 100);
         requireNoValue();
+        // TODO: sanity checks on metaDataUrl and metaDataContentHash
 
         // the caller doesn't have to register a staker beforehand.
         Address caller = Blockchain.getCaller();
@@ -85,7 +84,7 @@ public class PoolRegistry {
         Address  custodianAddress = new Address(result.getReturnData());
 
         // step 3: update pool state
-        PoolState ps = new PoolState(caller, coinbaseAddress, custodianAddress, metaData, commissionRate);
+        PoolState ps = new PoolState(caller, coinbaseAddress, custodianAddress, commissionRate, metaDataUrl, metaDataContentHash);
         pools.put(caller, ps);
 
         return coinbaseAddress;
