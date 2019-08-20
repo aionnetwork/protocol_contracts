@@ -2,6 +2,43 @@ package org.aion.unity;
 
 import java.math.BigInteger;
 
+/**
+ * Notes on Precision Selection
+ * ----------------------------
+ * <p>
+ * WLOG, all amounts are denominated in some units of "coin".
+ * <p>
+ * When we refer to "precision", we mean the number of precision places required to represent the smallest possible real
+ * number that can arise when we divide the smallest unit of staked coin, with the largest size of the pool.
+ * <p>
+ * Such quantity required in the computation of the F1 rewards distribution scheme.
+ * <p>
+ * Consider the following degenerate case: all coins in the system are delegated to one pool, and a delegator has
+ * staked 1 coin to this pool. In this case, the maximum precision "precision" we need is the number of precision places
+ * required to represent (max # of coins in the system)^-1
+ * <p>
+ * Now, if there is an upper limit to the number of coins that can be delegated to a pool, then the "precision" we
+ * need would be the number of precision places required to represent (max # of coins per pool)^-1. In the
+ * absence of such a maximum, in the design of this system, we fall-back to the "precision" that depends on the max #
+ * of coins in the system.
+ * <p>
+ * Furthermore, we run into another problem here; the max # of coins in the system has not been defined for Aion. In
+ * order to resolve this, we consider the maximum number which can be represented by a 64-bit signed (Java) long,
+ * the number of precision places required is ceil(log_10(2^63 - 1)) = ceil(18.96) = 19 ~ 20.
+ * <p>
+ * Assuming the AVM data-word limit of 128-bit unsigned integer, the number of precision places required
+ * is ceil(log_10(2^128 - 1)) = ceil(38.53) = 39 ~ 40.
+ * <p>
+ * We pick 20 precision places as the "precision" in this proof of concept.
+ * <p>
+ * Under such a precision regime:
+ * > All additions and subtractions can be computed without precision loss
+ * > Multiplications would need to be performed with double the precision (40 precision places), which is then
+ * truncated down to 20 precision places.
+ * <p>
+ * We've used long to represent all "coin" units in this system. A decision needs to be made about the units used
+ * in the smart contract; if we're using base units (nAmp) or Aion, or some other quanta of coin.
+ */
 @SuppressWarnings({"unused", "WeakerAccess"})
 public class Decimal {
 

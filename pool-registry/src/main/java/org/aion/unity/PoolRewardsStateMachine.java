@@ -6,6 +6,10 @@ import org.aion.avm.userlib.AionMap;
 
 import java.util.Map;
 
+/**
+ * See https://github.com/ali-sharif/f1-fee-distribution for a PoC implementation of the F1 algorithm
+ * TODO: need more tests for this class
+ */
 public class PoolRewardsStateMachine {
     // pool variables
     private int fee; // 0-100%
