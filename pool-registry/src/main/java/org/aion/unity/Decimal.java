@@ -44,12 +44,9 @@ public class Decimal {
 
     // class settings
     // ==============
-    private final static int precision = 18;
-    // bytes required to represent the above precision
-    // Ceiling[Log2[999 999 999 999 999 999]]
-    private final static int DecimalPrecisionBits = 60;
+    private final static int precision = 20;
 
-    private static BigInteger precisionInt = BigInteger.valueOf(1_000_000_000_000_000_000L);
+    private static BigInteger precisionInt = BigInteger.TEN.pow(precision);
     private final BigInteger value;
 
     private Decimal(BigInteger v) {
@@ -98,18 +95,12 @@ public class Decimal {
     public Decimal add(Decimal d) {
         BigInteger r = value.add(d.value);
 
-        if (r.bitLength() > 255 + DecimalPrecisionBits)
-            throw new RuntimeException("Int overflow");
-
         return new Decimal(r);
     }
 
     // subtraction
     public Decimal subtract(Decimal d) {
         BigInteger r = value.subtract(d.value);
-
-        if (r.bitLength() > 255 + DecimalPrecisionBits)
-            throw new RuntimeException("Int overflow");
 
         return new Decimal(r);
     }
@@ -119,9 +110,6 @@ public class Decimal {
         // multiply precision twice
         BigInteger mul = value.multiply(d.value);
         BigInteger chopped = chopPrecisionAndTruncate(mul);
-
-        if (chopped.bitLength() > 255 + DecimalPrecisionBits)
-            throw new RuntimeException("Int overflow");
 
         return new Decimal(chopped);
     }
@@ -133,9 +121,6 @@ public class Decimal {
         BigInteger quo = mul.divide(d.value);
         BigInteger chopped = chopPrecisionAndTruncate(quo);
 
-        if (chopped.bitLength() > 255 + DecimalPrecisionBits)
-            throw new RuntimeException("Int overflow");
-
         return new Decimal(chopped);
     }
 
@@ -143,8 +128,9 @@ public class Decimal {
         return d.divide(precisionInt);
     }
 
+    // TODO: is the truncated version is appropriate? (or if full expansion (without truncation) should be used)
     @Override
     public String toString() {
-        return Double.toString(value.doubleValue() / 10e18);
+        return getTruncated().toString();
     }
 }
