@@ -53,41 +53,87 @@ public class PoolRegistry {
     /**
      * Registers a pool in the registry.
      *
+     * @param signingAddress
      * @param commissionRate the pool commission rate
      * @return the pool coinbase address
      */
     @Callable
-    public static Address registerPool(int commissionRate, byte[] metaDataUrl, byte[] metaDataContentHash) {
+    public static void registerPool(Address signingAddress, int commissionRate, byte[] metaDataUrl, byte[] metaDataContentHash) {
         // sanity check
         require(commissionRate >= 0 && commissionRate <= 100);
         requireNoValue();
         // TODO: sanity checks on metaDataUrl and metaDataContentHash
 
-        // the caller doesn't have to register a staker beforehand.
         Address caller = Blockchain.getCaller();
+
+        // make sure no one has registered as a staker using this identity
+        require(isStakerRegistered(caller));
+
+        // make sure no one has registered as a pool using this identity
         require(!pools.containsKey(caller));
 
-        byte[] poolRegistryAddr = Blockchain.getAddress().toByteArray();
-        byte[] stakerRegistryAddr = stakerRegistry.toByteArray();
+        Address poolRegistry =  Blockchain.getAddress();
 
         // step 1: deploy a coinbase contract
-        System.arraycopy(poolRegistryAddr, 0, poolCoinbaseContract, poolCoinbaseContract.length - Address.LENGTH, Address.LENGTH);
+        System.arraycopy(poolRegistry.toByteArray(), 0, poolCoinbaseContract, poolCoinbaseContract.length - Address.LENGTH, Address.LENGTH);
         Result result = Blockchain.create(BigInteger.ZERO, poolCoinbaseContract, Blockchain.getRemainingEnergy());
         require(result.isSuccess());
         Address coinbaseAddress = new Address(result.getReturnData());
 
         // step 2: deploy a custodian contract
-        System.arraycopy(poolRegistryAddr, 0, poolCustodianContract, poolCustodianContract.length - Address.LENGTH * 2 - 1, Address.LENGTH);
-        System.arraycopy(stakerRegistryAddr, 0, poolCustodianContract, poolCustodianContract.length - Address.LENGTH, Address.LENGTH);
+        System.arraycopy(poolRegistry.toByteArray(), 0, poolCustodianContract, poolCustodianContract.length - Address.LENGTH * 2 - 1, Address.LENGTH);
+        System.arraycopy(stakerRegistry.toByteArray(), 0, poolCustodianContract, poolCustodianContract.length - Address.LENGTH, Address.LENGTH);
         result = Blockchain.create(BigInteger.ZERO, poolCustodianContract, Blockchain.getRemainingEnergy());
         require(result.isSuccess());
-        Address  custodianAddress = new Address(result.getReturnData());
+        Address custodianAddress = new Address(result.getReturnData());
 
-        // step 3: update pool state
+        // step 3: create a staker in the staker registry
+        /*
+        registerStaker(Address identityAddress, Address managementAddress,
+                                      Address signingAddress, Address coinbaseAddress, Address selfBondAddress)
+         */
+        byte[] registerStakerCall = new ABIStreamingEncoder()
+                .encodeOneString("registerStaker")
+                .encodeOneAddress(caller)
+                .encodeOneAddress(poolRegistry)
+                .encodeOneAddress(signingAddress)
+                .encodeOneAddress(coinbaseAddress)
+                .encodeOneAddress(custodianAddress)
+                .toBytes();
+        secureCall(stakerRegistry, BigInteger.ZERO, registerStakerCall, Blockchain.getRemainingEnergy());
+
+        // step 4: add the pool registry as a listener in the staker registry
+        byte[] addListenerCall = new ABIStreamingEncoder()
+                .encodeOneString("addListener")
+                .encodeOneAddress(caller)
+                .encodeOneAddress(poolRegistry)
+                .toBytes();
+        secureCall(stakerRegistry, BigInteger.ZERO, addListenerCall, Blockchain.getRemainingEnergy());
+
+        // step 5: update pool state
         PoolState ps = new PoolState(caller, coinbaseAddress, custodianAddress, commissionRate, metaDataUrl, metaDataContentHash);
         pools.put(caller, ps);
+    }
 
-        return coinbaseAddress;
+    /**
+     * Updates the signing address of a staker. Owner only.
+     *
+     * @param staker the staker address
+     * @param newAddress the new signing address
+     */
+    @Callable
+    public static void setSigningAddress(Address staker, Address newAddress) {
+        requireNonNull(newAddress);
+        requireNoValue();
+        require(Blockchain.getCaller().equals(staker));
+        requirePool(staker);
+
+        byte[] data = new ABIStreamingEncoder()
+                .encodeOneString("setCoinbaseAddress")
+                .encodeOneAddress(staker)
+                .encodeOneAddress(newAddress)
+                .toBytes();
+        secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
     }
 
     /**
@@ -398,11 +444,11 @@ public class PoolRegistry {
      * @return the fee in percentage, or -1
      */
     @Callable
-    public static int getAutoRedelegationFee(Address pool, Address delegator) {
+    public static int getAutoRewardsDelegationFee(Address pool, Address delegator) {
         requirePool(pool);
         requireNoValue();
 
-        return getOrDefault(pools.get(pool).autoRedelegationDelegators, delegator, -1);
+        return getOrDefault(pools.get(pool).autoRewardsDelegationDelegators, delegator, -1);
     }
 
     /**
@@ -412,12 +458,12 @@ public class PoolRegistry {
      * @param feePercentage the auto-redelegation fee
      */
     @Callable
-    public static void enableAutoRedelegation(Address pool, int feePercentage) {
+    public static void enableAutoRewardsDelegation(Address pool, int feePercentage) {
         requirePool(pool);
         require(feePercentage >= 0 && feePercentage <= 100);
         requireNoValue();
 
-        pools.get(pool).autoRedelegationDelegators.put(Blockchain.getCaller(), feePercentage);
+        pools.get(pool).autoRewardsDelegationDelegators.put(Blockchain.getCaller(), feePercentage);
     }
 
     /**
@@ -426,11 +472,11 @@ public class PoolRegistry {
      * @param pool the pool address
      */
     @Callable
-    public static void disableAutoRedelegation(Address pool) {
+    public static void disableAutoRewardsDedelegation(Address pool) {
         requirePool(pool);
         requireNoValue();
 
-        pools.get(pool).autoRedelegationDelegators.remove(Blockchain.getCaller());
+        pools.get(pool).autoRewardsDelegationDelegators.remove(Blockchain.getCaller());
     }
 
     /**
@@ -441,7 +487,7 @@ public class PoolRegistry {
      * @param delegator the delegator address
      */
     @Callable
-    public static void autoRedelegate(Address pool, Address delegator) {
+    public static void autoDelegateRewards(Address pool, Address delegator) {
         requirePool(pool);
         requireNonNull(delegator);
         requireNoValue();
@@ -450,7 +496,7 @@ public class PoolRegistry {
 
         // check auto-redelegation authorization
         PoolState ps = pools.get(pool);
-        require(ps.autoRedelegationDelegators.containsKey(delegator));
+        require(ps.autoRewardsDelegationDelegators.containsKey(delegator));
 
         // do a withdraw
         long amount = ps.rewards.onWithdraw(delegator, Blockchain.getBlockNumber());
@@ -461,7 +507,7 @@ public class PoolRegistry {
         Blockchain.println("Auto delegation: rewards = " + amount);
 
         if (amount > 0) {
-            long fee = amount * ps.autoRedelegationDelegators.get(delegator) / 100;
+            long fee = amount * ps.autoRewardsDelegationDelegators.get(delegator) / 100;
             long remaining = amount - fee;
 
             Blockchain.println("Auto delegation: fee = " + fee + ", remaining = " + remaining);
@@ -490,7 +536,7 @@ public class PoolRegistry {
         requirePositive(Blockchain.getValue());
 
         delegate(Blockchain.getCaller(), pool, Blockchain.getValue(), true);
-        enableAutoRedelegation(pool, fee);
+        enableAutoRewardsDelegation(pool, fee);
     }
 
     /**
@@ -610,6 +656,17 @@ public class PoolRegistry {
     private static boolean isActive(Address pool) {
         // TODO: optimize - checking all three condition each time costs too much energy
         return isCoinbaseSetup(pool) && isListenerSetup(pool) && isSelfStakeSatisfied(pool);
+    }
+
+    private static boolean isStakerRegistered(Address staker) {
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("isStaker")
+                .encodeOneAddress(staker)
+                .toBytes();
+        Result result = secureCall(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
+        boolean isStaker = new ABIDecoder(result.getReturnData()).decodeOneBoolean();
+
+        return isStaker;
     }
 
     private static boolean isCoinbaseSetup(Address pool) {

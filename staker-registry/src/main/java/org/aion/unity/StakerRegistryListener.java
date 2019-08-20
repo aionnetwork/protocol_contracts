@@ -10,17 +10,33 @@ public interface StakerRegistryListener {
      * When the signing address of a staker is changed.
      *
      * @param staker            the staker address
-     * @param newSigningAddress the new signing address
+     * @param newAddress the new signing address
      */
-    void onSigningAddressChange(Address staker, Address newSigningAddress);
+    void onSigningAddressChange(Address staker, Address newAddress);
 
     /**
      * When the coinbase address of a staker is changed.
      *
      * @param staker             the staker address
-     * @param newCoinbaseAddress the new coinbase address
+     * @param newAddress the new coinbase address
      */
-    void onCoinbaseAddressChange(Address staker, Address newCoinbaseAddress);
+    void onCoinbaseAddressChange(Address staker, Address newAddress);
+
+    /**
+     * When the self-bond address of a staker is changed.
+     *
+     * @param staker             the staker address
+     * @param newAddress the new coinbase address
+     */
+    void onSelfBondAddressChange(Address staker, Address newAddress);
+
+    /**
+     * When the management address of a staker is changed.
+     *
+     * @param staker             the staker address
+     * @param newAddress the new coinbase address
+     */
+    void onManagementAddressChange(Address staker, Address newAddress);
 
     /**
      * When this listener is added.

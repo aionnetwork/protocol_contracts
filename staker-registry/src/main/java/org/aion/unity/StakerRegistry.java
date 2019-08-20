@@ -30,8 +30,11 @@ public class StakerRegistry {
     public static final BigInteger PENALTY_AMOUNT = BigInteger.valueOf(100L);
 
     private static class Staker {
+        private Address identityAddress;
+        private Address managementAddress;
         private Address signingAddress;
         private Address coinbaseAddress;
+        private Address selfBondAddress;
 
         private long lastSigningAddressUpdate;
 
@@ -43,9 +46,12 @@ public class StakerRegistry {
 
         private Set<Address> listeners;
 
-        public Staker(Address signingAddress, Address coinbaseAddress, long lastSigningAddressUpdate) {
+        public Staker(Address identityAddress, Address managementAddress, Address signingAddress, Address coinbaseAddress, Address selfBondAddress, long lastSigningAddressUpdate) {
+            this.identityAddress = identityAddress;
+            this.managementAddress = managementAddress;
             this.signingAddress = signingAddress;
             this.coinbaseAddress = coinbaseAddress;
+            this.selfBondAddress = selfBondAddress;
             this.lastSigningAddressUpdate = lastSigningAddressUpdate;
             this.totalStake = BigInteger.ZERO;
             this.stakes = new AionMap<>();
@@ -85,6 +91,7 @@ public class StakerRegistry {
         }
     }
 
+    private static Map<Address, Address> managers = new AionMap<>();
     private static Map<Address, Staker> stakers = new AionMap<>();
     private static Map<Address, Address> signingAddresses = new AionMap<>();
 
@@ -97,23 +104,26 @@ public class StakerRegistry {
      * Registers a staker. The caller address will be the identification
      * address of the new staker.
      *
+     * @param identityAddress  the identity of the staker; can't be changed
+     * @param managementAddress  the address with management rights. can't be changed.
      * @param signingAddress  the address of the key used for signing PoS blocks
      * @param coinbaseAddress the address of the key used for collecting block rewards
+     * @param selfBondAddress  the self bond is deposited by staker
      */
     @Callable
-    public static void registerStaker(Address signingAddress, Address coinbaseAddress) {
-        Address caller = Blockchain.getCaller();
+    public static void registerStaker(Address identityAddress, Address managementAddress,
+                                      Address signingAddress, Address coinbaseAddress, Address selfBondAddress) {
 
         requireNonNull(signingAddress);
         requireNonNull(coinbaseAddress);
         requireNoValue();
 
         require(!signingAddresses.containsKey(signingAddress));
-        require(!stakers.containsKey(caller));
+        require(!stakers.containsKey(identityAddress));
 
-        signingAddresses.put(signingAddress, caller);
+        signingAddresses.put(signingAddress, identityAddress);
 
-        stakers.put(caller, new Staker(signingAddress, coinbaseAddress, Blockchain.getBlockNumber()));
+        stakers.put(identityAddress, new Staker(identityAddress, managementAddress, signingAddress, coinbaseAddress, selfBondAddress, Blockchain.getBlockNumber()));
     }
 
     /**
@@ -420,7 +430,7 @@ public class StakerRegistry {
      */
     @Callable
     public static long getSelfStake(Address staker) {
-        return getStake(staker, staker);
+        return getStake(staker, stakers.get(staker).selfBondAddress);
     }
 
     /**
@@ -440,6 +450,17 @@ public class StakerRegistry {
     }
 
     /**
+     * Returns if staker is registered.
+     *
+     * @param staker the address of the staker
+     * @return the amount of stake
+     */
+    @Callable
+    public static boolean isStaker(Address staker) {
+        return stakers.containsKey(staker);
+    }
+
+    /**
      * Returns whether a staker is active, subject to pre-defined rules, e.g. min_self_stake
      * and slashing rules.
      *
@@ -451,7 +472,7 @@ public class StakerRegistry {
         requireNonNull(staker);
         requireNoValue();
 
-        return BigInteger.valueOf(getStake(staker, staker)).compareTo(MIN_SELF_STAKE) >= 0;
+        return BigInteger.valueOf(getSelfStake(staker)).compareTo(MIN_SELF_STAKE) >= 0;
     }
 
     /**
@@ -482,20 +503,26 @@ public class StakerRegistry {
         return stakers.get(staker).coinbaseAddress;
     }
 
+    // TODO: correct error checking.
+    private static Staker requireStakerAndManager(Address staker, Address manager) {
+        requireStaker(staker);
+        requireManager(manager);
+        Staker s = stakers.get(staker);
+        require(s.managementAddress.equals(manager));
+
+        return s;
+    }
     /**
      * Updates the signing address of a staker. Owner only.
      *
      * @param newSigningAddress the new signing address
      */
     @Callable
-    public static void setSigningAddress(Address newSigningAddress) {
-        Address caller = Blockchain.getCaller();
-
-        requireStaker(caller);
+    public static void setSigningAddress(Address staker, Address newSigningAddress) {
         requireNonNull(newSigningAddress);
         requireNoValue();
 
-        Staker s = stakers.get(caller);
+        Staker s =  requireStakerAndManager(staker, Blockchain.getCaller());
         if (!newSigningAddress.equals(s.signingAddress)) {
             // check last update
             long blockNumber = Blockchain.getBlockNumber();
@@ -504,14 +531,14 @@ public class StakerRegistry {
             // check duplicated signing address
             require(!signingAddresses.containsKey(newSigningAddress));
 
-            signingAddresses.put(newSigningAddress, caller);
+            signingAddresses.put(newSigningAddress, s.identityAddress);
             s.signingAddress = newSigningAddress;
             s.lastSigningAddressUpdate = blockNumber;
 
             for (Address listener : s.listeners) {
                 byte[] data = new ABIStreamingEncoder()
                         .encodeOneString("onSigningAddressChange")
-                        .encodeOneAddress(caller)
+                        .encodeOneAddress(s.identityAddress)
                         .encodeOneAddress(newSigningAddress)
                         .toBytes();
                 secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
@@ -525,22 +552,44 @@ public class StakerRegistry {
      * @param newCoinbaseAddress the new coinbase address
      */
     @Callable
-    public static void setCoinbaseAddress(Address newCoinbaseAddress) {
-        Address caller = Blockchain.getCaller();
-
-        requireStaker(caller);
+    public static void setCoinbaseAddress(Address staker, Address newCoinbaseAddress) {
         requireNonNull(newCoinbaseAddress);
         requireNoValue();
 
-        Staker s = stakers.get(caller);
+        Staker s = requireStakerAndManager(staker, Blockchain.getCaller());
         if (!newCoinbaseAddress.equals(s.coinbaseAddress)) {
             s.coinbaseAddress = newCoinbaseAddress;
 
             for (Address listener : s.listeners) {
                 byte[] data = new ABIStreamingEncoder()
                         .encodeOneString("onCoinbaseAddressChange")
-                        .encodeOneAddress(caller)
+                        .encodeOneAddress(s.identityAddress)
                         .encodeOneAddress(newCoinbaseAddress)
+                        .toBytes();
+                secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+            }
+        }
+    }
+
+    /**
+     * Updates the coinbase address of a staker. Owner only.
+     *
+     * @param newAddress the new coinbase address
+     */
+    @Callable
+    public static void setSelfBondAddress(Address staker, Address newAddress) {
+        requireNonNull(newAddress);
+        requireNoValue();
+
+        Staker s = requireStakerAndManager(staker, Blockchain.getCaller());
+        if (!newAddress.equals(s.selfBondAddress)) {
+            s.selfBondAddress = newAddress;
+
+            for (Address listener : s.listeners) {
+                byte[] data = new ABIStreamingEncoder()
+                        .encodeOneString("onSelfBondAddressChange")
+                        .encodeOneAddress(s.identityAddress)
+                        .encodeOneAddress(newAddress)
                         .toBytes();
                 secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
             }
@@ -553,19 +602,17 @@ public class StakerRegistry {
      * @param listener the address of the listener
      */
     @Callable
-    public static void addListener(Address listener) {
-        Address caller = Blockchain.getCaller();
-        requireStaker(caller);
+    public static void addListener(Address staker, Address listener) {
         requireNoValue();
 
-        Staker s = stakers.get(caller);
+        Staker s = requireStakerAndManager(staker, Blockchain.getCaller());
         if (!s.listeners.contains(listener)) {
             s.listeners.add(listener);
 
             // notify the listener
             byte[] data = new ABIStreamingEncoder()
                     .encodeOneString("onListenerAdded")
-                    .encodeOneAddress(caller)
+                    .encodeOneAddress(s.identityAddress)
                     .toBytes();
             secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
         }
@@ -577,20 +624,17 @@ public class StakerRegistry {
      * @param listener the address of the listener contract
      */
     @Callable
-    public static void removeListener(Address listener) {
-        Address caller = Blockchain.getCaller();
-
-        requireStaker(caller);
+    public static void removeListener(Address staker, Address listener) {
         requireNoValue();
 
-        Staker s = stakers.get(caller);
+        Staker s = requireStakerAndManager(staker, Blockchain.getCaller());
         if (s.listeners.contains(listener)) {
             s.listeners.remove(listener);
 
             // notify the listener
             byte[] data = new ABIStreamingEncoder()
                     .encodeOneString("onListenerRemoved")
-                    .encodeOneAddress(caller)
+                    .encodeOneAddress(s.identityAddress)
                     .toBytes();
             secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
         }
@@ -618,6 +662,10 @@ public class StakerRegistry {
 
     private static void requireStaker(Address staker) {
         require(staker != null && stakers.containsKey(staker));
+    }
+
+    private static void requireManager(Address manager) {
+        require(manager != null && managers.containsKey(manager));
     }
 
     private static void requirePositive(BigInteger num) {
