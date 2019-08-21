@@ -333,11 +333,12 @@ public class StakerRegistry {
 
     private static void slash(Address staker) {
         Staker s = stakers.get(staker);
+        Address selfBondAddress = s.selfBondAddress;
 
         // deduct the stake of the staker
-        BigInteger selfStake = getOrDefault(s.stakes, staker, BigInteger.ZERO);
+        BigInteger selfStake = getOrDefault(s.stakes, selfBondAddress, BigInteger.ZERO);
         require(selfStake.compareTo(PENALTY_AMOUNT) >= 0);
-        s.stakes.put(staker, selfStake.min(PENALTY_AMOUNT));
+        s.stakes.put(selfBondAddress, selfStake.min(PENALTY_AMOUNT));
 
         // transfer the slashed stake to the reporter TODO: Yao has different view on this
         secureCall(Blockchain.getCaller(), PENALTY_AMOUNT, new byte[0], Blockchain.getRemainingEnergy());
