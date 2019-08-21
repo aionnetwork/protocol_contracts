@@ -29,7 +29,7 @@ public class SlashingTest {
 
     private Address preminedAddress;
 
-    private Address stakerAddress;
+    private Address stakerAddress; // TODO: separate identity, management and selfbond address
     private Address signingAddress;
     private Address coinbaseAddress;
 
@@ -45,14 +45,17 @@ public class SlashingTest {
         coinbaseAddress = RULE.getRandomAddress(BigInteger.ZERO);
 
         // deploy the staker registry contract
-        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null, AionBlockHeader.class, RlpDecoder.class, RlpEncoder.class, RlpList.class, RlpString.class, RlpType.class, Arrays.class);
+        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null, AionBlockHeader.class, RlpDecoder.class, RlpEncoder.class, RlpList.class, RlpString.class, RlpType.class, Arrays.class, ByteArrayWrapper.class);
         stakerRegistry = RULE.deploy(preminedAddress, BigInteger.ZERO, jar).getDappAddress();
 
         // register the staker
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("registerStaker")
+                .encodeOneAddress(stakerAddress)
+                .encodeOneAddress(stakerAddress)
                 .encodeOneAddress(signingAddress)
                 .encodeOneAddress(coinbaseAddress)
+                .encodeOneAddress(stakerAddress)
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
         ResultCode status = result.getReceiptStatus();

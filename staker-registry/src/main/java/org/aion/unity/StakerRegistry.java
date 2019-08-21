@@ -530,7 +530,6 @@ public class StakerRegistry {
     // TODO: correct error checking.
     private static Staker requireStakerAndManager(Address staker, Address manager) {
         requireStaker(staker);
-        requireManager(manager);
         Staker s = stakers.get(staker);
         require(s.managementAddress.equals(manager));
 
@@ -686,10 +685,6 @@ public class StakerRegistry {
 
     private static void requireStaker(Address staker) {
         require(staker != null && stakers.containsKey(staker));
-    }
-
-    private static void requireManager(Address manager) {
-        require(manager != null && managers.containsKey(manager));
     }
 
     private static void requirePositive(BigInteger num) {
