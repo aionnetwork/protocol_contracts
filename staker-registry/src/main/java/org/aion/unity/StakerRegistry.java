@@ -115,7 +115,7 @@ public class StakerRegistry {
     @Callable
     public static void registerStaker(Address identityAddress, Address managementAddress,
                                       Address signingAddress, Address coinbaseAddress, Address selfBondAddress) {
-
+        requireNonNull(identityAddress);
         requireNonNull(signingAddress);
         requireNonNull(coinbaseAddress);
         requireNoValue();
@@ -123,6 +123,7 @@ public class StakerRegistry {
         require(!signingAddresses.containsKey(signingAddress));
         require(!stakers.containsKey(identityAddress));
 
+        managers.put(identityAddress, signingAddress);
         signingAddresses.put(signingAddress, identityAddress);
 
         stakers.put(identityAddress, new Staker(identityAddress, managementAddress, signingAddress, coinbaseAddress, selfBondAddress, Blockchain.getBlockNumber()));
