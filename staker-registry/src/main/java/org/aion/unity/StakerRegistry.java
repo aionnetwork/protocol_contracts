@@ -39,6 +39,7 @@ public class StakerRegistry {
         private long lastSigningAddressUpdate;
 
         private BigInteger totalStake;
+        private boolean isActive;
 
         // maps addresses to the stakes those addresses have sent to this staker
         // the sum of stakes.values() should always equal totalStake
@@ -56,6 +57,7 @@ public class StakerRegistry {
             this.totalStake = BigInteger.ZERO;
             this.stakes = new AionMap<>();
             this.listeners = new AionSet<>();
+            this.isActive = true;
         }
     }
 
@@ -422,16 +424,6 @@ public class StakerRegistry {
         return stakers.get(staker).totalStake.longValue();
     }
 
-    /**
-     * Returns the self-bond stake of a staker
-     *
-     * @param staker the address of the staker
-     * @return the amount of self-bond stake
-     */
-    @Callable
-    public static long getSelfStake(Address staker) {
-        return getStake(staker, stakers.get(staker).selfBondAddress);
-    }
 
     /**
      * Returns the stake from a voter to a staker.
@@ -472,7 +464,37 @@ public class StakerRegistry {
         requireNonNull(staker);
         requireNoValue();
 
-        return BigInteger.valueOf(getSelfStake(staker)).compareTo(MIN_SELF_STAKE) >= 0;
+        Staker s = stakers.get(staker);
+
+        return s.isActive && BigInteger.valueOf(getStake(staker, s.selfBondAddress)).compareTo(MIN_SELF_STAKE) >= 0;
+    }
+
+    /**
+     * Updates the active status of a staker. Owner only.
+     *
+     * @param isActive the new signing address
+     */
+    @Callable
+    public static void setActive(Address staker, boolean isActive) {
+        requireNoValue();
+
+        Staker s =  requireStakerAndManager(staker, Blockchain.getCaller());
+
+        if (isActive != s.isActive) {
+            s.isActive = isActive;
+
+            for (Address listener : s.listeners) {
+                byte[] data = new ABIStreamingEncoder()
+                        .encodeOneString("onActiveStatusChange")
+                        .encodeOneAddress(s.identityAddress)
+                        .encodeOneBoolean(isActive)
+                        .toBytes();
+                secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+            }
+        }
+
+
+        s.isActive = isActive;
     }
 
     /**

@@ -39,6 +39,14 @@ public interface StakerRegistryListener {
     void onManagementAddressChange(Address staker, Address newAddress);
 
     /**
+     * When the active status of a staker is changed.
+     *
+     * @param staker the staker address
+     * @param newStatus the new coinbase address
+     */
+    void onActiveStatusChange(Address staker, boolean newStatus);
+
+    /**
      * When this listener is added.
      *
      * @param staker the staker address

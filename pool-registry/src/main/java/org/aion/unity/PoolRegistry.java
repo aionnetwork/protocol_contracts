@@ -655,7 +655,7 @@ public class PoolRegistry {
 
     private static boolean isActive(Address pool) {
         // TODO: optimize - checking all three condition each time costs too much energy
-        return isCoinbaseSetup(pool) && isListenerSetup(pool) && isSelfStakeSatisfied(pool);
+        return isCoinbaseSetup(pool) && isListenerSetup(pool) && isSelfStakeSatisfied(pool) && isStakerActive(pool);
     }
 
     private static boolean isStakerRegistered(Address staker) {
@@ -667,6 +667,17 @@ public class PoolRegistry {
         boolean isStaker = new ABIDecoder(result.getReturnData()).decodeOneBoolean();
 
         return isStaker;
+    }
+
+    private static boolean isStakerActive(Address pool) {
+        requirePool(pool);
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("isActive")
+                .encodeOneAddress(pool)
+                .toBytes();
+        Result result = secureCall(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
+        return new ABIDecoder(result.getReturnData()).decodeOneBoolean();
     }
 
     private static boolean isCoinbaseSetup(Address pool) {
@@ -700,6 +711,8 @@ public class PoolRegistry {
 
         PoolState ps = pools.get(pool);
         BigInteger stake = getOrDefault(ps.delegators, ps.stakerAddress, BigInteger.ZERO);
+
+        // can implement a self-bond percentage very easily here
         return stake.compareTo(MIN_SELF_STAKE) >= 0;
     }
 
@@ -712,6 +725,8 @@ public class PoolRegistry {
     private static void switchToBroken(PoolState ps) {
         ps.isActive = false;
         ps.rewards.setCommissionRate(0);
+
+        // alternatively, punishment could be making the staker inactive
     }
 
     private static void require(boolean condition) {
