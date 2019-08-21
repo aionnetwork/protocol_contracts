@@ -67,7 +67,7 @@ public class PoolRegistry {
         Address caller = Blockchain.getCaller();
 
         // make sure no one has registered as a staker using this identity
-        require(isStakerRegistered(caller));
+        require(!isStakerRegistered(caller));
 
         // make sure no one has registered as a pool using this identity
         require(!pools.containsKey(caller));
@@ -129,7 +129,7 @@ public class PoolRegistry {
         requirePool(staker);
 
         byte[] data = new ABIStreamingEncoder()
-                .encodeOneString("setCoinbaseAddress")
+                .encodeOneString("setSigningAddress")
                 .encodeOneAddress(staker)
                 .encodeOneAddress(newAddress)
                 .toBytes();
