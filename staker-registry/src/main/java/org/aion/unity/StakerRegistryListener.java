@@ -31,14 +31,6 @@ public interface StakerRegistryListener {
     void onSelfBondAddressChange(Address staker, Address newAddress);
 
     /**
-     * When the management address of a staker is changed.
-     *
-     * @param staker             the staker address
-     * @param newAddress the new coinbase address
-     */
-    void onManagementAddressChange(Address staker, Address newAddress);
-
-    /**
      * When the active status of a staker is changed.
      *
      * @param staker the staker address
