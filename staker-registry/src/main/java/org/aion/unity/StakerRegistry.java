@@ -93,7 +93,6 @@ public class StakerRegistry {
         }
     }
 
-    private static Map<Address, Address> managers = new AionMap<>();
     private static Map<Address, Staker> stakers = new AionMap<>();
     private static Map<Address, Address> signingAddresses = new AionMap<>();
 
@@ -116,14 +115,15 @@ public class StakerRegistry {
     public static void registerStaker(Address identityAddress, Address managementAddress,
                                       Address signingAddress, Address coinbaseAddress, Address selfBondAddress) {
         requireNonNull(identityAddress);
+        requireNonNull(managementAddress);
         requireNonNull(signingAddress);
         requireNonNull(coinbaseAddress);
+        requireNonNull(selfBondAddress);
         requireNoValue();
 
         require(!signingAddresses.containsKey(signingAddress));
         require(!stakers.containsKey(identityAddress));
 
-        managers.put(identityAddress, signingAddress);
         signingAddresses.put(signingAddress, identityAddress);
 
         stakers.put(identityAddress, new Staker(identityAddress, managementAddress, signingAddress, coinbaseAddress, selfBondAddress, Blockchain.getBlockNumber()));
