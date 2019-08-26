@@ -516,15 +516,31 @@ public class StakerRegistry {
     /**
      * Returns the coinbase address of a staker.
      *
-     * @param staker the address of the staker.
+     * @param staker the identity address of the staker.
      * @return the coinbase address
      */
     @Callable
-    public static Address getCoinbaseAddress(Address staker) {
+    public static Address getCoinbaseAddressForIdentityAddress(Address staker) {
         requireStaker(staker);
         requireNoValue();
 
         return stakers.get(staker).coinbaseAddress;
+    }
+
+    /**
+     * Returns the coinbase address of a staker.
+     *
+     * @param signingAddress the signing address of the staker.
+     * @return the coinbase address
+     */
+    @Callable
+    public static Address getCoinbaseAddressForSigningAddress(Address signingAddress) {
+        requireNoValue();
+
+        Address identityAddress = signingAddresses.get(signingAddress);
+        requireStaker(identityAddress);
+
+        return stakers.get(identityAddress).coinbaseAddress;
     }
 
     // TODO: correct error checking.

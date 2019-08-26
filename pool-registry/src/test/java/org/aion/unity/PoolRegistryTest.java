@@ -509,7 +509,7 @@ public class PoolRegistryTest {
 
     private void generateBlock(Address pool, long blockRewards) {
         byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("getCoinbaseAddress")
+                .encodeOneString("getCoinbaseAddressForIdentityAddress")
                 .encodeOneAddress(pool)
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);

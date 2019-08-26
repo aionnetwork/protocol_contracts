@@ -684,7 +684,7 @@ public class PoolRegistry {
         requirePool(pool);
 
         byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("getCoinbaseAddress")
+                .encodeOneString("getCoinbaseAddressForIdentityAddress")
                 .encodeOneAddress(pool)
                 .toBytes();
         Result result = secureCall(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());

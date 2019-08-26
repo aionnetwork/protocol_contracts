@@ -79,7 +79,7 @@ public class StakerRegistryTest {
 
         // query the coinbase address
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getCoinbaseAddress")
+                .encodeOneString("getCoinbaseAddressForIdentityAddress")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
@@ -304,7 +304,7 @@ public class StakerRegistryTest {
         Assert.assertTrue(status.isSuccess());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getCoinbaseAddress")
+                .encodeOneString("getCoinbaseAddressForIdentityAddress")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
