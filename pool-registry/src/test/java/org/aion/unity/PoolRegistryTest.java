@@ -43,8 +43,7 @@ public class PoolRegistryTest {
 
         byte[] arguments = ABIUtil.encodeDeploymentArguments(stakerRegistry);
         byte[] data = RULE.getDappBytes(PoolRegistry.class, arguments, PoolState.class, PoolRewardsStateMachine.class, Decimal.class);
-        // TODO: FIX ENERGY
-        AvmRule.ResultWrapper result = RULE.deploy(preminedAddress, BigInteger.ZERO, data, 10_000_000L, 1L);
+        AvmRule.ResultWrapper result = RULE.deploy(preminedAddress, BigInteger.ZERO, data);
         assertTrue(result.getReceiptStatus().isSuccess());
         poolRegistry = result.getDappAddress();
     }
@@ -96,23 +95,6 @@ public class PoolRegistryTest {
 
         assertTrue(result.getReceiptStatus().isSuccess());
         assertEquals(stakerRegistry, result.getDecodedReturnData());
-    }
-
-    @Test
-    public void testPoolCoinbaseContract() {
-        byte[] arguments = ABIUtil.encodeDeploymentArguments(new Address(new byte[32]));
-        byte[] data = RULE.getDappBytes(PoolCoinbase.class, arguments);
-        System.out.println(Hex.toHexString(data));
-        System.out.println(data.length);
-    }
-
-
-    @Test
-    public void testPoolCustodianContract() {
-        byte[] arguments = ABIUtil.encodeDeploymentArguments(new Address(new byte[32]), new Address(new byte[32]));
-        byte[] data = RULE.getDappBytes(PoolCustodian.class, arguments);
-        System.out.println(Hex.toHexString(data));
-        System.out.println(data.length);
     }
 
     @Test

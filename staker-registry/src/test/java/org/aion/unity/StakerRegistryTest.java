@@ -287,12 +287,6 @@ public class StakerRegistryTest {
     }
 
     @Test
-    public void testPrintJarInHex() {
-        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null, otherClasses);
-        System.out.println(Hex.toHexString(jar));
-    }
-
-    @Test
     public void testLockupPeriod() {
         long voteAmount = 1000L;
         long unvoteAmount = 900L;
