@@ -42,7 +42,7 @@ public class PoolRegistryTest {
         }
 
         byte[] arguments = ABIUtil.encodeDeploymentArguments(stakerRegistry);
-        byte[] data = RULE.getDappBytes(PoolRegistry.class, arguments, PoolState.class, PoolRewardsStateMachine.class, Decimal.class);
+        byte[] data = RULE.getDappBytes(PoolRegistry.class, arguments, PoolState.class, PoolRewardsStateMachine.class, Decimal.class, PoolRegistryEvents.class);
         AvmRule.ResultWrapper result = RULE.deploy(preminedAddress, BigInteger.ZERO, data);
         assertTrue(result.getReceiptStatus().isSuccess());
         poolRegistry = result.getDappAddress();

@@ -8,6 +8,7 @@ import org.aion.avm.userlib.AionMap;
 import org.aion.avm.userlib.AionSet;
 import org.aion.avm.userlib.abi.ABIStreamingEncoder;
 
+import java.beans.EventSetDescriptor;
 import java.math.BigInteger;
 import java.util.Map;
 import java.util.Set;
@@ -20,7 +21,6 @@ public class StakerRegistry {
 
     // TODO: replace long with BigInteger once the ABI supports it.
     // TODO: replace object graph-based collections with key-value storage.
-    // TODO: add events.
 
     public static final long SIGNING_ADDRESS_COOLING_PERIOD = 6 * 60 * 24 * 7;
     public static final long UNVOTE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
@@ -127,6 +127,7 @@ public class StakerRegistry {
         signingAddresses.put(signingAddress, identityAddress);
 
         stakers.put(identityAddress, new Staker(identityAddress, managementAddress, signingAddress, coinbaseAddress, selfBondAddress, Blockchain.getBlockNumber()));
+        StakerRegistryEvents.registeredStaker(identityAddress, managementAddress, signingAddress, coinbaseAddress, selfBondAddress);
     }
 
     /**
@@ -146,6 +147,7 @@ public class StakerRegistry {
         s.totalStake = s.totalStake.add(amount);
         BigInteger previousStake = getOrDefault(s.stakes, caller, BigInteger.ZERO);
         putOrRemove(s.stakes, caller, previousStake.add(amount));
+        StakerRegistryEvents.voted(caller, staker, amount);
     }
 
     /**
@@ -193,6 +195,7 @@ public class StakerRegistry {
         long id = nextUnvote++;
         PendingUnvote unvote = new PendingUnvote(caller, recipient, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
         pendingUnvotes.put(id, unvote);
+        StakerRegistryEvents.unvoted(id, caller, staker, recipient, amountBI);
 
         return id;
     }
@@ -244,6 +247,7 @@ public class StakerRegistry {
         long id = nextTransfer++;
         PendingTransfer transfer = new PendingTransfer(caller, fromStaker, toStaker, recipient, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
         pendingTransfers.put(id, transfer);
+        StakerRegistryEvents.transferredStake(id, fromStaker, toStaker, recipient, amountBI);
 
         return id;
     }
@@ -269,6 +273,7 @@ public class StakerRegistry {
 
         // do a value transfer
         secureCall(unvote.recipient, unvote.value, new byte[0], Blockchain.getRemainingEnergy());
+        StakerRegistryEvents.finalizedUnvote(id);
     }
 
     /**
@@ -300,6 +305,7 @@ public class StakerRegistry {
         BigInteger previousStake = getOrDefault(s.stakes, transfer.recipient, BigInteger.ZERO);
         s.totalStake = s.totalStake.add(transfer.value);
         putOrRemove(s.stakes, transfer.recipient, previousStake.add(transfer.value));
+        StakerRegistryEvents.finalizedTransfer(id);
     }
 
     private static Set<ByteArrayWrapper> slashedHeaders = new AionSet<>();
@@ -583,6 +589,8 @@ public class StakerRegistry {
                 secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
             }
         }
+        // todo only if a new address?
+        StakerRegistryEvents.setSigningAddress(staker, newSigningAddress);
     }
 
     /**
@@ -608,6 +616,7 @@ public class StakerRegistry {
                 secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
             }
         }
+        StakerRegistryEvents.setCoinbaseAddress(staker, newCoinbaseAddress);
     }
 
     /**
@@ -633,6 +642,7 @@ public class StakerRegistry {
                 secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
             }
         }
+        StakerRegistryEvents.setSelfBondAddress(staker, newAddress);
     }
 
     /**

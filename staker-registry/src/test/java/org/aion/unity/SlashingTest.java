@@ -40,7 +40,7 @@ public class SlashingTest {
         coinbaseAddress = RULE.getRandomAddress(BigInteger.ZERO);
 
         // deploy the staker registry contract
-        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null, AionBlockHeader.class, RlpDecoder.class, RlpEncoder.class, RlpList.class, RlpString.class, RlpType.class, Arrays.class, ByteArrayWrapper.class);
+        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null, AionBlockHeader.class, RlpDecoder.class, RlpEncoder.class, RlpList.class, RlpString.class, RlpType.class, Arrays.class, ByteArrayWrapper.class, StakerRegistryEvents.class);
         stakerRegistry = RULE.deploy(preminedAddress, BigInteger.ZERO, jar).getDappAddress();
 
         // register the staker

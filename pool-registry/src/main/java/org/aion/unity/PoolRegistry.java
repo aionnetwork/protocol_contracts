@@ -27,7 +27,6 @@ public class PoolRegistry {
     // TODO: replace object graph-based collections with key-value storage
     // TODO: replace long with BigInteger
     // TODO: add meta data and commission rate setters/getters
-    // TODO: add events
 
     public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
 
@@ -113,6 +112,7 @@ public class PoolRegistry {
         // step 5: update pool state
         PoolState ps = new PoolState(caller, coinbaseAddress, custodianAddress, commissionRate, metaDataUrl, metaDataContentHash);
         pools.put(caller, ps);
+        PoolRegistryEvents.registeredPool(caller, commissionRate, metaDataContentHash, metaDataUrl);
     }
 
     /**
@@ -190,6 +190,7 @@ public class PoolRegistry {
         if (delegator.equals(ps.stakerAddress)) {
             checkPoolState(ps.stakerAddress);
         }
+        PoolRegistryEvents.delegated(delegator, pool, value);
     }
 
     /**
@@ -239,6 +240,7 @@ public class PoolRegistry {
             checkPoolState(ps.stakerAddress);
         }
 
+        PoolRegistryEvents.undelegated(id, delegator, pool, amountBI);
         return id;
     }
 
@@ -343,6 +345,7 @@ public class PoolRegistry {
             checkPoolState(ps.stakerAddress);
         }
 
+        PoolRegistryEvents.transferredStake(id, caller, fromPool, toPool, amountBI);
         return id;
     }
 
@@ -463,7 +466,9 @@ public class PoolRegistry {
         require(feePercentage >= 0 && feePercentage <= 100);
         requireNoValue();
 
-        pools.get(pool).autoRewardsDelegationDelegators.put(Blockchain.getCaller(), feePercentage);
+        Address caller = Blockchain.getCaller();
+        pools.get(pool).autoRewardsDelegationDelegators.put(caller, feePercentage);
+        PoolRegistryEvents.enabledAutoRewardsDelegation(caller, pool, feePercentage);
     }
 
     /**
@@ -476,7 +481,9 @@ public class PoolRegistry {
         requirePool(pool);
         requireNoValue();
 
+        Address caller = Blockchain.getCaller();
         pools.get(pool).autoRewardsDelegationDelegators.remove(Blockchain.getCaller());
+        PoolRegistryEvents.disabledAutoRewardsDelegation(caller, pool);
     }
 
     /**
@@ -574,10 +581,12 @@ public class PoolRegistry {
             amount += ps.rewards.onWithdrawOperator();
         }
 
+        BigInteger amountBI = BigInteger.valueOf(amount);
         // do a transfer
         if (amount > 0) {
-            secureCall(caller, BigInteger.valueOf(amount), new byte[0], Blockchain.getRemainingEnergy());
+            secureCall(caller, amountBI, new byte[0], Blockchain.getRemainingEnergy());
         }
+        PoolRegistryEvents.withdrew(caller, pool, amountBI);
         return amount;
     }
 
