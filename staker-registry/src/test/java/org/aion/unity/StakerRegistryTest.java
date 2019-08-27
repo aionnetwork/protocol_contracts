@@ -1,7 +1,6 @@
 package org.aion.unity;
 
 import avm.Address;
-import org.aion.avm.core.util.Helpers;
 import org.aion.avm.embed.AvmRule;
 import org.aion.avm.userlib.abi.ABIStreamingEncoder;
 import org.aion.kernel.TestingState;
@@ -21,7 +20,7 @@ public class StakerRegistryTest {
     private static BigInteger ENOUGH_BALANCE_TO_TRANSACT = BigInteger.TEN.pow(18 + 5);
 
     @Rule
-    public AvmRule RULE = new AvmRule(true);
+    public AvmRule RULE = new AvmRule(false);
 
     private Address preminedAddress;
 
@@ -204,7 +203,7 @@ public class StakerRegistryTest {
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         // tweak the block number to skip the TRANSFER_LOCK_UP_PERIOD
-        tweakBlockNumber(1 + StakerRegistry.TRANSFER_LOCK_UP_PERIOD);
+        tweakBlockNumber(RULE.kernel.getBlockNumber() + StakerRegistry.TRANSFER_LOCK_UP_PERIOD);
 
         // the recipient staker needs to finalize the transfer
         txData = new ABIStreamingEncoder()
@@ -247,7 +246,7 @@ public class StakerRegistryTest {
         AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertFalse(result.getReceiptStatus().isSuccess());
 
-        tweakBlockNumber(1L + StakerRegistry.SIGNING_ADDRESS_COOLING_PERIOD);
+        tweakBlockNumber(RULE.kernel.getBlockNumber() + StakerRegistry.SIGNING_ADDRESS_COOLING_PERIOD);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("setSigningAddress")
@@ -316,6 +315,8 @@ public class StakerRegistryTest {
         long id = (long) result.getDecodedReturnData();
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
+        long blockNumber = RULE.kernel.getBlockNumber();
+
         // now try to release
         txData = new ABIStreamingEncoder()
                 .encodeOneString("finalizeUnvote")
@@ -325,7 +326,7 @@ public class StakerRegistryTest {
         Assert.assertFalse(result.getReceiptStatus().isSuccess());
 
         // tweak the block number
-        tweakBlockNumber(1L + StakerRegistry.UNVOTE_LOCK_UP_PERIOD);
+        tweakBlockNumber(blockNumber + StakerRegistry.UNVOTE_LOCK_UP_PERIOD);
 
         // and, query again
         txData = new ABIStreamingEncoder()

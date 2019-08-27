@@ -23,7 +23,7 @@ public class PoolRegistryTest {
     private static BigInteger ENOUGH_BALANCE_TO_TRANSACT = BigInteger.TEN.pow(18 + 5);
 
     @Rule
-    public AvmRule RULE = new AvmRule(true);
+    public AvmRule RULE = new AvmRule(false);
 
     // default address with balance
     private Address preminedAddress = RULE.getPreminedAccount();
@@ -43,7 +43,8 @@ public class PoolRegistryTest {
 
         byte[] arguments = ABIUtil.encodeDeploymentArguments(stakerRegistry);
         byte[] data = RULE.getDappBytes(PoolRegistry.class, arguments, PoolState.class, PoolRewardsStateMachine.class, Decimal.class);
-        AvmRule.ResultWrapper result = RULE.deploy(preminedAddress, BigInteger.ZERO, data);
+        // TODO: FIX ENERGY
+        AvmRule.ResultWrapper result = RULE.deploy(preminedAddress, BigInteger.ZERO, data, 10_000_000L, 1L);
         assertTrue(result.getReceiptStatus().isSuccess());
         poolRegistry = result.getDappAddress();
     }
@@ -210,7 +211,7 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
 
         // bump block number and finalize the transfer
-        tweakBlockNumber(1 + 6 * 10);
+        tweakBlockNumber(RULE.kernel.getBlockNumber() + 6 * 10);
         txData = new ABIStreamingEncoder()
                 .encodeOneString("finalizeTransfer")
                 .encodeOneLong(id)
