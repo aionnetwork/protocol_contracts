@@ -694,6 +694,28 @@ public class StakerRegistry {
         return stakers.get(staker).listeners.contains(listener);
     }
 
+    @Callable
+    public static long[] getPendingUnvoteIds() {
+        requireNoValue();
+        long[] pendingUnvoteIds = new long[pendingUnvotes.keySet().size()];
+        int i = 0;
+        for (long id : pendingUnvotes.keySet()) {
+            pendingUnvoteIds[i++] = id;
+        }
+        return pendingUnvoteIds;
+    }
+
+    @Callable
+    public static long[] getPendingTransferIds() {
+        requireNoValue();
+        long[] pendingTransferIds = new long[pendingTransfers.keySet().size()];
+        int i = 0;
+        for (long id : pendingTransfers.keySet()) {
+            pendingTransferIds[i++] = id;
+        }
+        return pendingTransferIds;
+    }
+
     private static void require(boolean condition) {
         // now implements as un-catchable
         Blockchain.require(condition);

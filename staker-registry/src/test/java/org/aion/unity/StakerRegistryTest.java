@@ -8,7 +8,6 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.spongycastle.util.encoders.Hex;
 import org.web3j.rlp.*;
 
 import java.lang.reflect.Field;
@@ -329,6 +328,144 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
+    }
+
+    @Test
+    public void testGetPendingUnvoteIds() {
+        long voteAmount = 1000L;
+        long unvoteAmount = 90L;
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("vote")
+                .encodeOneAddress(stakerAddress)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(preminedAddress, stakerRegistry, BigInteger.valueOf(voteAmount), txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getPendingUnvoteIds")
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertArrayEquals(new long[]{}, (long[]) result.getDecodedReturnData());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("unvote")
+                .encodeOneAddress(stakerAddress)
+                .encodeOneLong(unvoteAmount)
+                .toBytes();
+        int size = 10;
+        long[] ids = new long[size];
+        for (int i = 0; i < size; i++) {
+            result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+            Assert.assertTrue(result.getReceiptStatus().isSuccess());
+            ids[i] = i;
+        }
+
+        long blockNumber = RULE.kernel.getBlockNumber();
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getPendingUnvoteIds")
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertArrayEquals(ids, (long[]) result.getDecodedReturnData());
+
+        tweakBlockNumber(blockNumber + StakerRegistry.UNVOTE_LOCK_UP_PERIOD);
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("finalizeUnvote")
+                .encodeOneLong(0)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getPendingUnvoteIds")
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertArrayEquals(new long[]{1, 2, 3, 4, 5, 6, 7, 8, 9}, (long[]) result.getDecodedReturnData());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("finalizeUnvote")
+                .encodeOneLong(5)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getPendingUnvoteIds")
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertArrayEquals(new long[]{1, 2, 3, 4, 6, 7, 8, 9}, (long[]) result.getDecodedReturnData());
+    }
+
+    @Test
+    public void testGetPendingTransferIds() {
+        long voteAmount = 1000L;
+        long transferAmount = 100L;
+        Address stakerAddress2 = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+        Address signingAddress2 = RULE.getRandomAddress(BigInteger.ZERO);
+        Address coinbaseAddress2 = RULE.getRandomAddress(BigInteger.ZERO);
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("registerStaker")
+                .encodeOneAddress(stakerAddress2)
+                .encodeOneAddress(stakerAddress2)
+                .encodeOneAddress(signingAddress2)
+                .encodeOneAddress(coinbaseAddress2)
+                .encodeOneAddress(stakerAddress2)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(stakerAddress2, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("vote")
+                .encodeOneAddress(stakerAddress)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.valueOf(voteAmount), txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("transferStake")
+                .encodeOneAddress(stakerAddress)
+                .encodeOneAddress(stakerAddress2)
+                .encodeOneLong(transferAmount)
+                .toBytes();
+        int size = 10;
+        long[] ids = new long[size];
+        for (int i = 0; i < size; i++) {
+            result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+            Assert.assertTrue(result.getReceiptStatus().isSuccess());
+            ids[i] = i;
+        }
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getPendingTransferIds")
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertArrayEquals(ids, (long[]) result.getDecodedReturnData());
+
+        // tweak the block number to skip the TRANSFER_LOCK_UP_PERIOD
+        tweakBlockNumber(RULE.kernel.getBlockNumber() + StakerRegistry.TRANSFER_LOCK_UP_PERIOD);
+
+        // the recipient staker needs to finalize the transfer
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("finalizeTransfer")
+                .encodeOneLong(9)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getPendingTransferIds")
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertArrayEquals(new long[]{0, 1, 2, 3, 4, 5, 6, 7, 8}, (long[]) result.getDecodedReturnData());
     }
 
     public void tweakBlockNumber(long number) {
