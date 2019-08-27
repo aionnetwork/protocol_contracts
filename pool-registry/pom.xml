@@ -13,7 +13,7 @@
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
 
-        <aion4j.plugin.version>0.6.7</aion4j.plugin.version>
+        <aion4j.plugin.version>0.7.2</aion4j.plugin.version>
         <avm.lib.dir>${project.basedir}/lib</avm.lib.dir>
 
         <contract.main.class>org.aion.unity.PoolRegistry</contract.main.class>

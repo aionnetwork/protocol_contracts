@@ -1,11 +1,10 @@
 package org.aion.unity;
 
 import avm.Address;
-import org.aion.avm.core.util.ABIUtil;
-import org.aion.avm.tooling.AvmRule;
+import org.aion.avm.embed.AvmRule;
+import org.aion.avm.tooling.ABIUtil;
 import org.aion.avm.userlib.abi.ABIStreamingEncoder;
-import org.aion.kernel.TestingKernel;
-import org.aion.vm.api.interfaces.ResultCode;
+import org.aion.kernel.TestingState;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -62,8 +61,7 @@ public class PoolRegistryTest {
                 .toBytes();
         // TODO: fix energy usage
         AvmRule.ResultWrapper result = RULE.call(newPool, poolRegistry, BigInteger.ZERO, txData, 100_000_000L, 1L);
-        ResultCode status = result.getReceiptStatus();
-        Assert.assertTrue(status.isSuccess());
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         // STEP-5 do self-stake
         txData = new ABIStreamingEncoder()
@@ -71,8 +69,7 @@ public class PoolRegistryTest {
                 .encodeOneAddress(newPool)
                 .toBytes();
         result = RULE.call(newPool, poolRegistry, nStake(1), txData);
-        status = result.getReceiptStatus();
-        Assert.assertTrue(status.isSuccess());
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         // verify now
         txData = new ABIStreamingEncoder()
@@ -80,8 +77,7 @@ public class PoolRegistryTest {
                 .encodeOneAddress(newPool)
                 .toBytes();
         result = RULE.call(newPool, poolRegistry, BigInteger.ZERO, txData);
-        status = result.getReceiptStatus();
-        Assert.assertTrue(status.isSuccess());
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
         assertEquals("ACTIVE", result.getDecodedReturnData());
 
         return newPool;
@@ -247,7 +243,7 @@ public class PoolRegistryTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
-          stake = (Long) result.getDecodedReturnData();
+        stake = (Long) result.getDecodedReturnData();
         assertEquals(nStake(1).longValue() + 1L, stake);
         txData = new ABIStreamingEncoder()
                 .encodeOneString("getTotalStake")
@@ -529,7 +525,7 @@ public class PoolRegistryTest {
 
     private void tweakBlockNumber(long number) {
         try {
-            Field f = TestingKernel.class.getDeclaredField("blockNumber");
+            Field f = TestingState.class.getDeclaredField("blockNumber");
             f.setAccessible(true);
 
             f.set(RULE.kernel, number);
