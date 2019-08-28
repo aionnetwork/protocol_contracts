@@ -576,6 +576,8 @@ public class StakerRegistry {
             // check duplicated signing address
             require(!signingAddresses.containsKey(newSigningAddress));
 
+            // the old signing address is removed and can be used again by another staker
+            signingAddresses.remove(s.signingAddress);
             signingAddresses.put(newSigningAddress, s.identityAddress);
             s.signingAddress = newSigningAddress;
             s.lastSigningAddressUpdate = blockNumber;

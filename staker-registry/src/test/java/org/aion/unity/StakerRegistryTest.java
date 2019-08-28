@@ -469,6 +469,60 @@ public class StakerRegistryTest {
         Assert.assertArrayEquals(new long[]{0, 1, 2, 3, 4, 5, 6, 7, 8}, (long[]) result.getDecodedReturnData());
     }
 
+    @Test
+    public void testUpdateSigningAddress() {
+        Address anotherSigningAddress = RULE.getRandomAddress(BigInteger.ZERO);
+        Address anotherCoinbaseAddress = RULE.getRandomAddress(BigInteger.ZERO);
+
+        tweakBlockNumber(RULE.kernel.getBlockNumber() + StakerRegistry.SIGNING_ADDRESS_COOLING_PERIOD);
+
+        // update the signing address
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("setSigningAddress")
+                .encodeOneAddress(stakerAddress)
+                .encodeOneAddress(anotherSigningAddress)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getCoinbaseAddressForSigningAddress")
+                .encodeOneAddress(signingAddress)
+                .toBytes();
+        result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertFalse(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getCoinbaseAddressForSigningAddress")
+                .encodeOneAddress(anotherSigningAddress)
+                .toBytes();
+        result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(coinbaseAddress, result.getDecodedReturnData());
+
+        Address newStakerAddress = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("registerStaker")
+                .encodeOneAddress(newStakerAddress)
+                .encodeOneAddress(newStakerAddress)
+                .encodeOneAddress(signingAddress)
+                .encodeOneAddress(anotherCoinbaseAddress)
+                .encodeOneAddress(newStakerAddress)
+                .toBytes();
+
+        result = RULE.call(newStakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getCoinbaseAddressForSigningAddress")
+                .encodeOneAddress(signingAddress)
+                .toBytes();
+        result = RULE.call(newStakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(anotherCoinbaseAddress, result.getDecodedReturnData());
+    }
+
     public void tweakBlockNumber(long number) {
         try {
             Field f = TestingState.class.getDeclaredField("blockNumber");
