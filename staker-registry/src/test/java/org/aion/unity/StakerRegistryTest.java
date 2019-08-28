@@ -8,7 +8,6 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.web3j.rlp.*;
 
 import java.lang.reflect.Field;
 import java.math.BigInteger;
@@ -27,10 +26,7 @@ public class StakerRegistryTest {
     private Address signingAddress;
     private Address coinbaseAddress;
 
-    private Class[] otherClasses = {
-            AionBlockHeader.class, RlpDecoder.class, RlpEncoder.class, RlpList.class, RlpString.class, RlpType.class, Arrays.class, ByteArrayWrapper.class,
-            StakerRegistryEvents.class
-    };
+    private Class[] otherClasses = {StakerRegistryEvents.class};
     private Address stakerRegistry;
 
     @Before

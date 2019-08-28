@@ -19,13 +19,11 @@ import java.util.Map;
  * Workflow for pool operator:
  * - Register a staker;
  * - Register the staker as a pool;
- * - Add the pool registry as a listener to the staker;
  * - Set the coinbase address to the address of the pool coinbase contract.
  */
 public class PoolRegistry {
 
     // TODO: replace object graph-based collections with key-value storage
-    // TODO: replace long with BigInteger
 
     public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
 
@@ -101,15 +99,7 @@ public class PoolRegistry {
                 .toBytes();
         secureCall(stakerRegistry, BigInteger.ZERO, registerStakerCall, Blockchain.getRemainingEnergy());
 
-        // step 4: add the pool registry as a listener in the staker registry
-        byte[] addListenerCall = new ABIStreamingEncoder()
-                .encodeOneString("addListener")
-                .encodeOneAddress(caller)
-                .encodeOneAddress(poolRegistry)
-                .toBytes();
-        secureCall(stakerRegistry, BigInteger.ZERO, addListenerCall, Blockchain.getRemainingEnergy());
-
-        // step 5: update pool state
+        // step 4: update pool state
         PoolState ps = new PoolState(caller, coinbaseAddress, custodianAddress, commissionRate, metaDataUrl, metaDataContentHash);
         pools.put(caller, ps);
         PoolRegistryEvents.registeredPool(caller, commissionRate, metaDataContentHash, metaDataUrl);
@@ -653,52 +643,6 @@ public class PoolRegistry {
         return pools.get(pool).isActive ? "ACTIVE" : "BROKEN";
     }
 
-    @Callable
-    public static void onSigningAddressChange(Address staker, Address newSigningAddress) {
-
-        // do nothing
-    }
-
-    @Callable
-    public static void onCoinbaseAddressChange(Address staker, Address newCoinbaseAddress) {
-        onlyStakerRegistry();
-        requireNonNull(newCoinbaseAddress);
-        requireNoValue();
-
-        checkPoolState(staker);
-    }
-
-    @Callable
-    public static void onListenerAdded(Address staker) {
-        onlyStakerRegistry();
-        requireNoValue();
-
-        checkPoolState(staker);
-    }
-
-    @Callable
-    public static void onListenerRemoved(Address staker) {
-        onlyStakerRegistry();
-        requireNoValue();
-
-        checkPoolState(staker);
-    }
-
-    @Callable
-    public static void onSlashing(Address staker, long amount) {
-        PoolState ps = pools.get(staker);
-        if (ps != null) {
-            // the slashing amount should be greater than the stake
-            require(getStake(staker, staker) >= amount);
-
-            // do a un-delegate
-            undelegate(staker, staker, amount, false);
-
-            // check pool state
-            checkPoolState(staker);
-        }
-    }
-
     private static void checkPoolState(Address staker) {
         PoolState ps = pools.get(staker);
         if (ps != null) {
@@ -714,7 +658,7 @@ public class PoolRegistry {
 
     private static boolean isActive(Address pool) {
         // TODO: optimize - checking all three condition each time costs too much energy
-        return isCoinbaseSetup(pool) && isListenerSetup(pool) && isSelfStakeSatisfied(pool) && isStakerActive(pool);
+        return isCoinbaseSetup(pool) && isSelfStakeSatisfied(pool) && isStakerActive(pool);
     }
 
     private static boolean isStakerRegistered(Address staker) {
@@ -751,18 +695,6 @@ public class PoolRegistry {
 
         PoolState ps = pools.get(pool);
         return ps.coinbaseAddress.equals(coinbaseAddress);
-    }
-
-    private static boolean isListenerSetup(Address pool) {
-        requirePool(pool);
-
-        byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("isListener")
-                .encodeOneAddress(pool)
-                .encodeOneAddress(Blockchain.getAddress())
-                .toBytes();
-        Result result = secureCall(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
-        return new ABIDecoder(result.getReturnData()).decodeOneBoolean();
     }
 
     private static boolean isSelfStakeSatisfied(Address pool) {
@@ -810,11 +742,6 @@ public class PoolRegistry {
 
     private static void requirePositive(long num) {
         require(num > 0);
-    }
-
-    private static void onlyStakerRegistry() {
-        Address caller = Blockchain.getCaller();
-        require(caller.equals(stakerRegistry));
     }
 
     private static byte[] hexStringToByteArray(String s) {

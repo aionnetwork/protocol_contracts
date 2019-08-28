@@ -19,7 +19,6 @@ import java.util.Set;
  */
 public class StakerRegistry {
 
-    // TODO: replace long with BigInteger once the ABI supports it.
     // TODO: replace object graph-based collections with key-value storage.
 
     public static final long SIGNING_ADDRESS_COOLING_PERIOD = 6 * 60 * 24 * 7;
@@ -27,7 +26,6 @@ public class StakerRegistry {
     public static final long TRANSFER_LOCK_UP_PERIOD = 6 * 10;
 
     public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
-    public static final BigInteger PENALTY_AMOUNT = BigInteger.valueOf(100L);
 
     private static class Staker {
         private Address identityAddress;
@@ -45,8 +43,6 @@ public class StakerRegistry {
         // the sum of stakes.values() should always equal totalStake
         private Map<Address, BigInteger> stakes;
 
-        private Set<Address> listeners;
-
         public Staker(Address identityAddress, Address managementAddress, Address signingAddress, Address coinbaseAddress, Address selfBondAddress, long lastSigningAddressUpdate) {
             this.identityAddress = identityAddress;
             this.managementAddress = managementAddress;
@@ -56,7 +52,6 @@ public class StakerRegistry {
             this.lastSigningAddressUpdate = lastSigningAddressUpdate;
             this.totalStake = BigInteger.ZERO;
             this.stakes = new AionMap<>();
-            this.listeners = new AionSet<>();
             this.isActive = true;
         }
     }
@@ -291,7 +286,6 @@ public class StakerRegistry {
 
         // only the initiator can finalize the transfer, mainly because
         // the pool registry needs to keep track of stake transfers.
-        // TODO: a more elegant way would be using listener?
         require(Blockchain.getCaller().equals(transfer.initiator));
 
         // lock-up period check
@@ -307,77 +301,6 @@ public class StakerRegistry {
         putOrRemove(s.stakes, transfer.recipient, previousStake.add(transfer.value));
         StakerRegistryEvents.finalizedTransfer(id);
     }
-
-    private static Set<ByteArrayWrapper> slashedHeaders = new AionSet<>();
-
-    @Callable
-    public static void slash(int type, byte[] ...headers) {
-        switch(type) {
-            // Here, I'm implementing one slashing condition, dunkle, to test
-            // the slashing workflow. Please replace with whatever conditions
-            // the team eventually decides.
-            case 1:
-                require(headers.length == 1);
-
-                // decode block header
-                AionBlockHeader header = new AionBlockHeader(headers[0]);
-                byte[] hash = header.getHash();
-                byte[] correctHash = "test".getBytes(); // FIXME: use `Blockchain.getBlockHash(header.number)`;
-
-                // avoid double-slashing
-                require(!slashedHeaders.contains(new ByteArrayWrapper(hash)));
-
-                if (!Arrays.equals(hash, correctHash)) {
-                    // find the staker
-                    Address staker = stakers.keySet().iterator().next(); // FIXME: use `signingAddresses.get(header.getSigner())`;
-                    requireNonNull(staker);
-
-                    slash(staker);
-                }
-                break;
-        }
-    }
-
-    private static void slash(Address staker) {
-        Staker s = stakers.get(staker);
-        Address selfBondAddress = s.selfBondAddress;
-
-        // deduct the stake of the staker
-        BigInteger selfStake = getOrDefault(s.stakes, selfBondAddress, BigInteger.ZERO);
-        require(selfStake.compareTo(PENALTY_AMOUNT) >= 0);
-        s.stakes.put(selfBondAddress, selfStake.min(PENALTY_AMOUNT));
-
-        // transfer the slashed stake to the reporter TODO: Yao has different view on this
-        secureCall(Blockchain.getCaller(), PENALTY_AMOUNT, new byte[0], Blockchain.getRemainingEnergy());
-
-        // NOTE: when calling the onSlash callback, cap the energy limit and ignore
-        // the call results. Otherwise, a staker can set up a energy sucker as listener
-        // to prevent a slashing.
-
-        // Also, to make sure the pool registry have enough energy to execute
-        // its internal logic, we should check the remaining energy here.
-
-        // In conclusion, we need to make sure the listener get executed with enough
-        // energy and prevent a listener from stopping a slashing event.
-
-        // FIXME: reduce this number after optimizing the energy usage in pool registry.
-        long energyForListener = 2_000_000L;
-        long remainingEnergy = Blockchain.getRemainingEnergy();
-        require(remainingEnergy > energyForListener * s.listeners.size() + 100_000L);
-
-        // FIXME: limit the max number of listeners per staker
-        // otherwise, staker can register many listeners to prevent slashing.
-
-        for (Address listener : s.listeners) {
-            byte[] data = new ABIStreamingEncoder()
-                    .encodeOneString("onSlashing")
-                    .encodeOneAddress(staker)
-                    .encodeOneLong(PENALTY_AMOUNT.longValue())
-                    .toBytes();
-            Blockchain.call(listener, BigInteger.ZERO, data, energyForListener);
-        }
-    }
-
 
     /**
      * Returns the effective stake, after conversion and status check, of a staker.
@@ -462,7 +385,6 @@ public class StakerRegistry {
 
     /**
      * Returns whether a staker is active, subject to pre-defined rules, e.g. min_self_stake
-     * and slashing rules.
      *
      * @param staker the address of staker
      * @return true if active, otherwise false
@@ -487,22 +409,9 @@ public class StakerRegistry {
         requireNoValue();
 
         Staker s =  requireStakerAndManager(staker, Blockchain.getCaller());
-
         if (isActive != s.isActive) {
             s.isActive = isActive;
-
-            for (Address listener : s.listeners) {
-                byte[] data = new ABIStreamingEncoder()
-                        .encodeOneString("onActiveStatusChange")
-                        .encodeOneAddress(s.identityAddress)
-                        .encodeOneBoolean(isActive)
-                        .toBytes();
-                secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-            }
         }
-
-
-        s.isActive = isActive;
     }
 
     /**
@@ -581,15 +490,6 @@ public class StakerRegistry {
             signingAddresses.put(newSigningAddress, s.identityAddress);
             s.signingAddress = newSigningAddress;
             s.lastSigningAddressUpdate = blockNumber;
-
-            for (Address listener : s.listeners) {
-                byte[] data = new ABIStreamingEncoder()
-                        .encodeOneString("onSigningAddressChange")
-                        .encodeOneAddress(s.identityAddress)
-                        .encodeOneAddress(newSigningAddress)
-                        .toBytes();
-                secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-            }
         }
         // todo only if a new address?
         StakerRegistryEvents.setSigningAddress(staker, newSigningAddress);
@@ -608,15 +508,6 @@ public class StakerRegistry {
         Staker s = requireStakerAndManager(staker, Blockchain.getCaller());
         if (!newCoinbaseAddress.equals(s.coinbaseAddress)) {
             s.coinbaseAddress = newCoinbaseAddress;
-
-            for (Address listener : s.listeners) {
-                byte[] data = new ABIStreamingEncoder()
-                        .encodeOneString("onCoinbaseAddressChange")
-                        .encodeOneAddress(s.identityAddress)
-                        .encodeOneAddress(newCoinbaseAddress)
-                        .toBytes();
-                secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-            }
         }
         StakerRegistryEvents.setCoinbaseAddress(staker, newCoinbaseAddress);
     }
@@ -634,76 +525,8 @@ public class StakerRegistry {
         Staker s = requireStakerAndManager(staker, Blockchain.getCaller());
         if (!newAddress.equals(s.selfBondAddress)) {
             s.selfBondAddress = newAddress;
-
-            for (Address listener : s.listeners) {
-                byte[] data = new ABIStreamingEncoder()
-                        .encodeOneString("onSelfBondAddressChange")
-                        .encodeOneAddress(s.identityAddress)
-                        .encodeOneAddress(newAddress)
-                        .toBytes();
-                secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-            }
         }
         StakerRegistryEvents.setSelfBondAddress(staker, newAddress);
-    }
-
-    /**
-     * Registers a listener to a staker. Owner only.
-     *
-     * @param listener the address of the listener
-     */
-    @Callable
-    public static void addListener(Address staker, Address listener) {
-        requireNoValue();
-
-        Staker s = requireStakerAndManager(staker, Blockchain.getCaller());
-        if (!s.listeners.contains(listener)) {
-            s.listeners.add(listener);
-
-            // notify the listener
-            byte[] data = new ABIStreamingEncoder()
-                    .encodeOneString("onListenerAdded")
-                    .encodeOneAddress(s.identityAddress)
-                    .toBytes();
-            secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-        }
-    }
-
-    /**
-     * Removes a listener of a staker. Owner only.
-     *
-     * @param listener the address of the listener contract
-     */
-    @Callable
-    public static void removeListener(Address staker, Address listener) {
-        requireNoValue();
-
-        Staker s = requireStakerAndManager(staker, Blockchain.getCaller());
-        if (s.listeners.contains(listener)) {
-            s.listeners.remove(listener);
-
-            // notify the listener
-            byte[] data = new ABIStreamingEncoder()
-                    .encodeOneString("onListenerRemoved")
-                    .encodeOneAddress(s.identityAddress)
-                    .toBytes();
-            secureCall(listener, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-        }
-    }
-
-    /**
-     * Returns if the given listener is registered to the staker.
-     *
-     * @param staker   the staker address
-     * @param listener the listener address
-     */
-    @Callable
-    public static boolean isListener(Address staker, Address listener) {
-        requireStaker(staker);
-        requireNonNull(listener);
-        requireNoValue();
-
-        return stakers.get(staker).listeners.contains(listener);
     }
 
     @Callable

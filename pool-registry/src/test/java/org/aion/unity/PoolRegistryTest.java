@@ -487,69 +487,6 @@ public class PoolRegistryTest {
         assertArrayEquals(newMetaDataContentHash, result.getLogs().get(0).copyOfData());
     }
 
-    @Test
-    public void testSlashing() {
-        Address pool = setupNewPool(10);
-
-        // do a self-bond
-        byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("vote")
-                .encodeOneAddress(pool)
-                .toBytes();
-        AvmRule.ResultWrapper result = RULE.call(pool, stakerRegistry, PoolRegistry.MIN_SELF_STAKE, txData);
-        Assert.assertTrue(result.getReceiptStatus().isSuccess());
-
-
-        // [pre-slash] check the pool status
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("getPoolStatus")
-                .encodeOneAddress(pool)
-                .toBytes();
-        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
-        Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        assertEquals("ACTIVE", result.getDecodedReturnData());
-
-        // [pre-slash] check the pool stake
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("getSelfStake")
-                .encodeOneAddress(pool)
-                .toBytes();
-        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
-        Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        assertEquals(1000L, result.getDecodedReturnData());
-
-        // submit a proof
-        int type = 1;
-        byte[] header = Hex.decode("f8dd0102a06068a128093216a3c0bd9b8cecea132731b8d4fca67de87020b42965fd32a581a0bee628af072dde474c426e5062b2c5ad6888ad3221fe949a1962df918159ded2a0f2953aeb18a5bcb88220ecc0f2c5e222d932f09cc7a26f724276c67fb1c301a5a02e5def03d03e5e6a1b2b22c8185263920b36e056d4e7b1a0d9318764ce0758f3a090685796aa5ee0da1a7d27b5d43b7d52e9f8f2199f5d579489431524170d9828a00000000000000000000000000000000000000000000000000000000000000000038464617461040506857061727431857061727432");
-        byte[][] headers = {header};
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("slash")
-                .encodeOneInteger(type)
-                .encodeOne2DByteArray(headers)
-                .toBytes();
-        // FIMXE: energy usage
-        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData, 5_000_000L, 1L);
-        Assert.assertTrue(result.getReceiptStatus().isSuccess());
-
-        // [post-slash] check the pool status
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("getPoolStatus")
-                .encodeOneAddress(pool)
-                .toBytes();
-        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
-        Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        assertEquals("BROKEN", result.getDecodedReturnData());
-
-        // [post-slash] check the pool stake
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("getSelfStake")
-                .encodeOneAddress(pool)
-                .toBytes();
-        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
-        Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        assertEquals(1000L - 100L, result.getDecodedReturnData());
-    }
-
     /**
      * N unit of MIN_SELF_STAKE.
      *

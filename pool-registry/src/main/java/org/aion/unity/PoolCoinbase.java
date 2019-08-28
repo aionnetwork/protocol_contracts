@@ -13,8 +13,6 @@ import java.math.BigInteger;
  */
 public class PoolCoinbase {
 
-    // TODO: replace long with BigInteger
-
     @Initializable
     private static Address poolRegistry;
 
