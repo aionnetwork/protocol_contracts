@@ -67,6 +67,24 @@ public class PoolRegistryEvents {
                 pool.toByteArray());
     }
 
+    static void updatedCommissionRate(Address pool, int newCommissionRate) {
+        Blockchain.log("ADSCommissionRateUpdated".getBytes(),
+                pool.toByteArray(),
+                BigInteger.valueOf(newCommissionRate).toByteArray());
+    }
+
+    static void updatedMetaDataUrl(Address pool, byte[] newMetaDataUrl) {
+        Blockchain.log("ADSMetaDataUrlUpdated".getBytes(),
+                pool.toByteArray(),
+                newMetaDataUrl);
+    }
+
+    static void updateMetaDataContentHash(Address pool, byte[] newMetaDataContentHash) {
+        Blockchain.log("ADSMetaDataContentHashUpdated".getBytes(),
+                pool.toByteArray(),
+                newMetaDataContentHash);
+    }
+
     // following events are implemented only in StakerRegistry
 //    - finalizedUnvote
 //    - finalizedTransfer

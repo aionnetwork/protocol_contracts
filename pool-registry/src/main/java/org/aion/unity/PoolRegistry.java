@@ -26,7 +26,6 @@ public class PoolRegistry {
 
     // TODO: replace object graph-based collections with key-value storage
     // TODO: replace long with BigInteger
-    // TODO: add meta data and commission rate setters/getters
 
     public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
 
@@ -61,7 +60,8 @@ public class PoolRegistry {
         // sanity check
         require(commissionRate >= 0 && commissionRate <= 100);
         requireNoValue();
-        // TODO: sanity checks on metaDataUrl and metaDataContentHash
+        requireNonNull(metaDataUrl);
+        require(metaDataContentHash != null && metaDataContentHash.length == 32);
 
         Address caller = Blockchain.getCaller();
 
@@ -588,6 +588,56 @@ public class PoolRegistry {
         }
         PoolRegistryEvents.withdrew(caller, pool, amountBI);
         return amount;
+    }
+
+    @Callable
+    public static void updateCommissionRate(Address pool, int newCommissionRate){
+        // todo possible to add a delay and max value
+        requireNoValue();
+        requirePool(pool);
+        require(newCommissionRate >= 0 && newCommissionRate <= 100);
+        PoolState ps = pools.get(pool);
+        require(ps.stakerAddress.equals(Blockchain.getCaller()));
+        ps.commissionRate = newCommissionRate;
+        ps.rewards.setCommissionRate(newCommissionRate);
+        PoolRegistryEvents.updatedCommissionRate(pool, newCommissionRate);
+    }
+
+    @Callable
+    public static void updateMetaDataUrl(Address pool, byte[] newMetaDataUrl){
+        requireNoValue();
+        requirePool(pool);
+        requireNonNull(newMetaDataUrl);
+        PoolState ps = pools.get(pool);
+        require(ps.stakerAddress.equals(Blockchain.getCaller()));
+        ps.metaDataUrl = newMetaDataUrl;
+        PoolRegistryEvents.updatedMetaDataUrl(pool, newMetaDataUrl);
+    }
+
+    @Callable
+    public static void updateMetaDataContentHash(Address pool, byte[] newMetaDataContentHash){
+        requireNoValue();
+        requirePool(pool);
+        require(newMetaDataContentHash != null && newMetaDataContentHash.length == 32);
+        PoolState ps = pools.get(pool);
+        require(ps.stakerAddress.equals(Blockchain.getCaller()));
+        ps.metaDataContentHash = newMetaDataContentHash;
+        PoolRegistryEvents.updateMetaDataContentHash(pool, newMetaDataContentHash);
+    }
+
+    @Callable
+    public static byte[] getPoolInfo(Address pool) {
+        requirePool(pool);
+        requireNoValue();
+        PoolState ps = pools.get(pool);
+        return new ABIStreamingEncoder()
+                .encodeOneAddress(ps.stakerAddress)
+                .encodeOneAddress(ps.coinbaseAddress)
+                .encodeOneAddress(ps.custodianAddress)
+                .encodeOneInteger(ps.commissionRate)
+                .encodeOneByteArray(ps.metaDataUrl)
+                .encodeOneByteArray(ps.metaDataContentHash)
+                .toBytes();
     }
 
     /**
