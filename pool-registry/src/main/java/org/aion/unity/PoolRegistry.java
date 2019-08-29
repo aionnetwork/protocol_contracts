@@ -658,7 +658,7 @@ public class PoolRegistry {
 
     private static boolean isActive(Address pool) {
         // TODO: optimize - checking all three condition each time costs too much energy
-        return isCoinbaseSetup(pool) && isSelfStakeSatisfied(pool) && isStakerActive(pool);
+        return isCoinbaseSetup(pool) && isSelfStakeSatisfied(pool);
     }
 
     private static boolean isStakerRegistered(Address staker) {
@@ -670,17 +670,6 @@ public class PoolRegistry {
         boolean isStaker = new ABIDecoder(result.getReturnData()).decodeOneBoolean();
 
         return isStaker;
-    }
-
-    private static boolean isStakerActive(Address pool) {
-        requirePool(pool);
-
-        byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("isActive")
-                .encodeOneAddress(pool)
-                .toBytes();
-        Result result = secureCall(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
-        return new ABIDecoder(result.getReturnData()).decodeOneBoolean();
     }
 
     private static boolean isCoinbaseSetup(Address pool) {

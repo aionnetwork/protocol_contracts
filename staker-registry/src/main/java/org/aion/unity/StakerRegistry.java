@@ -37,7 +37,6 @@ public class StakerRegistry {
         private long lastSigningAddressUpdate;
 
         private BigInteger totalStake;
-        private boolean isActive;
 
         // maps addresses to the stakes those addresses have sent to this staker
         // the sum of stakes.values() should always equal totalStake
@@ -52,7 +51,6 @@ public class StakerRegistry {
             this.lastSigningAddressUpdate = lastSigningAddressUpdate;
             this.totalStake = BigInteger.ZERO;
             this.stakes = new AionMap<>();
-            this.isActive = true;
         }
     }
 
@@ -396,22 +394,7 @@ public class StakerRegistry {
 
         Staker s = stakers.get(staker);
 
-        return s.isActive && BigInteger.valueOf(getStake(staker, s.selfBondAddress)).compareTo(MIN_SELF_STAKE) >= 0;
-    }
-
-    /**
-     * Updates the active status of a staker. Owner only.
-     *
-     * @param isActive the new signing address
-     */
-    @Callable
-    public static void setActive(Address staker, boolean isActive) {
-        requireNoValue();
-
-        Staker s =  requireStakerAndManager(staker, Blockchain.getCaller());
-        if (isActive != s.isActive) {
-            s.isActive = isActive;
-        }
+        return BigInteger.valueOf(getStake(staker, s.selfBondAddress)).compareTo(MIN_SELF_STAKE) >= 0;
     }
 
     /**
