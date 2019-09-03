@@ -146,10 +146,10 @@ public class PoolRewardsStateMachine {
     /* ----------------------------------------------------------------------
      * Contract Lifecycle Functions
      * ----------------------------------------------------------------------*/
-    public void onUnvote(Address delegator, long blockNumber, long stake) {
+    public void onUndelegate(Address delegator, long blockNumber, long stake) {
         assert (delegations.containsKey(delegator));
         long prevBond = delegations.get(delegator).stake;
-        assert (stake <= prevBond); // make sure the amount of unvote requested is legal.
+        assert (stake <= prevBond); // make sure the amount of undelegate requested is legal.
 
         long unbondedStake = leave(delegator, blockNumber);
         assert (unbondedStake == prevBond);
@@ -161,7 +161,7 @@ public class PoolRewardsStateMachine {
         }
     }
 
-    public void onVote(Address delegator, long blockNumber, long stake) {
+    public void onDelegate(Address delegator, long blockNumber, long stake) {
         assert (stake >= 0);
 
         long prevBond = 0L;

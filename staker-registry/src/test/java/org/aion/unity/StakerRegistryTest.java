@@ -81,17 +81,17 @@ public class StakerRegistryTest {
         long voteAmount = 1000L;
         long unvoteAmount = 900L;
 
-        // vote first
+        // delegate first
         byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("vote")
+                .encodeOneString("delegate")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(preminedAddress, stakerRegistry, BigInteger.valueOf(voteAmount), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
-        // then unvote
+        // then undelegate
         txData = new ABIStreamingEncoder()
-                .encodeOneString("unvote")
+                .encodeOneString("undelegate")
                 .encodeOneAddress(stakerAddress)
                 .encodeOneLong(unvoteAmount)
                 .toBytes();
@@ -123,7 +123,6 @@ public class StakerRegistryTest {
     public void testGetEffectiveStake() {
         BigInteger halfMinStake = StakerRegistry.MIN_SELF_STAKE.divide(BigInteger.valueOf(2));
 
-        // vote first
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("bond")
                 .encodeOneAddress(stakerAddress)
@@ -141,7 +140,6 @@ public class StakerRegistryTest {
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
         Assert.assertEquals(0L, result.getDecodedReturnData());
 
-        // then unvote
         txData = new ABIStreamingEncoder()
                 .encodeOneString("bond")
                 .encodeOneAddress(stakerAddress)
@@ -164,7 +162,7 @@ public class StakerRegistryTest {
     public void testBond() {
         // voting for stakerAddress does not go into the self bond stake
         byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("vote")
+                .encodeOneString("delegate")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, StakerRegistry.MIN_SELF_STAKE, txData);
@@ -180,7 +178,6 @@ public class StakerRegistryTest {
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
         Assert.assertEquals(0L, result.getDecodedReturnData());
 
-        // then unvote
         txData = new ABIStreamingEncoder()
                 .encodeOneString("bond")
                 .encodeOneAddress(stakerAddress)
@@ -226,17 +223,16 @@ public class StakerRegistryTest {
         AvmRule.ResultWrapper result = RULE.call(stakerAddress2, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
-        // vote first
+        // delegate first
         txData = new ABIStreamingEncoder()
-                .encodeOneString("vote")
+                .encodeOneString("delegate")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.valueOf(voteAmount), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
-        // then unvote
         txData = new ABIStreamingEncoder()
-                .encodeOneString("transferStake")
+                .encodeOneString("transferDelegation")
                 .encodeOneAddress(stakerAddress)
                 .encodeOneAddress(stakerAddress2)
                 .encodeOneLong(transferAmount)
@@ -334,17 +330,17 @@ public class StakerRegistryTest {
         long voteAmount = 1000L;
         long unvoteAmount = 900L;
 
-        // vote first
+        // delegate first
         byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("vote")
+                .encodeOneString("delegate")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(preminedAddress, stakerRegistry, BigInteger.valueOf(voteAmount), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
-        // then unvote
+        // then undelegate
         txData = new ABIStreamingEncoder()
-                .encodeOneString("unvote")
+                .encodeOneString("undelegate")
                 .encodeOneAddress(stakerAddress)
                 .encodeOneLong(unvoteAmount)
                 .toBytes();
@@ -356,18 +352,18 @@ public class StakerRegistryTest {
 
         // now try to release
         txData = new ABIStreamingEncoder()
-                .encodeOneString("finalizeUnvote")
+                .encodeOneString("finalizeUndelegate")
                 .encodeOneLong(id)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertFalse(result.getReceiptStatus().isSuccess());
 
         // tweak the block number
-        tweakBlockNumber(blockNumber + StakerRegistry.UNVOTE_LOCK_UP_PERIOD);
+        tweakBlockNumber(blockNumber + StakerRegistry.UNDELEGATE_LOCK_UP_PERIOD);
 
         // and, query again
         txData = new ABIStreamingEncoder()
-                .encodeOneString("finalizeUnvote")
+                .encodeOneString("finalizeUndelegate")
                 .encodeOneLong(id)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
@@ -380,21 +376,21 @@ public class StakerRegistryTest {
         long unvoteAmount = 90L;
 
         byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("vote")
+                .encodeOneString("delegate")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(preminedAddress, stakerRegistry, BigInteger.valueOf(voteAmount), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getPendingUnvoteIds")
+                .encodeOneString("getPendingUndelegateIds")
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
         Assert.assertArrayEquals(new long[]{}, (long[]) result.getDecodedReturnData());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("unvote")
+                .encodeOneString("undelegate")
                 .encodeOneAddress(stakerAddress)
                 .encodeOneLong(unvoteAmount)
                 .toBytes();
@@ -409,37 +405,37 @@ public class StakerRegistryTest {
         long blockNumber = RULE.kernel.getBlockNumber();
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getPendingUnvoteIds")
+                .encodeOneString("getPendingUndelegateIds")
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
         Assert.assertArrayEquals(ids, (long[]) result.getDecodedReturnData());
 
-        tweakBlockNumber(blockNumber + StakerRegistry.UNVOTE_LOCK_UP_PERIOD);
+        tweakBlockNumber(blockNumber + StakerRegistry.UNDELEGATE_LOCK_UP_PERIOD);
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("finalizeUnvote")
+                .encodeOneString("finalizeUndelegate")
                 .encodeOneLong(0)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getPendingUnvoteIds")
+                .encodeOneString("getPendingUndelegateIds")
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
         Assert.assertArrayEquals(new long[]{1, 2, 3, 4, 5, 6, 7, 8, 9}, (long[]) result.getDecodedReturnData());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("finalizeUnvote")
+                .encodeOneString("finalizeUndelegate")
                 .encodeOneLong(5)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getPendingUnvoteIds")
+                .encodeOneString("getPendingUndelegateIds")
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
@@ -466,14 +462,14 @@ public class StakerRegistryTest {
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("vote")
+                .encodeOneString("delegate")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.valueOf(voteAmount), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("transferStake")
+                .encodeOneString("transferDelegation")
                 .encodeOneAddress(stakerAddress)
                 .encodeOneAddress(stakerAddress2)
                 .encodeOneLong(transferAmount)

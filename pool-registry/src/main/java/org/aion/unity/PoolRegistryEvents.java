@@ -35,12 +35,12 @@ public class PoolRegistryEvents {
                 amount.toByteArray());
     }
 
-    static void transferredStake(long id, Address caller, Address fromPool, Address toPool, BigInteger amount) {
+    static void transferredDelegation(long id, Address caller, Address fromPool, Address toPool, BigInteger amount) {
         byte[] data = AionBuffer.allocate(Address.LENGTH + 32) //64
                 .putAddress(toPool)
                 .put32ByteInt(amount)
                 .getArray();
-        Blockchain.log("ADSStakeTransferred".getBytes(),
+        Blockchain.log("ADSDelegationTransferred".getBytes(),
                 AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
                 caller.toByteArray(),
                 fromPool.toByteArray(),
@@ -86,7 +86,7 @@ public class PoolRegistryEvents {
     }
 
     // following events are implemented only in StakerRegistry
-//    - finalizedUnvote
+//    - finalizedUndelegate
 //    - finalizedTransfer
 //    - setSigningAddress
 

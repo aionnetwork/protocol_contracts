@@ -31,49 +31,49 @@ public class StakerRegistryEvents {
                 newAddress.toByteArray());
     }
 
-    static void voted(Address delegator, Address staker, BigInteger value) {
-        Blockchain.log("Voted".getBytes(),
+    static void delegated(Address delegator, Address staker, BigInteger value) {
+        Blockchain.log("delegated".getBytes(),
                 delegator.toByteArray(),
                 staker.toByteArray(),
                 value.toByteArray());
     }
 
-    static void unvoted(long id, Address delegator, Address staker, Address recipient, BigInteger amount) {
+    static void undelegated(long id, Address delegator, Address staker, Address recipient, BigInteger amount) {
         byte[] amountBytes = amount.toByteArray();
         byte[] data = new byte[Address.LENGTH + amountBytes.length];
         System.arraycopy(recipient.toByteArray(), 0, data, 0, Address.LENGTH);
         System.arraycopy(amountBytes, 0, data, Address.LENGTH, amountBytes.length);
 
-        Blockchain.log("Unvoted".getBytes(),
+        Blockchain.log("Undelegated".getBytes(),
                 AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
                 delegator.toByteArray(),
                 staker.toByteArray(),
                 data);
     }
 
-    static void transferredStake(long id, Address fromStaker, Address toStaker, Address recipient, BigInteger amount) {
+    static void transferredDelegation(long id, Address fromStaker, Address toStaker, Address recipient, BigInteger amount) {
         byte[] data = AionBuffer.allocate(Address.LENGTH + 32) //64
                 .putAddress(toStaker)
                 .put32ByteInt(amount)
                 .getArray();
-        Blockchain.log("StakeTransferred".getBytes(),
+        Blockchain.log("DelegationTransferred".getBytes(),
                 AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
                 fromStaker.toByteArray(),
                 recipient.toByteArray(),
                 data);
     }
 
-    static void finalizedUnvote(long id) {
-        Blockchain.log("UnvoteFinalized".getBytes(),
+    static void finalizedUndelegation(long id) {
+        Blockchain.log("UndelegationFinalized".getBytes(),
                 BigInteger.valueOf(id).toByteArray());
     }
 
-    static void finalizedTransfer(long id) {
+    static void finalizedDelegationTransfer(long id) {
         Blockchain.log("TransferFinalized".getBytes(),
                 BigInteger.valueOf(id).toByteArray());
     }
 
-    // Events for self bond stake are different to allow the distinction between normal vote for one of the delegator addresses and self-bond stake
+    // Events for self bond stake are different to allow the distinction between normal delegation and self-bond stake
     static void bonded(Address identityAddress, BigInteger amount) {
         Blockchain.log("Bonded".getBytes(),
                 identityAddress.toByteArray(),

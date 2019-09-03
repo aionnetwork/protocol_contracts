@@ -160,9 +160,9 @@ public class PoolRegistryTest {
 
         tweakBlockNumber(getBlockNumber() +  6 * 60 * 24 * 7);
 
-        // release the pending unvote
+        // release the pending undelegate
         txData = new ABIStreamingEncoder()
-                .encodeOneString("finalizeUnvote")
+                .encodeOneString("finalizeUndelegate")
                 .encodeOneLong(id)
                 .toBytes();
         result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
@@ -185,7 +185,7 @@ public class PoolRegistryTest {
 
         // transfer 1 stake
         txData = new ABIStreamingEncoder()
-                .encodeOneString("transferStake")
+                .encodeOneString("transferDelegation")
                 .encodeOneAddress(pool1)
                 .encodeOneAddress(pool2)
                 .encodeOneLong(1)
@@ -425,8 +425,11 @@ public class PoolRegistryTest {
         assertEquals(nStake(1).longValue() + 1L, stake);
     }
 
+    /**
+     * Tests the case where delegation is done through the StakerRegistry
+     */
     @Test
-    public void delegateAndVoteSelfStake(){
+    public void delegateAndDelegateSelfStake(){
         Address pool = setupNewPool(4);
         Address delegator = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
 
@@ -455,9 +458,9 @@ public class PoolRegistryTest {
         stake = (Long) result.getDecodedReturnData();
         assertEquals(nStake(1).longValue() + 1L, stake);
 
-        // vote as identity address
+        // delegate as identity address
         txData = new ABIStreamingEncoder()
-                .encodeOneString("vote")
+                .encodeOneString("delegate")
                 .encodeOneAddress(pool)
                 .toBytes();
         result = RULE.call(pool, stakerRegistry, BigInteger.ONE, txData);
@@ -481,9 +484,9 @@ public class PoolRegistryTest {
         stake = (Long) result.getDecodedReturnData();
         assertEquals(nStake(1).longValue() + 2L, stake);
 
-        // vote as external delegator address
+        // delegate as external delegator address
         txData = new ABIStreamingEncoder()
-                .encodeOneString("vote")
+                .encodeOneString("delegate")
                 .encodeOneAddress(pool)
                 .toBytes();
         result = RULE.call(delegator, stakerRegistry, BigInteger.ONE, txData);
@@ -507,7 +510,7 @@ public class PoolRegistryTest {
         stake = (Long) result.getDecodedReturnData();
         assertEquals(nStake(1).longValue() + 3L, stake);
 
-        // NOTE: since vote is directly called, the getStake values retrieved from registry contracts are different
+        // NOTE: since delegate is directly called from the StakerRegistry, the getStake values retrieved from registry contracts are different
         txData = new ABIStreamingEncoder()
                 .encodeOneString("getStake")
                 .encodeOneAddress(pool)
@@ -555,8 +558,11 @@ public class PoolRegistryTest {
         assertEquals(nStake(1).longValue() + 4L, stake);
     }
 
+    /**
+     * Tests the case where un-delegation is done through the StakerRegistry
+     */
     @Test
-    public void delegateAndUnvoteSelfStake(){
+    public void delegateAndUndelegateSelfStake(){
         Address pool = setupNewPool(4);
 
         byte[] txData = new ABIStreamingEncoder()
@@ -575,9 +581,9 @@ public class PoolRegistryTest {
         long stake = (long) result.getDecodedReturnData();
         assertEquals(nStake(1).longValue() + 10L, stake);
 
-        // unvote as identity address will fail, only the dedicated method for unbonding the self stake should be called
+        // undelegate as identity address will fail, only the dedicated method for unbonding the self stake should be called
         txData = new ABIStreamingEncoder()
-                .encodeOneString("unvote")
+                .encodeOneString("undelegate")
                 .encodeOneAddress(pool)
                 .encodeOneLong(1L)
                 .toBytes();
@@ -616,9 +622,9 @@ public class PoolRegistryTest {
 
         tweakBlockNumber(getBlockNumber() +  6 * 60 * 24 * 7);
 
-        // release the pending unvote
+        // release the pending undelegate
         txData = new ABIStreamingEncoder()
-                .encodeOneString("finalizeUnvote")
+                .encodeOneString("finalizeUndelegate")
                 .encodeOneLong(id)
                 .toBytes();
         result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
@@ -640,7 +646,7 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("transferStake")
+                .encodeOneString("transferDelegation")
                 .encodeOneAddress(pool1)
                 .encodeOneAddress(pool2)
                 .encodeOneLong(10)
@@ -674,7 +680,7 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("transferStake")
+                .encodeOneString("transferDelegation")
                 .encodeOneAddress(pool1)
                 .encodeOneAddress(pool2)
                 .encodeOneLong(10)

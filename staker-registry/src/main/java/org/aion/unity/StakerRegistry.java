@@ -10,15 +10,15 @@ import java.math.BigInteger;
 import java.util.Map;
 
 /**
- * A staker registry manages the staker database, and provides an interface for voters
- * to vote/unvote for a staker.
+ * A staker registry manages the staker database, and provides an interface for delegators
+ * to delegate/undelegate for a staker.
  */
 public class StakerRegistry {
 
     // TODO: replace object graph-based collections with key-value storage.
 
     public static final long SIGNING_ADDRESS_COOLING_PERIOD = 6 * 60 * 24 * 7;
-    public static final long UNVOTE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
+    public static final long UNDELEGATE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
     public static final long TRANSFER_LOCK_UP_PERIOD = 6 * 10;
 
     public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
@@ -50,12 +50,12 @@ public class StakerRegistry {
         }
     }
 
-    private static class PendingUnvote {
+    private static class PendingUndelegate {
         private Address recipient;
         private BigInteger value;
         private long blockNumber;
 
-        public PendingUnvote(Address recipient, BigInteger value, long blockNumber) {
+        public PendingUndelegate(Address recipient, BigInteger value, long blockNumber) {
             this.recipient = recipient;
             this.value = value;
             this.blockNumber = blockNumber;
@@ -81,9 +81,9 @@ public class StakerRegistry {
     private static Map<Address, Staker> stakers = new AionMap<>();
     private static Map<Address, Address> signingAddresses = new AionMap<>();
 
-    private static long nextUnvote = 0;
-    private static Map<Long, PendingUnvote> pendingUnvotes = new AionMap<>();
-    private static long nextTransfer = 0;
+    private static long nextUndelegateId = 0;
+    private static Map<Long, PendingUndelegate> pendingUndelegates = new AionMap<>();
+    private static long nextTransferId = 0;
     private static Map<Long, PendingTransfer> pendingTransfers = new AionMap<>();
 
     /**
@@ -114,12 +114,12 @@ public class StakerRegistry {
     }
 
     /**
-     * Votes for a staker. Any liquid coins, passed along the call, become locked stake.
+     * Delegates to a staker. Any liquid coins, passed along the call, become locked stake.
      *
      * @param staker the address of the staker
      */
     @Callable
-    public static void vote(Address staker) {
+    public static void delegate(Address staker) {
         Address caller = Blockchain.getCaller();
         BigInteger amount = Blockchain.getValue();
 
@@ -130,32 +130,32 @@ public class StakerRegistry {
         s.totalStake = s.totalStake.add(amount);
         BigInteger previousStake = getOrDefault(s.stakes, caller, BigInteger.ZERO);
         putOrRemove(s.stakes, caller, previousStake.add(amount));
-        StakerRegistryEvents.voted(caller, staker, amount);
+        StakerRegistryEvents.delegated(caller, staker, amount);
     }
 
     /**
-     * Unvotes for a staker. After a successful unvote, the locked coins will be released
-     * to the original voters, subject to lock-up period.
+     * Un-delegates to a staker. After a successful undelegate, the locked coins will be released
+     * to the original delegator, subject to lock-up period.
      *
      * @param staker the address of the staker
      * @param amount the amount of stake
-     * @return a pending unvote identifier
+     * @return a pending undelegation identifier
      */
     @Callable
-    public static long unvote(Address staker, long amount) {
-        return unvoteTo(staker, amount, Blockchain.getCaller());
+    public static long undelegate(Address staker, long amount) {
+        return undelegateTo(staker, amount, Blockchain.getCaller());
     }
 
     /**
-     * Un-votes for a staker, and receives the released fund using another account.
+     * Un-delegates for a staker, and receives the released fund using another account.
      *
      * @param staker   the address of the staker
      * @param amount   the amount of stake
      * @param recipient the receiving address
-     * @return a pending unvote identifier
+     * @return a pending un-delegation identifier
      */
     @Callable
-    public static long unvoteTo(Address staker, long amount, Address recipient) {
+    public static long undelegateTo(Address staker, long amount, Address recipient) {
         Address caller = Blockchain.getCaller();
 
         requireStaker(staker);
@@ -174,11 +174,11 @@ public class StakerRegistry {
         s.totalStake = s.totalStake.subtract(amountBI);
         putOrRemove(s.stakes, caller, previousStake.subtract(amountBI));
 
-        // create pending unvote
-        long id = nextUnvote++;
-        PendingUnvote unvote = new PendingUnvote(recipient, amountBI, Blockchain.getBlockNumber());
-        pendingUnvotes.put(id, unvote);
-        StakerRegistryEvents.unvoted(id, caller, staker, recipient, amountBI);
+        // create pending un-delegate
+        long id = nextUndelegateId++;
+        PendingUndelegate undelegate = new PendingUndelegate(recipient, amountBI, Blockchain.getBlockNumber());
+        pendingUndelegates.put(id, undelegate);
+        StakerRegistryEvents.undelegated(id, caller, staker, recipient, amountBI);
 
         return id;
     }
@@ -192,8 +192,8 @@ public class StakerRegistry {
      * @return a pending transfer identifier
      */
     @Callable
-    public static long transferStake(Address fromStaker, Address toStaker, long amount) {
-        return transferStakeTo(fromStaker, toStaker, amount, Blockchain.getCaller());
+    public static long transferDelegation(Address fromStaker, Address toStaker, long amount) {
+        return transferDelegationTo(fromStaker, toStaker, amount, Blockchain.getCaller());
     }
 
     /**
@@ -206,7 +206,7 @@ public class StakerRegistry {
      * @return a pending transfer identifier
      */
     @Callable
-    public static long transferStakeTo(Address fromStaker, Address toStaker, long amount, Address recipient) {
+    public static long transferDelegationTo(Address fromStaker, Address toStaker, long amount, Address recipient) {
         Address caller = Blockchain.getCaller();
 
         requireStaker(fromStaker);
@@ -227,36 +227,36 @@ public class StakerRegistry {
         putOrRemove(s.stakes, caller, previousStake.subtract(amountBI));
 
         // create pending transfer
-        long id = nextTransfer++;
+        long id = nextTransferId++;
         PendingTransfer transfer = new PendingTransfer(caller, toStaker, recipient, amountBI, Blockchain.getBlockNumber());
         pendingTransfers.put(id, transfer);
-        StakerRegistryEvents.transferredStake(id, fromStaker, toStaker, recipient, amountBI);
+        StakerRegistryEvents.transferredDelegation(id, fromStaker, toStaker, recipient, amountBI);
 
         return id;
     }
 
     /**
-     * Finalizes an un-vote operation, specified by id.
+     * Finalizes an undelegate operation, specified by id.
      *
-     * @param id the pending unvote identifier
+     * @param id the pending un-delegate identifier
      */
     @Callable
-    public static void finalizeUnvote(long id) {
+    public static void finalizeUndelegate(long id) {
         requireNoValue();
 
         // check existence
-        PendingUnvote unvote = pendingUnvotes.get(id);
-        requireNonNull(unvote);
+        PendingUndelegate undelegate = pendingUndelegates.get(id);
+        requireNonNull(undelegate);
 
         // lock-up period check
-        require(Blockchain.getBlockNumber() >= unvote.blockNumber + UNVOTE_LOCK_UP_PERIOD);
+        require(Blockchain.getBlockNumber() >= undelegate.blockNumber + UNDELEGATE_LOCK_UP_PERIOD);
 
-        // remove the unvote
-        pendingUnvotes.remove(id);
+        // remove the undelegate
+        pendingUndelegates.remove(id);
 
         // do a value transfer
-        secureCall(unvote.recipient, unvote.value, new byte[0], Blockchain.getRemainingEnergy());
-        StakerRegistryEvents.finalizedUnvote(id);
+        secureCall(undelegate.recipient, undelegate.value, new byte[0], Blockchain.getRemainingEnergy());
+        StakerRegistryEvents.finalizedUndelegation(id);
     }
 
     /**
@@ -287,7 +287,7 @@ public class StakerRegistry {
         BigInteger previousStake = getOrDefault(s.stakes, transfer.recipient, BigInteger.ZERO);
         s.totalStake = s.totalStake.add(transfer.value);
         putOrRemove(s.stakes, transfer.recipient, previousStake.add(transfer.value));
-        StakerRegistryEvents.finalizedTransfer(id);
+        StakerRegistryEvents.finalizedDelegationTransfer(id);
     }
 
     /**
@@ -345,19 +345,19 @@ public class StakerRegistry {
 
 
     /**
-     * Returns the stake from a voter to a staker.
+     * Returns the stake from a delegator to a staker.
      *
      * @param staker the address of the staker
-     * @param voter  the address of the voter
+     * @param delegator  the address of the delegator
      * @return the amount of stake
      */
     @Callable
-    public static long getStake(Address staker, Address voter) {
+    public static long getStake(Address staker, Address delegator) {
         requireStaker(staker);
-        requireNonNull(voter);
+        requireNonNull(delegator);
         requireNoValue();
 
-        return getOrDefault(stakers.get(staker).stakes, voter, BigInteger.ZERO).longValue();
+        return getOrDefault(stakers.get(staker).stakes, delegator, BigInteger.ZERO).longValue();
     }
 
     /**
@@ -383,7 +383,7 @@ public class StakerRegistry {
      * This is subject to lock-up period.
      * @param staker the address of the staker
      * @param amount the amount of stake
-     * @return a pending unvote identifier
+     * @return a pending un-delegate identifier
      */
     @Callable
     public static long unbond(Address staker, long amount){
@@ -396,7 +396,7 @@ public class StakerRegistry {
      * @param staker the address of the staker
      * @param amount the amount of stake
      * @param recipient the receiving address
-     * @return a pending unvote identifier
+     * @return a pending un-delegate identifier
      */
     @Callable
     public static long unbondTo(Address staker, long amount, Address recipient){
@@ -414,9 +414,9 @@ public class StakerRegistry {
         s.selfBondStake = s.selfBondStake.subtract(amountBI);
         s.totalStake = s.totalStake.subtract(amountBI);
 
-        long id = nextUnvote++;
-        PendingUnvote unvote = new PendingUnvote(recipient, amountBI, Blockchain.getBlockNumber());
-        pendingUnvotes.put(id, unvote);
+        long id = nextUndelegateId++;
+        PendingUndelegate undelegate = new PendingUndelegate(recipient, amountBI, Blockchain.getBlockNumber());
+        pendingUndelegates.put(id, undelegate);
 
         StakerRegistryEvents.unbonded(id, staker, recipient, amountBI);
 
@@ -549,14 +549,14 @@ public class StakerRegistry {
     }
 
     @Callable
-    public static long[] getPendingUnvoteIds() {
+    public static long[] getPendingUndelegateIds() {
         requireNoValue();
-        long[] pendingUnvoteIds = new long[pendingUnvotes.keySet().size()];
+        long[] pendingUndelegateIds = new long[pendingUndelegates.keySet().size()];
         int i = 0;
-        for (long id : pendingUnvotes.keySet()) {
-            pendingUnvoteIds[i++] = id;
+        for (long id : pendingUndelegates.keySet()) {
+            pendingUndelegateIds[i++] = id;
         }
-        return pendingUnvoteIds;
+        return pendingUndelegateIds;
     }
 
     @Callable

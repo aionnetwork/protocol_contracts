@@ -132,10 +132,10 @@ public class PoolRegistry {
         delegate(caller, pool, Blockchain.getValue(), true);
     }
 
-    private static void delegate(Address delegator, Address pool, BigInteger value, boolean doVote) {
+    private static void delegate(Address delegator, Address pool, BigInteger value, boolean doDelegate) {
         PoolState ps = pools.get(pool);
 
-        if (doVote) {
+        if (doDelegate) {
             byte[] data;
             if (delegator.equals(pool)) {
                 data = new ABIStreamingEncoder()
@@ -144,7 +144,7 @@ public class PoolRegistry {
                         .toBytes();
             } else {
                 data = new ABIStreamingEncoder()
-                        .encodeOneString("vote")
+                        .encodeOneString("delegate")
                         .encodeOneAddress(pool)
                         .toBytes();
             }
@@ -155,7 +155,7 @@ public class PoolRegistry {
         ps.delegators.put(delegator, previousStake.add(value));
 
         // update rewards state machine
-        ps.rewards.onVote(delegator, Blockchain.getBlockNumber(), value.longValue());
+        ps.rewards.onDelegate(delegator, Blockchain.getBlockNumber(), value.longValue());
 
         // possible pool state change
         if (delegator.equals(ps.stakerAddress)) {
@@ -181,7 +181,7 @@ public class PoolRegistry {
         return undelegate(Blockchain.getCaller(), pool, amount, true);
     }
 
-    private static long undelegate(Address delegator, Address pool, long amount, boolean doUnvote) {
+    private static long undelegate(Address delegator, Address pool, long amount, boolean doUndelegate) {
         PoolState ps = pools.get(pool);
 
         BigInteger previousStake = getOrDefault(ps.delegators, delegator, BigInteger.ZERO);
@@ -190,7 +190,7 @@ public class PoolRegistry {
         ps.delegators.put(delegator, previousStake.subtract(amountBI));
 
         long id = -1;
-        if (doUnvote) {
+        if (doUndelegate) {
             byte[] data;
             if (delegator.equals(pool)) {
                 data = new ABIStreamingEncoder()
@@ -201,7 +201,7 @@ public class PoolRegistry {
                         .toBytes();
             } else {
                 data = new ABIStreamingEncoder()
-                        .encodeOneString("unvoteTo")
+                        .encodeOneString("undelegateTo")
                         .encodeOneAddress(pool)
                         .encodeOneLong(amount)
                         .encodeOneAddress(delegator)
@@ -212,7 +212,7 @@ public class PoolRegistry {
         }
 
         // update rewards state machine
-        ps.rewards.onUnvote(delegator, Blockchain.getBlockNumber(), amount);
+        ps.rewards.onUndelegate(delegator, Blockchain.getBlockNumber(), amount);
 
         // possible pool state change
         if (delegator.equals(ps.stakerAddress)) {
@@ -266,7 +266,7 @@ public class PoolRegistry {
     private static Map<Long, StakeTransfer> transfers = new AionMap<>();
 
     /**
-     * Transfers stake from one pool to another pool.
+     * Transfers delegation from one pool to another pool.
      *
      * @param fromPool the from pool address
      * @param toPool   the to pool address
@@ -274,7 +274,7 @@ public class PoolRegistry {
      * @return the pending transfer id
      */
     @Callable
-    public static long transferStake(Address fromPool, Address toPool, long amount) {
+    public static long transferDelegation(Address fromPool, Address toPool, long amount) {
         Address caller = Blockchain.getCaller();
         requirePool(fromPool);
         requirePool(toPool);
@@ -295,10 +295,10 @@ public class PoolRegistry {
         ps.delegators.put(caller, previousStake1.subtract(amountBI));
 
         // update rewards state machine
-        ps.rewards.onUnvote(caller, Blockchain.getBlockNumber(), amount);
+        ps.rewards.onUndelegate(caller, Blockchain.getBlockNumber(), amount);
 
         byte[] data = new ABIStreamingEncoder()
-                    .encodeOneString("transferStakeTo")
+                    .encodeOneString("transferDelegationTo")
                     .encodeOneAddress(fromPool)
                     .encodeOneAddress(toPool)
                     .encodeOneLong(amount)
@@ -314,7 +314,7 @@ public class PoolRegistry {
             checkPoolState(ps.stakerAddress);
         }
 
-        PoolRegistryEvents.transferredStake(id, caller, fromPool, toPool, amountBI);
+        PoolRegistryEvents.transferredDelegation(id, caller, fromPool, toPool, amountBI);
         return id;
     }
 
@@ -369,16 +369,16 @@ public class PoolRegistry {
     }
 
     /**
-     * Finalizes an un-vote operation.
+     * Finalizes an undelegate operation.
      *
-     * @param id pending unvote id
+     * @param id pending undelegation id
      */
     @Callable
-    public static void finalizeUnvote(long id) {
+    public static void finalizeUndelegate(long id) {
         requireNoValue();
 
         byte[] data = new ABIStreamingEncoder()
-                .encodeOneString("finalizeUnvote")
+                .encodeOneString("finalizeUndelegate")
                 .encodeOneLong(id)
                 .toBytes();
         secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
