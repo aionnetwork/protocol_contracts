@@ -5,13 +5,9 @@ import avm.Blockchain;
 import avm.Result;
 import org.aion.avm.tooling.abi.Callable;
 import org.aion.avm.userlib.AionMap;
-import org.aion.avm.userlib.AionSet;
-import org.aion.avm.userlib.abi.ABIStreamingEncoder;
 
-import java.beans.EventSetDescriptor;
 import java.math.BigInteger;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * A staker registry manages the staker database, and provides an interface for voters
@@ -32,36 +28,34 @@ public class StakerRegistry {
         private Address managementAddress;
         private Address signingAddress;
         private Address coinbaseAddress;
-        private Address selfBondAddress;
 
         private long lastSigningAddressUpdate;
 
         private BigInteger totalStake;
+        private BigInteger selfBondStake;
 
         // maps addresses to the stakes those addresses have sent to this staker
         // the sum of stakes.values() should always equal totalStake
         private Map<Address, BigInteger> stakes;
 
-        public Staker(Address identityAddress, Address managementAddress, Address signingAddress, Address coinbaseAddress, Address selfBondAddress, long lastSigningAddressUpdate) {
+        public Staker(Address identityAddress, Address managementAddress, Address signingAddress, Address coinbaseAddress, long lastSigningAddressUpdate) {
             this.identityAddress = identityAddress;
             this.managementAddress = managementAddress;
             this.signingAddress = signingAddress;
             this.coinbaseAddress = coinbaseAddress;
-            this.selfBondAddress = selfBondAddress;
             this.lastSigningAddressUpdate = lastSigningAddressUpdate;
             this.totalStake = BigInteger.ZERO;
             this.stakes = new AionMap<>();
+            this.selfBondStake = BigInteger.ZERO;
         }
     }
 
     private static class PendingUnvote {
-        private Address initiator;
         private Address recipient;
         private BigInteger value;
         private long blockNumber;
 
-        public PendingUnvote(Address initiator, Address recipient, BigInteger value, long blockNumber) {
-            this.initiator = initiator;
+        public PendingUnvote(Address recipient, BigInteger value, long blockNumber) {
             this.recipient = recipient;
             this.value = value;
             this.blockNumber = blockNumber;
@@ -70,15 +64,13 @@ public class StakerRegistry {
 
     private static class PendingTransfer {
         private Address initiator;
-        private Address fromStaker;
         private Address toStaker;
         private Address recipient;
         private BigInteger value;
         private long blockNumber;
 
-        public PendingTransfer(Address initiator, Address fromStaker, Address toStaker, Address recipient, BigInteger value, long blockNumber) {
+        public PendingTransfer(Address initiator, Address toStaker, Address recipient, BigInteger value, long blockNumber) {
             this.initiator = initiator;
-            this.fromStaker = fromStaker;
             this.toStaker = toStaker;
             this.recipient = recipient;
             this.value = value;
@@ -102,16 +94,14 @@ public class StakerRegistry {
      * @param managementAddress  the address with management rights. can't be changed.
      * @param signingAddress  the address of the key used for signing PoS blocks
      * @param coinbaseAddress the address of the key used for collecting block rewards
-     * @param selfBondAddress  the self bond is deposited by staker
      */
     @Callable
     public static void registerStaker(Address identityAddress, Address managementAddress,
-                                      Address signingAddress, Address coinbaseAddress, Address selfBondAddress) {
+                                      Address signingAddress, Address coinbaseAddress) {
         requireNonNull(identityAddress);
         requireNonNull(managementAddress);
         requireNonNull(signingAddress);
         requireNonNull(coinbaseAddress);
-        requireNonNull(selfBondAddress);
         requireNoValue();
 
         require(!signingAddresses.containsKey(signingAddress));
@@ -119,8 +109,8 @@ public class StakerRegistry {
 
         signingAddresses.put(signingAddress, identityAddress);
 
-        stakers.put(identityAddress, new Staker(identityAddress, managementAddress, signingAddress, coinbaseAddress, selfBondAddress, Blockchain.getBlockNumber()));
-        StakerRegistryEvents.registeredStaker(identityAddress, managementAddress, signingAddress, coinbaseAddress, selfBondAddress);
+        stakers.put(identityAddress, new Staker(identityAddress, managementAddress, signingAddress, coinbaseAddress, Blockchain.getBlockNumber()));
+        StakerRegistryEvents.registeredStaker(identityAddress, managementAddress, signingAddress, coinbaseAddress);
     }
 
     /**
@@ -149,7 +139,7 @@ public class StakerRegistry {
      *
      * @param staker the address of the staker
      * @param amount the amount of stake
-     * @return a pending unvote identity
+     * @return a pending unvote identifier
      */
     @Callable
     public static long unvote(Address staker, long amount) {
@@ -161,7 +151,7 @@ public class StakerRegistry {
      *
      * @param staker   the address of the staker
      * @param amount   the amount of stake
-     * @param recipient the receiving addresss
+     * @param recipient the receiving address
      * @return a pending unvote identifier
      */
     @Callable
@@ -186,7 +176,7 @@ public class StakerRegistry {
 
         // create pending unvote
         long id = nextUnvote++;
-        PendingUnvote unvote = new PendingUnvote(caller, recipient, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
+        PendingUnvote unvote = new PendingUnvote(recipient, amountBI, Blockchain.getBlockNumber());
         pendingUnvotes.put(id, unvote);
         StakerRegistryEvents.unvoted(id, caller, staker, recipient, amountBI);
 
@@ -238,7 +228,7 @@ public class StakerRegistry {
 
         // create pending transfer
         long id = nextTransfer++;
-        PendingTransfer transfer = new PendingTransfer(caller, fromStaker, toStaker, recipient, BigInteger.valueOf(amount), Blockchain.getBlockNumber());
+        PendingTransfer transfer = new PendingTransfer(caller, toStaker, recipient, amountBI, Blockchain.getBlockNumber());
         pendingTransfers.put(id, transfer);
         StakerRegistryEvents.transferredStake(id, fromStaker, toStaker, recipient, amountBI);
 
@@ -289,7 +279,7 @@ public class StakerRegistry {
         // lock-up period check
         require(Blockchain.getBlockNumber() >= transfer.blockNumber + TRANSFER_LOCK_UP_PERIOD);
 
-        // remvoe the transfer
+        // remove the transfer
         pendingTransfers.remove(id);
 
         // credit the stake to the designated pool of the recipient
@@ -371,6 +361,69 @@ public class StakerRegistry {
     }
 
     /**
+     * Bonds the stake to the staker (self-bond stake)
+     * @param staker the address of the staker
+     */
+    @Callable
+    public static void bond(Address staker){
+        BigInteger amount = Blockchain.getValue();
+
+        requirePositive(amount);
+        requireStakerAndManager(staker, Blockchain.getCaller());
+
+        Staker s = stakers.get(staker);
+        s.selfBondStake = s.selfBondStake.add(amount);
+        s.totalStake = s.totalStake.add(amount);
+
+        StakerRegistryEvents.bonded(staker, amount);
+    }
+
+    /**
+     * Unbonds for a staker, After a successful unbond, the locked coins will be released to the original bonder (management address).
+     * This is subject to lock-up period.
+     * @param staker the address of the staker
+     * @param amount the amount of stake
+     * @return a pending unvote identifier
+     */
+    @Callable
+    public static long unbond(Address staker, long amount){
+        return unbondTo(staker, amount, Blockchain.getCaller());
+    }
+
+    /**
+     * Unbonds for a staker, After a successful unbond, the locked coins will be released to the specified account.
+     * This is subject to lock-up period.
+     * @param staker the address of the staker
+     * @param amount the amount of stake
+     * @param recipient the receiving address
+     * @return a pending unvote identifier
+     */
+    @Callable
+    public static long unbondTo(Address staker, long amount, Address recipient){
+        Address caller = Blockchain.getCaller();
+
+        requireStakerAndManager(staker, caller);
+        requirePositive(amount);
+        requireNoValue();
+
+        Staker s = stakers.get(staker);
+        BigInteger amountBI = BigInteger.valueOf(amount);
+
+        require(amountBI.compareTo(s.selfBondStake) <= 0);
+
+        s.selfBondStake = s.selfBondStake.subtract(amountBI);
+        s.totalStake = s.totalStake.subtract(amountBI);
+
+        long id = nextUnvote++;
+        PendingUnvote unvote = new PendingUnvote(recipient, amountBI, Blockchain.getBlockNumber());
+        pendingUnvotes.put(id, unvote);
+
+        StakerRegistryEvents.unbonded(id, staker, recipient, amountBI);
+
+        return id;
+    }
+
+    /**
      * Returns if staker is registered.
      *
      * @param staker the address of the staker
@@ -394,7 +447,7 @@ public class StakerRegistry {
 
         Staker s = stakers.get(staker);
 
-        return BigInteger.valueOf(getStake(staker, s.selfBondAddress)).compareTo(MIN_SELF_STAKE) >= 0;
+        return s.selfBondStake.compareTo(MIN_SELF_STAKE) >= 0;
     }
 
     /**
@@ -495,23 +548,6 @@ public class StakerRegistry {
         StakerRegistryEvents.setCoinbaseAddress(staker, newCoinbaseAddress);
     }
 
-    /**
-     * Updates the coinbase address of a staker. Owner only.
-     *
-     * @param newAddress the new coinbase address
-     */
-    @Callable
-    public static void setSelfBondAddress(Address staker, Address newAddress) {
-        requireNonNull(newAddress);
-        requireNoValue();
-
-        Staker s = requireStakerAndManager(staker, Blockchain.getCaller());
-        if (!newAddress.equals(s.selfBondAddress)) {
-            s.selfBondAddress = newAddress;
-        }
-        StakerRegistryEvents.setSelfBondAddress(staker, newAddress);
-    }
-
     @Callable
     public static long[] getPendingUnvoteIds() {
         requireNoValue();
@@ -532,6 +568,13 @@ public class StakerRegistry {
             pendingTransferIds[i++] = id;
         }
         return pendingTransferIds;
+    }
+
+    @Callable
+    public static long getSelfBondStake(Address staker) {
+        requireStaker(staker);
+        requireNoValue();
+        return stakers.get(staker).selfBondStake.longValue();
     }
 
     private static void require(boolean condition) {

@@ -22,7 +22,7 @@ public class StakerRegistryTest {
 
     private Address preminedAddress;
 
-    private Address stakerAddress; // TODO: separate identity, management and selfbond address
+    private Address stakerAddress;
     private Address signingAddress;
     private Address coinbaseAddress;
 
@@ -125,7 +125,7 @@ public class StakerRegistryTest {
 
         // vote first
         byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("vote")
+                .encodeOneString("bond")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, halfMinStake, txData);
@@ -143,7 +143,7 @@ public class StakerRegistryTest {
 
         // then unvote
         txData = new ABIStreamingEncoder()
-                .encodeOneString("vote")
+                .encodeOneString("bond")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
         result = RULE.call(stakerAddress, stakerRegistry, halfMinStake, txData);
@@ -154,6 +154,53 @@ public class StakerRegistryTest {
                 .encodeOneString("getEffectiveStake")
                 .encodeOneAddress(signingAddress)
                 .encodeOneAddress(coinbaseAddress)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE.longValue(), result.getDecodedReturnData());
+    }
+
+    @Test
+    public void testBond() {
+        // voting for stakerAddress does not go into the self bond stake
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("vote")
+                .encodeOneAddress(stakerAddress)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, StakerRegistry.MIN_SELF_STAKE, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        // query the effective stake
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getEffectiveStake")
+                .encodeOneAddress(signingAddress)
+                .encodeOneAddress(coinbaseAddress)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(0L, result.getDecodedReturnData());
+
+        // then unvote
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("bond")
+                .encodeOneAddress(stakerAddress)
+                .toBytes();
+        result = RULE.call(stakerAddress, stakerRegistry, StakerRegistry.MIN_SELF_STAKE, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        // query the effective stake again
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getEffectiveStake")
+                .encodeOneAddress(signingAddress)
+                .encodeOneAddress(coinbaseAddress)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE.longValue() * 2, result.getDecodedReturnData());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getSelfBondStake")
+                .encodeOneAddress(stakerAddress)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());

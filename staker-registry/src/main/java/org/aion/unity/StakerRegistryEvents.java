@@ -10,17 +10,13 @@ import java.math.BigInteger;
 public class StakerRegistryEvents {
 
     static void registeredStaker(Address identityAddress, Address managementAddress,
-                                 Address signingAddress, Address coinbaseAddress, Address selfBondAddress) {
-        // todo check after address finalization
-        byte[] data = new byte[Address.LENGTH * 2];
-        System.arraycopy(managementAddress.toByteArray(), 0, data, 0, Address.LENGTH);
-        System.arraycopy(selfBondAddress.toByteArray(), 0, data, Address.LENGTH, Address.LENGTH);
+                                 Address signingAddress, Address coinbaseAddress) {
 
         Blockchain.log("StakerRegistered".getBytes(),
                 identityAddress.toByteArray(),
                 signingAddress.toByteArray(),
                 coinbaseAddress.toByteArray(),
-                data);
+                managementAddress.toByteArray());
     }
 
     static void setSigningAddress(Address identityAddress, Address newAddress) {
@@ -77,9 +73,18 @@ public class StakerRegistryEvents {
                 BigInteger.valueOf(id).toByteArray());
     }
 
-    static void setSelfBondAddress(Address identityAddress, Address newAddress) {
-        Blockchain.log("SelfBondAddressSet".getBytes(),
+    // Events for self bond stake are different to allow the distinction between normal vote for one of the delegator addresses and self-bond stake
+    static void bonded(Address identityAddress, BigInteger amount) {
+        Blockchain.log("Bonded".getBytes(),
                 identityAddress.toByteArray(),
-                newAddress.toByteArray());
+                amount.toByteArray());
+    }
+
+    static void unbonded(long id, Address staker, Address recipient, BigInteger amountBI) {
+        Blockchain.log("Unbonded".getBytes(),
+                AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
+                staker.toByteArray(),
+                recipient.toByteArray(),
+                amountBI.toByteArray());
     }
 }

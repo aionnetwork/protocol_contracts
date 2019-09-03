@@ -29,12 +29,4 @@ public class ContractCodeExtractor {
         System.out.println(Hex.toHexString(data));
         System.out.println(data.length);
     }
-
-    @Test
-    public void getPoolCustodianContractCode() {
-        byte[] arguments = ABIUtil.encodeDeploymentArguments(placeHolder, placeHolder);
-        byte[] data = avmRule.getDappBytes(PoolCustodian.class, arguments);
-        System.out.println(Hex.toHexString(data));
-        System.out.println(data.length);
-    }
 }
