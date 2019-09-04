@@ -235,6 +235,10 @@ public class PoolRewardsStateMachine {
         }
     }
 
+    public int getFee() {
+        return fee;
+    }
+
     private static class StartingInfo {
         public long stake;             // amount of coins being delegated
         public long blockNumber;       // block number at which delegation was created

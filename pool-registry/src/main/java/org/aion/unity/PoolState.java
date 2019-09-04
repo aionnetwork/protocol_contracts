@@ -10,8 +10,6 @@ import java.util.Map;
  * Manages the state of a pool.
  */
 public class PoolState {
-    public boolean isActive;
-
     Address stakerAddress; // a.k.a. owner address
     Address coinbaseAddress;
 
@@ -25,7 +23,6 @@ public class PoolState {
     Map<Address, Integer> autoRewardsDelegationDelegators;
 
     public PoolState(Address stakerAddress, Address coinbaseAddress, int commissionRate, byte[] metaDataUrl, byte[] metaDataContentHash) {
-        this.isActive = false;
         this.stakerAddress = stakerAddress;
         this.coinbaseAddress = coinbaseAddress;
         this.commissionRate = commissionRate;

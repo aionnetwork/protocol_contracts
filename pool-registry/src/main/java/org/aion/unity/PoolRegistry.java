@@ -26,6 +26,7 @@ public class PoolRegistry {
     // TODO: replace object graph-based collections with key-value storage
 
     public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
+    private static final int MIN_SELF_STAKE_PERCENTAGE = 1;
     // todo check value
     public static final long COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD = 6 * 60 * 24 * 7;
 
@@ -160,10 +161,11 @@ public class PoolRegistry {
         // update rewards state machine
         ps.rewards.onDelegate(delegator, Blockchain.getBlockNumber(), value.longValue());
 
-        // possible pool state change
-        if (delegator.equals(ps.stakerAddress)) {
-            checkPoolState(ps.stakerAddress);
+        // if after the delegation the pool becomes active, update the commission rate
+        if (delegator.equals(ps.stakerAddress) && isSelfStakeSatisfied(pool)) {
+            switchToActive(ps);
         }
+
         PoolRegistryEvents.delegated(delegator, pool, value);
     }
 
@@ -217,9 +219,15 @@ public class PoolRegistry {
         // update rewards state machine
         ps.rewards.onUndelegate(delegator, Blockchain.getBlockNumber(), amount);
 
-        // possible pool state change
-        if (delegator.equals(ps.stakerAddress)) {
-            checkPoolState(ps.stakerAddress);
+        boolean isActive = isSelfStakeSatisfied(pool);
+
+        // if after the un-delegation the state of the pool changes, update the commission rate
+        // undelegation from a delegator can make the pool go back into the active state
+        if (!delegator.equals(ps.stakerAddress) && isActive) {
+            switchToActive(ps);
+        }// undelegation from a pool operator can make the pool go into the broken state
+        else if (delegator.equals(ps.stakerAddress) && !isActive) {
+            switchToBroken(ps);
         }
 
         PoolRegistryEvents.undelegated(id, delegator, pool, amountBI);
@@ -301,20 +309,21 @@ public class PoolRegistry {
         ps.rewards.onUndelegate(caller, Blockchain.getBlockNumber(), amount);
 
         byte[] data = new ABIStreamingEncoder()
-                    .encodeOneString("transferDelegationTo")
-                    .encodeOneAddress(fromPool)
-                    .encodeOneAddress(toPool)
-                    .encodeOneLong(amount)
-                    .encodeOneAddress(Blockchain.getAddress())
-                    .toBytes();
+                .encodeOneString("transferDelegationTo")
+                .encodeOneAddress(fromPool)
+                .encodeOneAddress(toPool)
+                .encodeOneLong(amount)
+                .encodeOneAddress(Blockchain.getAddress())
+                .toBytes();
 
         Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
         long id = new ABIDecoder(result.getReturnData()).decodeOneLong();
         transfers.put(id, new StakeTransfer(caller, fromPool, toPool, amount));
 
-        // possible pool state change
-        if (caller.equals(ps.stakerAddress)) {
-            checkPoolState(ps.stakerAddress);
+        // transfer out of fromPool could make it broken
+        // this call can only be from a delegator
+        if (isSelfStakeSatisfied(fromPool)) {
+            switchToActive(ps);
         }
 
         PoolRegistryEvents.transferredDelegation(id, caller, fromPool, toPool, amountBI);
@@ -362,7 +371,10 @@ public class PoolRegistry {
     public static long getTotalStake(Address pool) {
         requirePool(pool);
         requireNoValue();
+        return getTotalStakeCall(pool);
+    }
 
+    private static long getTotalStakeCall(Address pool){
         byte[] data = new ABIStreamingEncoder()
                 .encodeOneString("getTotalStake")
                 .encodeOneAddress(pool)
@@ -595,8 +607,7 @@ public class PoolRegistry {
 
         // make sure the pool is active, so that pool owner can't change the commission rate after it has been set to 0 as a punishment
         // if the pool is not active, the commission fee in rewards is set when it becomes active
-        // todo enforce this after the self bond percentage is implemented
-        if(isActive(commissionUpdate.pool)) {
+        if(isSelfStakeSatisfied(commissionUpdate.pool)) {
             ps.rewards.setCommissionRate(commissionUpdate.newCommissionRate);
         }
 
@@ -650,25 +661,7 @@ public class PoolRegistry {
     public static String getPoolStatus(Address pool) {
         requirePool(pool);
         requireNoValue();
-        return pools.get(pool).isActive ? "ACTIVE" : "BROKEN";
-    }
-
-    private static void checkPoolState(Address staker) {
-        PoolState ps = pools.get(staker);
-        if (ps != null) {
-            boolean active = isActive(staker);
-            if (ps.isActive && !active) {
-                switchToBroken(ps);
-            }
-            if (!ps.isActive && active) {
-                switchToActive(ps);
-            }
-        }
-    }
-
-    private static boolean isActive(Address pool) {
-        // TODO: optimize - checking all three condition each time costs too much energy
-        return isSelfStakeSatisfied(pool);
+        return isSelfStakeSatisfied(pool) ? "ACTIVE" : "BROKEN";
     }
 
     private static boolean isStakerRegistered(Address staker) {
@@ -685,24 +678,25 @@ public class PoolRegistry {
     private static boolean isSelfStakeSatisfied(Address pool) {
         requirePool(pool);
 
+        long totalStake = getTotalStakeCall(pool);
         PoolState ps = pools.get(pool);
-        BigInteger stake = getOrDefault(ps.delegators, ps.stakerAddress, BigInteger.ZERO);
+        BigInteger selfStake = getOrDefault(ps.delegators, ps.stakerAddress, BigInteger.ZERO);
 
-        // can implement a self-bond percentage very easily here
-        return stake.compareTo(MIN_SELF_STAKE) >= 0;
+        return selfStake.compareTo(MIN_SELF_STAKE) >= 0 && ((selfStake.longValue() * 100) / totalStake >= MIN_SELF_STAKE_PERCENTAGE);
     }
 
-
     private static void switchToActive(PoolState ps) {
-        ps.isActive = true;
-        ps.rewards.setCommissionRate(ps.commissionRate);
+        if(ps.rewards.getFee() == 0 && ps.commissionRate != 0) {
+            ps.rewards.setCommissionRate(ps.commissionRate);
+            PoolRegistryEvents.changedPoolState(ps.stakerAddress, true);
+        }
     }
 
     private static void switchToBroken(PoolState ps) {
-        ps.isActive = false;
-        ps.rewards.setCommissionRate(0);
-
-        // alternatively, punishment could be making the staker inactive
+        if(ps.rewards.getFee() != 0) {
+            ps.rewards.setCommissionRate(0);
+            PoolRegistryEvents.changedPoolState(ps.stakerAddress, false);
+        }
     }
 
     private static void require(boolean condition) {
