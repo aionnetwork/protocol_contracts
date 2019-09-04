@@ -26,6 +26,9 @@ public class PoolRegistry {
     // TODO: replace object graph-based collections with key-value storage
 
     public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
+    // todo check value
+    public static final long COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD = 6 * 60 * 24 * 7;
+
 
     @Initializable
     private static Address stakerRegistry;
@@ -555,16 +558,50 @@ public class PoolRegistry {
     }
 
     @Callable
-    public static void updateCommissionRate(Address pool, int newCommissionRate){
-        // todo possible to add a delay and max value
+    public static long requestCommissionRateChange(Address pool, int newCommissionRate) {
         requireNoValue();
         requirePool(pool);
         require(newCommissionRate >= 0 && newCommissionRate <= 100);
-        PoolState ps = pools.get(pool);
+        require(pools.get(pool).stakerAddress.equals(Blockchain.getCaller()));
+
+        long id = nextCommissionRateUpdateRequestId++;
+        pendingCommissionUpdates.put(id, new CommissionUpdate(pool, newCommissionRate, Blockchain.getBlockNumber()));
+
+        PoolRegistryEvents.requestedCommissionRateChange(id, pool, newCommissionRate);
+
+        return id;
+    }
+
+    @Callable
+    public static void finalizeCommissionRateChange(long id){
+        requireNoValue();
+
+        // check existence
+        CommissionUpdate commissionUpdate = pendingCommissionUpdates.get(id);
+        requireNonNull(commissionUpdate);
+
+        // lock-up period check
+        require(Blockchain.getBlockNumber() >= commissionUpdate.blockNumber + COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD);
+
+        PoolState ps = pools.get(commissionUpdate.pool);
+        // only the pool owner can finalize the new commission rate
         require(ps.stakerAddress.equals(Blockchain.getCaller()));
-        ps.commissionRate = newCommissionRate;
-        ps.rewards.setCommissionRate(newCommissionRate);
-        PoolRegistryEvents.updatedCommissionRate(pool, newCommissionRate);
+
+        // commission rate in pool state is updated even in broken state to stay consistent with other meta data updates performed by the pool owner
+        ps.commissionRate = commissionUpdate.newCommissionRate;
+
+        // remove request
+        pendingCommissionUpdates.remove(id);
+
+        // make sure the pool is active, so that pool owner can't change the commission rate after it has been set to 0 as a punishment
+        // if the pool is not active, the commission fee in rewards is set when it becomes active
+        // todo enforce this after the self bond percentage is implemented
+        if(isActive(commissionUpdate.pool)) {
+            ps.rewards.setCommissionRate(commissionUpdate.newCommissionRate);
+        }
+
+        // generate finalization event
+        PoolRegistryEvents.finalizedCommissionRateChange(id);
     }
 
     @Callable
@@ -755,4 +792,19 @@ public class PoolRegistry {
             Blockchain.println("New block rewards: " + balance);
         }
     }
+
+    private static class CommissionUpdate {
+        Address pool;
+        int newCommissionRate;
+        long blockNumber;
+
+        public CommissionUpdate(Address pool, int newCommissionRate, long blockNumber) {
+            this.pool = pool;
+            this.newCommissionRate = newCommissionRate;
+            this.blockNumber = blockNumber;
+        }
+    }
+
+    private static Map<Long, CommissionUpdate> pendingCommissionUpdates = new AionMap<>();
+    private static long nextCommissionRateUpdateRequestId = 0;
 }

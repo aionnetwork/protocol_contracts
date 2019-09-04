@@ -67,8 +67,9 @@ public class PoolRegistryEvents {
                 pool.toByteArray());
     }
 
-    static void updatedCommissionRate(Address pool, int newCommissionRate) {
-        Blockchain.log("ADSCommissionRateUpdated".getBytes(),
+    static void requestedCommissionRateChange(long id, Address pool, int newCommissionRate) {
+        Blockchain.log("ADSCommissionRateChangeRequested".getBytes(),
+                AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
                 pool.toByteArray(),
                 BigInteger.valueOf(newCommissionRate).toByteArray());
     }
@@ -83,6 +84,11 @@ public class PoolRegistryEvents {
         Blockchain.log("ADSMetaDataContentHashUpdated".getBytes(),
                 pool.toByteArray(),
                 newMetaDataContentHash);
+    }
+
+    static void finalizedCommissionRateChange(long id) {
+        Blockchain.log("ADSCommissionRateChangeFinalized".getBytes(),
+                BigInteger.valueOf(id).toByteArray());
     }
 
     // following events are implemented only in StakerRegistry

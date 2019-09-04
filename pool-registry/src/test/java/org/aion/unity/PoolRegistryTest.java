@@ -703,7 +703,7 @@ public class PoolRegistryTest {
         Address pool = setupNewPool(10);
 
         byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("updateCommissionRate")
+                .encodeOneString("requestCommissionRateChange")
                 .encodeOneAddress(pool)
                 .encodeOneInteger(20)
                 .toBytes();
@@ -711,18 +711,11 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         // validate the log
         assertEquals(1, result.getLogs().size());
-        assertArrayEquals(LogSizeUtils.truncatePadTopic("ADSCommissionRateUpdated".getBytes()),
+        assertArrayEquals(LogSizeUtils.truncatePadTopic("ADSCommissionRateChangeRequested".getBytes()),
                 result.getLogs().get(0).copyOfTopics().get(0));
-        assertArrayEquals(pool.toByteArray(), result.getLogs().get(0).copyOfTopics().get(1));
+        assertEquals(BigInteger.ZERO, new BigInteger(result.getLogs().get(0).copyOfTopics().get(1)));
+        assertArrayEquals(pool.toByteArray(), result.getLogs().get(0).copyOfTopics().get(2));
         assertArrayEquals(BigInteger.valueOf(20).toByteArray(), result.getLogs().get(0).copyOfData());
-
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("updateCommissionRate")
-                .encodeOneAddress(pool)
-                .encodeOneInteger(30)
-                .toBytes();
-        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
-        assertTrue(result.getReceiptStatus().isFailed());
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("getPoolInfo")
@@ -731,8 +724,41 @@ public class PoolRegistryTest {
         result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
         byte[] info = (byte[]) result.getDecodedReturnData();
-        byte[] expected = new byte[]{0, 0, 0, 20};
+        byte[] expected = new byte[]{0, 0, 0, 10};
         Assert.assertArrayEquals(expected, Arrays.copyOfRange(info, 32 * 2 + 2 + 1, 32 * 2 + 2 + 1 + 4));
+
+        tweakBlockNumber(getBlockNumber() +  PoolRegistry.COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD);
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("finalizeCommissionRateChange")
+                .encodeOneLong(0)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // validate the log
+        assertEquals(1, result.getLogs().size());
+        assertArrayEquals(LogSizeUtils.truncatePadTopic("ADSCommissionRateChangeFinalized".getBytes()),
+                result.getLogs().get(0).copyOfTopics().get(0));
+        assertArrayEquals(BigInteger.ZERO.toByteArray(), result.getLogs().get(0).copyOfData());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getPoolInfo")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        info = (byte[]) result.getDecodedReturnData();
+        expected = new byte[]{0, 0, 0, 20};
+        Assert.assertArrayEquals(expected, Arrays.copyOfRange(info, 32 * 2 + 2 + 1, 32 * 2 + 2 + 1 + 4));
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("requestCommissionRateChange")
+                .encodeOneAddress(pool)
+                .encodeOneInteger(30)
+                .toBytes();
+        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isFailed());
     }
 
     @Test
