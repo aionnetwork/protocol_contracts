@@ -25,8 +25,9 @@ public class PoolRegistry {
 
     // TODO: replace object graph-based collections with key-value storage
 
-    public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
-    private static final int MIN_SELF_STAKE_PERCENTAGE = 1;
+    // 1000 Aions
+    public static final BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
+    private static final BigInteger MIN_SELF_STAKE_PERCENTAGE = BigInteger.ONE;
     // todo check value
     public static final long COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD = 6 * 60 * 24 * 7;
 
@@ -39,7 +40,7 @@ public class PoolRegistry {
     private static Map<Address, PoolState> pools = new AionMap<>();
 
     static {
-        poolCoinbaseContract = hexStringToByteArray("00000881504b0304140008080800d4ad282b000000000000000000000000140004004d4554412d494e462f4d414e49464553542e4d46feca0000f34dcccb4c4b2d2ed10d4b2d2acecccfb35230d433e0e5f24dccccd375ce492c2eb65270e4e5e2e50200504b07082bc2bf352a00000028000000504b0304140008080800d4ad282b00000000000000000000000007000000412e636c6173736d52db4e1351145da72d4c3b0c721750b4de9d2942b1222a37a10594522e52c335c69c0e873230b43a336de27ff8e28bafbe822675a2c6474dfc278dfb1422d430c9cc9cb36f6bedb5f7af3f5fbe03184296814d2a600ccdbbbccce3362fe4e38bb95d617a0a820c2d4bc5a29d2a5a851c7745bf0ca1047a1b33bcbc1f9fdcda7284eb8e509c5e63481b2b0ce7a4256917cd3d73875b05051186485e78296edbc26168d28d9a240d0dd054a868d4500f2582009a181a4e85286861a817af4bdc76193af4ccff9c478c0d0d6d6857d18a0e06c5a158cb110c217dc358d1d0892e09d0cdd05e4ddde7de4e3c69e5670b9ec80b47c1454a2a73bb2416b719baf5b491392b8ea85ec265153d8832b4524bcb629f3ab40af9e98270f26f1882ba91d67015d724dc75c237a96986c15a99ce2ebe994c1f09b32cdc92ed11d84ddc92756e33a827760506e969b9d9926952b12a2675df8b3b2a62e863088f9a3691f2c6ab2e1a084b2ab84b0d12e129ee71a98ab199d4700f83b2fc7dd276f438a14edf4c4ac11ee0a18a041e51725ec3889c4f02a39429fb25638e94d48d5373c87a0ec9409c1f6342c64ed66cd69157418ad8790e2fb8dbc209635ac5941c17131a9e4ac91298952b10566905e6889523cac2f134cc6340125d20fc54718bc6da98f5b8b937cf5f3de7399bee6ab658724c3163d982c40f20444b4e56b94e740a2222ab9265896eaba8abfac77c9cfb88e60acefbb810fb0125f401a1209da391b7ef4f6eb1a88f2bc16f611f377ce80b7d15f493f5b00af08cbe6184da279836419d218e8163902881caa7ed2b12eb3e863e6378bd82b14f685e3dac3a2218c7e071f01ab10bd07ff824782e564132d3fb130a411ff4b6ce54f0e41d3a63b2c84bfaa45facadfac848a78f4576f08f8e86c06f7429482898ea21db32d902a8fb0b504b070805b9dd0d9f020000f9030000504b0304140008080800d4ad282b00000000000000000000000007000000422e636c6173736d545d4f1351103db7bb65b76591adf2dd455a40694bf9100444c040312698a20f3524950759da8a4528a414222f461ff805fc001a124362248104ac11823efbeebf21e2dcedb6dd429beede99b973cfcc9999bb7ffefdbc00308c09061692c018d4657d4bef5bd1534b7d2f179713b18c0481a1762a34f334115b8b27d2bddc81dc17e99911e8f41509312ec824c4196cf32112120c55e3c95432f384c1ee9b0ff9e718049f7f4ec12da84e887029a886e2800d7714d440e2523d439dcf1f2ea510c9a493a9a531c27baba0098d4e726a2e4b32ef21c16dc0478cf773f27fa7a08d07b2c143dab48476273af241ef72eb3db2261574e57d7c0a1c68e552a01c7d7b23935895106470e8e9b4be1d5b5bdf6608f8c2d7cb343653c134c3f9f6a2cf891ef473e6b54e6818a0d04b545362aa6fadf64dc5e3e9c4c60691acb6a812869d18e1be35d36ba98d8c9ecacce92b9b5456719ada40e648468fbd9fd5d75fe98b2ba43b236b9be958e2597225012f1111a923225a5005ea2b4649b34126dd61d139616a8221530b6875d01ea549efc7a4b9c96ea3b53690c3ed40f729ea02c2291a8ec17fd460349a8ea3a6632b0b9ca0ee0b1481af17599a89f001e4c077b484bb8f8c4363f476427089971025aa868d57be08231a303dfc343d0d83aafc6177dc5d50c5854117ae3e7eda1d0f4449b52f5032ee6f46369cc85d13e637ece003796285d9996cbb06b3f35995b74b567b456b5545ab54d12a57b4aa9521d422c6a4414695399bb643b3b63545361162c3689da026788db2f2e371d5b18fea33744473e8fc65807294d722471954abf62c9b39dc3f2cd69e2aecd6486e2a36ef2f05e0d3f2d50890839f854b851bc8c263a99beacd422d15ff005b37427bf7caf3caa76bdf2f4ba87ba2b4a559b6b473f945215c8fa0fdc003035be3d067d0a23d390c5a27a919f64b0cd9b5fa4bb4b02b74c226f1bf66383cc49049f1c89c88dd02c53282ed5682ed591af522413ebe6f6e506caf4851f55888a89e7379b6801b14544f818aeac973198906737864e5520d71486bb844974417dfc63f5f66f6fda4f10968b97ebb8ad18eaded755109f887cd3c1d344f37566e46e9a800d640e2b8719becff01504b070823d52851280300001c060000504b0304140008080800d4ad282b00000000000000000000000007000000432e636c6173733d4ebb0ac240109c358991181f69d3d9a985e9ac44d0a0a0a542fa239e72122fa217f1b7ac040b3fc08f12d7082eec6386d9d97dbd1f4f004304048a5d1021dc8b8b8832a177d1aad0461de4ec9acaa351b976611182c974f167065f31af6e39970e7ec126d591d2ca8c0956b797f8f050f760c32734e25c9f8dd02611592109769c6fb879ebbc38a572ae32890e2aac651b84a8827f42935105359ee86bc5b5c54c5062c0e9dfd1b8fd2ea35d4a9d0f504b0708d8f1b600b0000000d8000000504b01021400140008080800d4ad282b2bc2bf352a000000280000001400040000000000000000000000000000004d4554412d494e462f4d414e49464553542e4d46feca0000504b01021400140008080800d4ad282b05b9dd0d9f020000f9030000070000000000000000000000000070000000412e636c617373504b01021400140008080800d4ad282b23d52851280300001c060000070000000000000000000000000044030000422e636c617373504b01021400140008080800d4ad282bd8f1b600b0000000d80000000700000000000000000000000000a1060000432e636c617373504b05060000000004000400e500000086070000000000000021220000000000000000000000000000000000000000000000000000000000000000");
+        poolCoinbaseContract = hexStringToByteArray("00000869504b0304140008080800d4ad282b000000000000000000000000140004004d4554412d494e462f4d414e49464553542e4d46feca0000f34dcccb4c4b2d2ed10d4b2d2acecccfb35230d433e0e5f24dccccd375ce492c2eb65270e4e5e2e50200504b07082bc2bf352a00000028000000504b0304140008080800d4ad282b00000000000000000000000007000000412e636c6173738d525d53d340143ddb16d286f0fd218a8a9fd80fa45811c556841450a0085206067860b661098134d52465c69fe29b6fbe82ced48e3a3eea8cff49c7bb05ad303ef890cdeeddb3e7de73eefdfef3e31700a3586160930a1843db1e3fe0499b3b6672b1b0270c5f4190a17da954b2b325cb29704f0c49083da0af39c70f8ac9c9ed6d57785e9a61207a2a90ab9115b9bf9bd42d73d6f18529dc746c95a145c274bb64ec1bbbdc7214441822a6f0b3dcb685cbd01a8d9d62d2d0044d858a660d8d502208a095a1e92f8882768646f1b2cc6d8fa13b9a3b2b241ddbd0d0892e151de866505cc25aae6008453762ab1acea1572638cfd0f5afb215f411bf67994eb9c8108cc666355cc2651517d1cfd041b52f8b2249b11c73da11aef9aa069ad37015d724ef754a64903a8691ff3169539f3b7660597865db27036e6240f2dc6250eb71053132cef2f265c320b25a4e9299c0a08a386e338433864d45f9e3b52b729ee90aee907c2a788afb5cca8f6dea1aee6244d2df23919993070dd14d5d3a731f0f54a430468f8586b46c440a197a29f552b0409651bfea86e77d976ca09a1f634262274fcdd5f1ad822c55e7bbdcf176841bc6b48a29d917b6c3d0fb9bedac2b1a9e625632cec93108ab3406392ad81507c2f5353cc3b0d4b048a5654bdbd4dae6bccf8dfd05fe6285176c3aabf952d935c48c650bea4b00219a7e8aca91a25d1011c94a91e7745a450345804c152defd056414f1517e25fa184de2214a47da2822ba137f5733c11fc1caee24615d185c10a86287454e35fa6358c50d7046b9920cd4862f824477f2d03d0f909a9f52a463fe0e17a058fdea36deda87611c138464ec06b040ed07fac0e9e8f57a0e712dfa050eac344c74c054f5ea3272e49b66899df5aab6241de55b1c40eff54a321f003bd0a520aa6fa2896a758000dbf00504b0708db58d443a102000010040000504b0304140008080800d4ad282b00000000000000000000000007000000422e636c6173739d545d4f1341143dd3ddb2edb6c8a2503e5ab41484520a45101001138a316952f40143527990a55d4bb1b4a42c445e8cf12ff003242486c4f80089502304df7df707f83f1af1ceb26d17a889b1e9eedc7be7de33f7cc99d91fbfbf9d0118c334038b4a600ccaaabaa546b26a2e1d79b6bcaa2575090243c34c34f6584be6535a61902750fa323d3181aacfc94872c341468ac1b618254363a89bcae432fa23067b7031dab7c02004fb16dcb80145868846375c703b61c32d37ea2171ab99a129d817afb630af1732b9f4244f6d9129a1f5528317b312da0de8795a35ed460787b7e136792b6ef82fbc4ef2662574c9e8e60b3be1e3d19ecb68db1bbab62621c8e0540b05753b995fdf660805e357b76432562314e3dc42e897d1873067d920c38b41da3b62a46ead456652a982b6b131c9e0b2b812eec918e679ec15436b99fd9aaaaf44a299742ca76b69ad40454db5e212c6648cf3eafad97c6e435773fa829adda4cd1767492c0acfeb6af2f59cbafe5c5dce922fcfe7370b49ed4926aba193b64024dd44b4a30ea43e26c8b3c141bed3e2f3ad22a90c9b84e24ad31c11a4f743f2bc14b7d1d8102ae266a8ff084d21e1089e43f01f1d03b49889136662070b7d41d347b8053e9eedd2c989efc3113a465bbcffc0289aa4b70ca1512c41948c1548b30a8c68c00cf06a7a3c238ae3cdce94b7ec8a4b238d387ffb6e672a9420d7be44cd783f9bddb82addfc84dda0ff89dabe434f80c5ab80c3bbf05bf094ce5d2855b47d6c19933cf042e411caf800d709ba1345dcfd6ed0e2a529fb9e255a44ef7475ca6799f29d3a9e96971b107c5f891bc7f671e8137813034544ac5bd3067b09a3765f73890eff391d6a9bc4ff5e23a11e4326c503a2c86fe64e99e22582012bc1c02e695721c8f578798d62a02645c56f21a2f84f1d7365dcb0a0f8cb5414ff0597e144b888112b1717c4519fa7845e89ee01c37d8c9addff32053afe1781baae08f4fe5af75d35bb17f72e47ad25ff25d63817ebc15fc4eab188356e5c28fa5c997487c86334b65fbd1d95850f2b9074011a09847fdecceab059dd52fbec554b05300f9953c6eaf63f504b07082a6a89950e03000002060000504b0304140008080800d4ad282b00000000000000000000000007000000432e636c6173733d4ebb0ac240109c358991181f69d3d9a985e9ac44d0a0a0a542fa239e72122fa217f1b7ac040b3fc08f12d7082eec6386d9d97dbd1f4f004304048a5d1021dc8b8b8832a177d1aad0461de4ec9acaa351b976611182c974f167065f31af6e39970e7ec126d591d2ca8c0956b797f8f050f760c32734e25c9f8dd02611592109769c6fb879ebbc38a572ae32890e2aac651b84a8827f42935105359ee86bc5b5c54c5062c0e9dfd1b8fd2ea35d4a9d0f504b0708d8f1b600b0000000d8000000504b01021400140008080800d4ad282b2bc2bf352a000000280000001400040000000000000000000000000000004d4554412d494e462f4d414e49464553542e4d46feca0000504b01021400140008080800d4ad282bdb58d443a102000010040000070000000000000000000000000070000000412e636c617373504b01021400140008080800d4ad282b2a6a89950e03000002060000070000000000000000000000000046030000422e636c617373504b01021400140008080800d4ad282bd8f1b600b0000000d8000000070000000000000000000000000089060000432e636c617373504b05060000000004000400e50000006e070000000000000021220000000000000000000000000000000000000000000000000000000000000000");
     }
 
     @Callable
@@ -159,7 +160,7 @@ public class PoolRegistry {
         ps.delegators.put(delegator, previousStake.add(value));
 
         // update rewards state machine
-        ps.rewards.onDelegate(delegator, Blockchain.getBlockNumber(), value.longValue());
+        ps.rewards.onDelegate(delegator, Blockchain.getBlockNumber(), value);
 
         // if after the delegation the pool becomes active, update the commission rate
         if (delegator.equals(ps.stakerAddress) && isSelfStakeSatisfied(pool)) {
@@ -176,7 +177,7 @@ public class PoolRegistry {
      * @param amount the amount of stake to undelegate
      */
     @Callable
-    public static long undelegate(Address pool, long amount) {
+    public static long undelegate(Address pool, BigInteger amount) {
         requirePool(pool);
         requirePositive(amount);
         requireNoValue();
@@ -186,13 +187,13 @@ public class PoolRegistry {
         return undelegate(Blockchain.getCaller(), pool, amount, true);
     }
 
-    private static long undelegate(Address delegator, Address pool, long amount, boolean doUndelegate) {
+    private static long undelegate(Address delegator, Address pool, BigInteger amount, boolean doUndelegate) {
         PoolState ps = pools.get(pool);
 
         BigInteger previousStake = getOrDefault(ps.delegators, delegator, BigInteger.ZERO);
-        BigInteger amountBI = BigInteger.valueOf(amount);
-        require(previousStake.compareTo(amountBI) >= 0);
-        ps.delegators.put(delegator, previousStake.subtract(amountBI));
+
+        require(previousStake.compareTo(amount) >= 0);
+        ps.delegators.put(delegator, previousStake.subtract(amount));
 
         long id = -1;
         if (doUndelegate) {
@@ -201,14 +202,14 @@ public class PoolRegistry {
                 data = new ABIStreamingEncoder()
                         .encodeOneString("unbondTo")
                         .encodeOneAddress(pool)
-                        .encodeOneLong(amount)
+                        .encodeOneBigInteger(amount)
                         .encodeOneAddress(delegator)
                         .toBytes();
             } else {
                 data = new ABIStreamingEncoder()
                         .encodeOneString("undelegateTo")
                         .encodeOneAddress(pool)
-                        .encodeOneLong(amount)
+                        .encodeOneBigInteger(amount)
                         .encodeOneAddress(delegator)
                         .toBytes();
             }
@@ -230,7 +231,7 @@ public class PoolRegistry {
             switchToBroken(ps);
         }
 
-        PoolRegistryEvents.undelegated(id, delegator, pool, amountBI);
+        PoolRegistryEvents.undelegated(id, delegator, pool, amount);
         return id;
     }
 
@@ -250,13 +251,14 @@ public class PoolRegistry {
         PoolState ps = pools.get(pool);
 
         // do a withdraw
-        long amount = ps.rewards.onWithdraw(caller, Blockchain.getBlockNumber());
+        BigInteger amount = ps.rewards.onWithdraw(caller, Blockchain.getBlockNumber());
         if (caller.equals(ps.stakerAddress)) {
-            amount += ps.rewards.onWithdrawOperator();
+            amount = amount.add(ps.rewards.onWithdrawOperator());
         }
 
-        if (amount > 0) {
-            delegate(caller, pool, BigInteger.valueOf(amount), true);
+        // amount > 0
+        if (amount.signum() == 1) {
+            delegate(caller, pool, amount, true);
         }
     }
 
@@ -264,9 +266,9 @@ public class PoolRegistry {
         Address initiator;
         Address fromPool;
         Address toPool;
-        long amount;
+        BigInteger amount;
 
-        public StakeTransfer(Address initiator, Address fromPool, Address toPool, long amount) {
+        public StakeTransfer(Address initiator, Address fromPool, Address toPool, BigInteger amount) {
             this.initiator = initiator;
             this.fromPool = fromPool;
             this.toPool = toPool;
@@ -285,7 +287,7 @@ public class PoolRegistry {
      * @return the pending transfer id
      */
     @Callable
-    public static long transferDelegation(Address fromPool, Address toPool, long amount) {
+    public static long transferDelegation(Address fromPool, Address toPool, BigInteger amount) {
         Address caller = Blockchain.getCaller();
         requirePool(fromPool);
         requirePool(toPool);
@@ -301,9 +303,8 @@ public class PoolRegistry {
         PoolState ps = pools.get(fromPool);
         BigInteger previousStake1 = getOrDefault(ps.delegators, caller, BigInteger.ZERO);
 
-        BigInteger amountBI = BigInteger.valueOf(amount);
-        require(previousStake1.compareTo(amountBI) >= 0);
-        ps.delegators.put(caller, previousStake1.subtract(amountBI));
+        require(previousStake1.compareTo(amount) >= 0);
+        ps.delegators.put(caller, previousStake1.subtract(amount));
 
         // update rewards state machine
         ps.rewards.onUndelegate(caller, Blockchain.getBlockNumber(), amount);
@@ -312,7 +313,7 @@ public class PoolRegistry {
                 .encodeOneString("transferDelegationTo")
                 .encodeOneAddress(fromPool)
                 .encodeOneAddress(toPool)
-                .encodeOneLong(amount)
+                .encodeOneBigInteger(amount)
                 .encodeOneAddress(Blockchain.getAddress())
                 .toBytes();
 
@@ -326,7 +327,7 @@ public class PoolRegistry {
             switchToActive(ps);
         }
 
-        PoolRegistryEvents.transferredDelegation(id, caller, fromPool, toPool, amountBI);
+        PoolRegistryEvents.transferredDelegation(id, caller, fromPool, toPool, amount);
         return id;
     }
 
@@ -338,12 +339,12 @@ public class PoolRegistry {
      * @return the amount of stake
      */
     @Callable
-    public static long getStake(Address pool, Address delegator) {
+    public static BigInteger getStake(Address pool, Address delegator) {
         requirePool(pool);
         requireNonNull(delegator);
         requireNoValue();
 
-        return getOrDefault(pools.get(pool).delegators, delegator, BigInteger.ZERO).longValue();
+        return getOrDefault(pools.get(pool).delegators, delegator, BigInteger.ZERO);
     }
 
     /**
@@ -353,12 +354,12 @@ public class PoolRegistry {
      * @return the amount of stake
      */
     @Callable
-    public static long getSelfStake(Address pool) {
+    public static BigInteger getSelfStake(Address pool) {
         requirePool(pool);
         requireNoValue();
 
         PoolState ps = pools.get(pool);
-        return getOrDefault(ps.delegators, ps.stakerAddress, BigInteger.ZERO).longValue();
+        return getOrDefault(ps.delegators, ps.stakerAddress, BigInteger.ZERO);
     }
 
     /**
@@ -368,19 +369,19 @@ public class PoolRegistry {
      * @return the amount of stake
      */
     @Callable
-    public static long getTotalStake(Address pool) {
+    public static BigInteger getTotalStake(Address pool) {
         requirePool(pool);
         requireNoValue();
         return getTotalStakeCall(pool);
     }
 
-    private static long getTotalStakeCall(Address pool){
+    private static BigInteger getTotalStakeCall(Address pool){
         byte[] data = new ABIStreamingEncoder()
                 .encodeOneString("getTotalStake")
                 .encodeOneAddress(pool)
                 .toBytes();
         Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-        return new ABIDecoder(result.getReturnData()).decodeOneLong();
+        return new ABIDecoder(result.getReturnData()).decodeOneBigInteger();
     }
 
     /**
@@ -419,7 +420,7 @@ public class PoolRegistry {
 
         secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
 
-        delegate(transfer.initiator, transfer.toPool, BigInteger.valueOf(transfer.amount), false);
+        delegate(transfer.initiator, transfer.toPool, transfer.amount, false);
     }
 
     /**
@@ -489,23 +490,25 @@ public class PoolRegistry {
         require(ps.autoRewardsDelegationDelegators.containsKey(delegator));
 
         // do a withdraw
-        long amount = ps.rewards.onWithdraw(delegator, Blockchain.getBlockNumber());
+        BigInteger amount = ps.rewards.onWithdraw(delegator, Blockchain.getBlockNumber());
         if (delegator.equals(ps.stakerAddress)) {
-            amount += ps.rewards.onWithdrawOperator();
+            amount = amount.add(ps.rewards.onWithdrawOperator());
         }
 
         Blockchain.println("Auto delegation: rewards = " + amount);
 
-        if (amount > 0) {
-            long fee = amount * ps.autoRewardsDelegationDelegators.get(delegator) / 100;
-            long remaining = amount - fee;
+        // amount > 0
+        if (amount.signum() == 1) {
+            // rounded down
+            BigInteger fee = (amount.multiply(BigInteger.valueOf(ps.autoRewardsDelegationDelegators.get(delegator)))).divide(BigInteger.valueOf(100));
+            BigInteger remaining = amount.subtract(fee);
 
             Blockchain.println("Auto delegation: fee = " + fee + ", remaining = " + remaining);
 
             // transfer fee to the caller
-            secureCall(Blockchain.getCaller(), BigInteger.valueOf(fee), new byte[0], Blockchain.getRemainingEnergy());
+            secureCall(Blockchain.getCaller(), fee, new byte[0], Blockchain.getRemainingEnergy());
 
-            delegate(delegator, pool, BigInteger.valueOf(remaining), true);
+            delegate(delegator, pool, remaining, true);
         }
     }
 
@@ -532,7 +535,7 @@ public class PoolRegistry {
      * @param delegator the delegator address
      * @return the amount of outstanding rewards
      */
-    public static long getRewards(Address pool, Address delegator) {
+    public static BigInteger getRewards(Address pool, Address delegator) {
         requirePool(pool);
         requireNonNull(delegator);
         requireNoValue();
@@ -546,7 +549,7 @@ public class PoolRegistry {
      * @param pool the pool address
      */
     @Callable
-    public static long withdraw(Address pool) {
+    public static BigInteger withdraw(Address pool) {
         Address caller = Blockchain.getCaller();
         requirePool(pool);
         requireNoValue();
@@ -555,17 +558,16 @@ public class PoolRegistry {
 
         // query withdraw amount from rewards state machine
         PoolState ps = pools.get(pool);
-        long amount = ps.rewards.onWithdraw(caller, Blockchain.getBlockNumber());
+        BigInteger amount = ps.rewards.onWithdraw(caller, Blockchain.getBlockNumber());
         if (caller.equals(ps.stakerAddress)) {
-            amount += ps.rewards.onWithdrawOperator();
+            amount = amount.add(ps.rewards.onWithdrawOperator());
         }
 
-        BigInteger amountBI = BigInteger.valueOf(amount);
-        // do a transfer
-        if (amount > 0) {
-            secureCall(caller, amountBI, new byte[0], Blockchain.getRemainingEnergy());
+        // do a transfer if amount > 0
+        if (amount.signum() == 1) {
+            secureCall(caller, amount, new byte[0], Blockchain.getRemainingEnergy());
         }
-        PoolRegistryEvents.withdrew(caller, pool, amountBI);
+        PoolRegistryEvents.withdrew(caller, pool, amount);
         return amount;
     }
 
@@ -678,22 +680,23 @@ public class PoolRegistry {
     private static boolean isSelfStakeSatisfied(Address pool) {
         requirePool(pool);
 
-        long totalStake = getTotalStakeCall(pool);
+        BigInteger totalStake = getTotalStakeCall(pool);
         PoolState ps = pools.get(pool);
         BigInteger selfStake = getOrDefault(ps.delegators, ps.stakerAddress, BigInteger.ZERO);
 
-        return selfStake.compareTo(MIN_SELF_STAKE) >= 0 && ((selfStake.longValue() * 100) / totalStake >= MIN_SELF_STAKE_PERCENTAGE);
+        return selfStake.compareTo(MIN_SELF_STAKE) >= 0 &&
+                (selfStake.multiply(BigInteger.valueOf(100))).divide(totalStake).compareTo(MIN_SELF_STAKE_PERCENTAGE) >= 0;
     }
 
     private static void switchToActive(PoolState ps) {
-        if(ps.rewards.getFee() == 0 && ps.commissionRate != 0) {
+        if(ps.rewards.isFeeSetToZero() && ps.commissionRate != 0) {
             ps.rewards.setCommissionRate(ps.commissionRate);
             PoolRegistryEvents.changedPoolState(ps.stakerAddress, true);
         }
     }
 
     private static void switchToBroken(PoolState ps) {
-        if(ps.rewards.getFee() != 0) {
+        if(!ps.rewards.isFeeSetToZero()) {
             ps.rewards.setCommissionRate(0);
             PoolRegistryEvents.changedPoolState(ps.stakerAddress, false);
         }
@@ -759,15 +762,16 @@ public class PoolRegistry {
         PoolState ps = pools.get(pool);
 
         BigInteger balance = Blockchain.getBalance(ps.coinbaseAddress);
-        if (balance.compareTo(BigInteger.ZERO) > 0) {
+        // balance > 0
+        if (balance.signum() == 1) {
             byte[] data = new ABIStreamingEncoder()
                     .encodeOneString("transfer")
                     .encodeOneAddress(Blockchain.getAddress())
-                    .encodeOneLong(balance.longValue())
+                    .encodeOneBigInteger(balance)
                     .toBytes();
             secureCall(ps.coinbaseAddress, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
 
-            ps.rewards.onBlock(Blockchain.getBlockNumber(), balance.longValue());
+            ps.rewards.onBlock(Blockchain.getBlockNumber(), balance);
 
             Blockchain.println("New block rewards: " + balance);
         }

@@ -21,7 +21,8 @@ public class StakerRegistry {
     public static final long UNDELEGATE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
     public static final long TRANSFER_LOCK_UP_PERIOD = 6 * 10;
 
-    public static final BigInteger MIN_SELF_STAKE = BigInteger.valueOf(1000L);
+    // 1000 Aions
+    public static final BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
 
     private static class Staker {
         private Address identityAddress;
@@ -142,7 +143,7 @@ public class StakerRegistry {
      * @return a pending undelegation identifier
      */
     @Callable
-    public static long undelegate(Address staker, long amount) {
+    public static long undelegate(Address staker, BigInteger amount) {
         return undelegateTo(staker, amount, Blockchain.getCaller());
     }
 
@@ -155,7 +156,7 @@ public class StakerRegistry {
      * @return a pending un-delegation identifier
      */
     @Callable
-    public static long undelegateTo(Address staker, long amount, Address recipient) {
+    public static long undelegateTo(Address staker, BigInteger amount, Address recipient) {
         Address caller = Blockchain.getCaller();
 
         requireStaker(staker);
@@ -165,20 +166,19 @@ public class StakerRegistry {
 
         Staker s = stakers.get(staker);
         BigInteger previousStake = getOrDefault(stakers.get(staker).stakes, caller, BigInteger.ZERO);
-        BigInteger amountBI = BigInteger.valueOf(amount);
 
         // check previous stake
-        require(amountBI.compareTo(previousStake) <= 0);
+        require(amount.compareTo(previousStake) <= 0);
 
         // update stake
-        s.totalStake = s.totalStake.subtract(amountBI);
-        putOrRemove(s.stakes, caller, previousStake.subtract(amountBI));
+        s.totalStake = s.totalStake.subtract(amount);
+        putOrRemove(s.stakes, caller, previousStake.subtract(amount));
 
         // create pending un-delegate
         long id = nextUndelegateId++;
-        PendingUndelegate undelegate = new PendingUndelegate(recipient, amountBI, Blockchain.getBlockNumber());
+        PendingUndelegate undelegate = new PendingUndelegate(recipient, amount, Blockchain.getBlockNumber());
         pendingUndelegates.put(id, undelegate);
-        StakerRegistryEvents.undelegated(id, caller, staker, recipient, amountBI);
+        StakerRegistryEvents.undelegated(id, caller, staker, recipient, amount);
 
         return id;
     }
@@ -192,7 +192,7 @@ public class StakerRegistry {
      * @return a pending transfer identifier
      */
     @Callable
-    public static long transferDelegation(Address fromStaker, Address toStaker, long amount) {
+    public static long transferDelegation(Address fromStaker, Address toStaker, BigInteger amount) {
         return transferDelegationTo(fromStaker, toStaker, amount, Blockchain.getCaller());
     }
 
@@ -206,7 +206,7 @@ public class StakerRegistry {
      * @return a pending transfer identifier
      */
     @Callable
-    public static long transferDelegationTo(Address fromStaker, Address toStaker, long amount, Address recipient) {
+    public static long transferDelegationTo(Address fromStaker, Address toStaker, BigInteger amount, Address recipient) {
         Address caller = Blockchain.getCaller();
 
         requireStaker(fromStaker);
@@ -217,20 +217,19 @@ public class StakerRegistry {
 
         Staker s = stakers.get(fromStaker);
         BigInteger previousStake = getOrDefault(s.stakes, caller, BigInteger.ZERO);
-        BigInteger amountBI = BigInteger.valueOf(amount);
 
         // check previous stake
-        require(amountBI.compareTo(previousStake) <= 0);
+        require(amount.compareTo(previousStake) <= 0);
 
         // update stake
-        s.totalStake = s.totalStake.subtract(amountBI);
-        putOrRemove(s.stakes, caller, previousStake.subtract(amountBI));
+        s.totalStake = s.totalStake.subtract(amount);
+        putOrRemove(s.stakes, caller, previousStake.subtract(amount));
 
         // create pending transfer
         long id = nextTransferId++;
-        PendingTransfer transfer = new PendingTransfer(caller, toStaker, recipient, amountBI, Blockchain.getBlockNumber());
+        PendingTransfer transfer = new PendingTransfer(caller, toStaker, recipient, amount, Blockchain.getBlockNumber());
         pendingTransfers.put(id, transfer);
-        StakerRegistryEvents.transferredDelegation(id, fromStaker, toStaker, recipient, amountBI);
+        StakerRegistryEvents.transferredDelegation(id, fromStaker, toStaker, recipient, amount);
 
         return id;
     }
@@ -300,33 +299,33 @@ public class StakerRegistry {
      * @return the effective stake of the staker
      */
     @Callable
-    public static long getEffectiveStake(Address signingAddress, Address coinbaseAddress) {
+    public static BigInteger getEffectiveStake(Address signingAddress, Address coinbaseAddress) {
         requireNonNull(signingAddress);
         requireNoValue();
 
         // if not a staker
         Address staker = signingAddresses.get(signingAddress);
         if (staker == null) {
-            return 0;
+            return BigInteger.ZERO;
         }
 
         // if coinbase addresses do not match
         if (!stakers.get(staker).coinbaseAddress.equals(coinbaseAddress)) {
-            return 0;
+            return BigInteger.ZERO;
         }
 
         // if not active
         if (!isActive(staker)) {
-            return 0;
+            return BigInteger.ZERO;
         }
 
         // query total stake
-        long totalStake = getTotalStake(staker);
+        BigInteger totalStake = getTotalStake(staker);
 
-        // FIXME: define the conversion, presumably 1 AION = 1 stake
-        long effectiveStake = totalStake / 1;
+        // FIXME: define the conversion, presumably 1 nAmp = 1 stake
+//        long effectiveStake = totalStake / 1;
 
-        return effectiveStake;
+        return totalStake;
     }
 
     /**
@@ -336,11 +335,11 @@ public class StakerRegistry {
      * @return the total amount of stake
      */
     @Callable
-    public static long getTotalStake(Address staker) {
+    public static BigInteger getTotalStake(Address staker) {
         requireStaker(staker);
         requireNoValue();
 
-        return stakers.get(staker).totalStake.longValue();
+        return stakers.get(staker).totalStake;
     }
 
 
@@ -352,12 +351,12 @@ public class StakerRegistry {
      * @return the amount of stake
      */
     @Callable
-    public static long getStake(Address staker, Address delegator) {
+    public static BigInteger getStake(Address staker, Address delegator) {
         requireStaker(staker);
         requireNonNull(delegator);
         requireNoValue();
 
-        return getOrDefault(stakers.get(staker).stakes, delegator, BigInteger.ZERO).longValue();
+        return getOrDefault(stakers.get(staker).stakes, delegator, BigInteger.ZERO);
     }
 
     /**
@@ -386,7 +385,7 @@ public class StakerRegistry {
      * @return a pending un-delegate identifier
      */
     @Callable
-    public static long unbond(Address staker, long amount){
+    public static long unbond(Address staker, BigInteger amount){
         return unbondTo(staker, amount, Blockchain.getCaller());
     }
 
@@ -399,7 +398,7 @@ public class StakerRegistry {
      * @return a pending un-delegate identifier
      */
     @Callable
-    public static long unbondTo(Address staker, long amount, Address recipient){
+    public static long unbondTo(Address staker, BigInteger amount, Address recipient){
         Address caller = Blockchain.getCaller();
 
         requireStakerAndManager(staker, caller);
@@ -407,18 +406,17 @@ public class StakerRegistry {
         requireNoValue();
 
         Staker s = stakers.get(staker);
-        BigInteger amountBI = BigInteger.valueOf(amount);
 
-        require(amountBI.compareTo(s.selfBondStake) <= 0);
+        require(amount.compareTo(s.selfBondStake) <= 0);
 
-        s.selfBondStake = s.selfBondStake.subtract(amountBI);
-        s.totalStake = s.totalStake.subtract(amountBI);
+        s.selfBondStake = s.selfBondStake.subtract(amount);
+        s.totalStake = s.totalStake.subtract(amount);
 
         long id = nextUndelegateId++;
-        PendingUndelegate undelegate = new PendingUndelegate(recipient, amountBI, Blockchain.getBlockNumber());
+        PendingUndelegate undelegate = new PendingUndelegate(recipient, amount, Blockchain.getBlockNumber());
         pendingUndelegates.put(id, undelegate);
 
-        StakerRegistryEvents.unbonded(id, staker, recipient, amountBI);
+        StakerRegistryEvents.unbonded(id, staker, recipient, amount);
 
         return id;
     }
@@ -571,10 +569,10 @@ public class StakerRegistry {
     }
 
     @Callable
-    public static long getSelfBondStake(Address staker) {
+    public static BigInteger getSelfBondStake(Address staker) {
         requireStaker(staker);
         requireNoValue();
-        return stakers.get(staker).selfBondStake.longValue();
+        return stakers.get(staker).selfBondStake;
     }
 
     private static void require(boolean condition) {

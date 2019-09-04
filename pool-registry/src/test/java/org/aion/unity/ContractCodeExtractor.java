@@ -25,7 +25,7 @@ public class ContractCodeExtractor {
     @Test
     public void getPoolCoinbaseContractCode() {
         byte[] arguments = ABIUtil.encodeDeploymentArguments(placeHolder);
-        byte[] data = avmRule.getDappBytes(PoolCoinbase.class, arguments);
+        byte[] data = avmRule.getDappBytes(PoolCoinbase.class, arguments, 1);
         System.out.println(Hex.toHexString(data));
         System.out.println(data.length);
     }

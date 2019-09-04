@@ -17,7 +17,7 @@ public class ContractCodeExtractor {
      */
     @Test
     public void testPrintJarInHex() {
-        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null, otherClasses);
+        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null, 1,  otherClasses);
         System.out.println(Hex.toHexString(jar));
     }
 }

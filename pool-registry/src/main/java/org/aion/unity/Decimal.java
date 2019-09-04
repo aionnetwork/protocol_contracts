@@ -29,26 +29,19 @@ import java.math.BigInteger;
  * Assuming the AVM data-word limit of 128-bit unsigned integer, the number of precision places required
  * is ceil(log_10(2^128 - 1)) = ceil(38.53) = 39 ~ 40.
  * <p>
- * We pick 18 precision places as the "precision" in this proof of concept, since it fits inside a Long.
- * <p>
  * Under such a precision regime:
  * > All additions and subtractions can be computed without precision loss
  * > Multiplications would need to be performed with double the precision (40 precision places), which is then
  * truncated down to 20 precision places.
  * <p>
- * We've used long to represent all "coin" units in this system. A decision needs to be made about the units used
- * in the smart contract; if we're using base units (nAmp) or Aion, or some other quanta of coin.
+ * We've used BigInteger to represent the nAmp base unit in this system.
  */
 @SuppressWarnings({"unused", "WeakerAccess"})
 public class Decimal {
 
     // class settings
     // ==============
-    private final static int precision = 18;
-    /* TODO: The value of precisionInt should be tied to the value of precision (defined above) directly; initially
-        this was implemented like so: BigInteger.TEN.pow(precision). We need a better was of initializing this
-        BigInteger (maybe using a String instead of a Long), since more than 20 decimals will overflow Long. */
-    private static BigInteger precisionInt = BigInteger.valueOf(1_000_000_000_000_000_000L);
+    private static BigInteger precisionInt = new BigInteger("1000000000000000000000000000");
     private final BigInteger value;
 
     private Decimal(BigInteger v) {
@@ -59,10 +52,12 @@ public class Decimal {
     }
 
     public static Decimal valueOf(long v) {
-        // important to do the precision expansion here!
-        return new Decimal(BigInteger.valueOf(v).multiply(precisionInt));
+        return new Decimal(BigInteger.valueOf(v));
     }
 
+    public static Decimal valueOf(BigInteger v) {
+        return new Decimal(v);
+    }
     public BigInteger getTruncated() {
         return chopPrecisionAndTruncate(value);
     }
@@ -109,21 +104,15 @@ public class Decimal {
 
     // multiplication truncate
     public Decimal multiplyTruncate(Decimal d) {
-        // multiply precision twice
         BigInteger mul = value.multiply(d.value);
-        BigInteger chopped = chopPrecisionAndTruncate(mul);
-
-        return new Decimal(chopped);
+        return new Decimal(mul);
     }
 
-    // multiplication truncate
+    // division truncate
     public Decimal divideTruncate(Decimal d) {
-        // multiply precision twice
-        BigInteger mul = value.multiply(precisionInt).multiply(precisionInt);
+        BigInteger mul = value.multiply(precisionInt);
         BigInteger quo = mul.divide(d.value);
-        BigInteger chopped = chopPrecisionAndTruncate(quo);
-
-        return new Decimal(chopped);
+        return new Decimal(quo);
     }
 
     private BigInteger chopPrecisionAndTruncate(BigInteger d) {
