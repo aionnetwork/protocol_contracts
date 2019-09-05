@@ -37,6 +37,8 @@ public class PoolRewardsStateMachine {
 
     // todo possible to replace multiplication and division with shift operation
     private static BigInteger precisionInt = new BigInteger("1000000000000000000000000000");
+    private static BigInteger feeDivisor = new BigInteger("1000000");
+
 
     BigInteger getWithdrawnRewards(Address delegator) {
         return getOrDefault(withdrawnRewards, delegator, BigInteger.ZERO);
@@ -44,7 +46,7 @@ public class PoolRewardsStateMachine {
 
     // Initialize pool
     public PoolRewardsStateMachine(int fee) {
-        assert (fee >= 0 && fee <= 100);
+        assert (fee >= 0 && fee <= 1000000);
         this.fee = BigInteger.valueOf(fee);
 
         currentCRR = BigInteger.ZERO;
@@ -96,7 +98,7 @@ public class PoolRewardsStateMachine {
 
         // deal with the block rewards
         BigInteger commission = (fee.multiply(accumulatedBlockRewards))
-                .divide(BigInteger.valueOf(100L));
+                .divide(feeDivisor);
 
         BigInteger shared = accumulatedBlockRewards.subtract(commission);
 

@@ -13,7 +13,7 @@ public class PoolState {
     Address stakerAddress; // a.k.a. owner address
     Address coinbaseAddress;
 
-    int commissionRate; // TODO: add max commission rate?
+    int commissionRate;
     byte[] metaDataUrl;
     byte[] metaDataContentHash;
 

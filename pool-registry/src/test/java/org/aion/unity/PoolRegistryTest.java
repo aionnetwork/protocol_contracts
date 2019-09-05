@@ -51,6 +51,7 @@ public class PoolRegistryTest {
     }
 
     public Address setupNewPool(int fee) {
+        fee = fee * 10000;
         Address newPool = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
 
         // STEP-1 register a new pool
@@ -725,7 +726,8 @@ public class PoolRegistryTest {
         result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
         byte[] info = (byte[]) result.getDecodedReturnData();
-        byte[] expected = new byte[]{0, 0, 0, 10};
+	//100000
+        byte[] expected = new byte[]{0, 1, -122, -96};
         Assert.assertArrayEquals(expected, Arrays.copyOfRange(info, 32 * 2 + 2 + 1, 32 * 2 + 2 + 1 + 4));
 
         tweakBlockNumber(getBlockNumber() +  PoolRegistry.COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD);

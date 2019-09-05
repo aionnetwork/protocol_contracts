@@ -59,7 +59,7 @@ public class PoolRegistry {
     @Callable
     public static void registerPool(Address signingAddress, int commissionRate, byte[] metaDataUrl, byte[] metaDataContentHash) {
         // sanity check
-        require(commissionRate >= 0 && commissionRate <= 100);
+        require(commissionRate >= 0 && commissionRate <= 1000000);
         requireNoValue();
         requireNonNull(metaDataUrl);
         require(metaDataContentHash != null && metaDataContentHash.length == 32);
@@ -575,7 +575,8 @@ public class PoolRegistry {
     public static long requestCommissionRateChange(Address pool, int newCommissionRate) {
         requireNoValue();
         requirePool(pool);
-        require(newCommissionRate >= 0 && newCommissionRate <= 100);
+        // 4 decimal places granularity for commission rate
+        require(newCommissionRate >= 0 && newCommissionRate <= 1000000);
         require(pools.get(pool).stakerAddress.equals(Blockchain.getCaller()));
 
         long id = nextCommissionRateUpdateRequestId++;
