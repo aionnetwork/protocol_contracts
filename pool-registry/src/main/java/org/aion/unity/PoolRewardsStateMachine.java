@@ -32,8 +32,11 @@ public class PoolRewardsStateMachine {
 
     private Map<Address, StartingInfo> delegations; // total delegations per delegator
 
-    Decimal currentCRR;
-    Decimal prevCRR;
+    BigInteger currentCRR;
+    BigInteger prevCRR;
+
+    // todo possible to replace multiplication and division with shift operation
+    private static BigInteger precisionInt = new BigInteger("1000000000000000000000000000");
 
     BigInteger getWithdrawnRewards(Address delegator) {
         return getOrDefault(withdrawnRewards, delegator, BigInteger.ZERO);
@@ -44,8 +47,8 @@ public class PoolRewardsStateMachine {
         assert (fee >= 0 && fee <= 100);
         this.fee = BigInteger.valueOf(fee);
 
-        currentCRR = Decimal.ZERO;
-        prevCRR = Decimal.ZERO;
+        currentCRR = BigInteger.ZERO;
+        prevCRR = BigInteger.ZERO;
 
         delegations = new AionMap<>();
     }
@@ -92,9 +95,9 @@ public class PoolRewardsStateMachine {
         // Blockchain.println("Increment period: acc_rewards = " + accumulatedBlockRewards);
 
         // deal with the block rewards
-        BigInteger commission = Decimal.valueOf(fee.multiply(accumulatedBlockRewards))
-                .divideTruncate(Decimal.valueOf(100))
-                .getTruncated();
+        BigInteger commission = (fee.multiply(accumulatedBlockRewards))
+                .divide(BigInteger.valueOf(100L));
+
         BigInteger shared = accumulatedBlockRewards.subtract(commission);
 
         this.accumulatedCommission = accumulatedCommission.add(commission);
@@ -109,7 +112,9 @@ public class PoolRewardsStateMachine {
         if (accumulatedStake.signum() == 1) {
             prevCRR = currentCRR;
 
-            Decimal crr = Decimal.valueOf(currentRewards).divideTruncate(Decimal.valueOf(accumulatedStake));
+            // currentRewards (in nAmps) is multiplied by 10^27 to keep precision.
+            // This is truncated during the calculation of the unsettled rewards for delegator
+            BigInteger crr = currentRewards.multiply(precisionInt).divide(accumulatedStake);
             currentCRR = currentCRR.add(crr);
         } else {
             // if there is no stake, then there should be no way to have accumulated rewards
@@ -136,13 +141,14 @@ public class PoolRewardsStateMachine {
         BigInteger stake = startingInfo.stake;
 
         // return stake * (ending - starting)
-        Decimal startingCRR = startingInfo.crr;
-        Decimal endingCRR = currentCRR;
-        Decimal differenceCRR = endingCRR.subtract(startingCRR);
+        BigInteger startingCRR = startingInfo.crr;
+        BigInteger endingCRR = currentCRR;
+        BigInteger differenceCRR = endingCRR.subtract(startingCRR);
 
         Blockchain.println("CCR: start = " + startingCRR + ", end = " + endingCRR + ", diff = " + differenceCRR);
 
-        return differenceCRR.multiplyTruncate(Decimal.valueOf(stake)).getTruncated();
+        // truncate the precision value
+        return differenceCRR.multiply(stake).divide(precisionInt);
     }
 
     /* ----------------------------------------------------------------------
@@ -246,9 +252,9 @@ public class PoolRewardsStateMachine {
     private static class StartingInfo {
         public BigInteger stake;             // amount of coins being delegated
         public long blockNumber;       // block number at which delegation was created
-        public Decimal crr;
+        public BigInteger crr;
 
-        public StartingInfo(BigInteger stake, long blockNumber, Decimal crr) {
+        public StartingInfo(BigInteger stake, long blockNumber, BigInteger crr) {
             this.stake = stake;
             this.blockNumber = blockNumber;
             this.crr = crr;
