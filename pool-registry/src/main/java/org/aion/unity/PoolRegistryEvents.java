@@ -80,7 +80,7 @@ public class PoolRegistryEvents {
                 newMetaDataUrl);
     }
 
-    static void updateMetaDataContentHash(Address pool, byte[] newMetaDataContentHash) {
+    static void updatedMetaDataContentHash(Address pool, byte[] newMetaDataContentHash) {
         Blockchain.log("ADSMetaDataContentHashUpdated".getBytes(),
                 pool.toByteArray(),
                 newMetaDataContentHash);

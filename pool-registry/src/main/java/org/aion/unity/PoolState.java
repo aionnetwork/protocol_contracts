@@ -30,7 +30,7 @@ public class PoolState {
         this.metaDataUrl = metaDataUrl;
         this.metaDataContentHash = metaDataContentHash;
 
-        this.rewards = new PoolRewardsStateMachine(0);
+        this.rewards = new PoolRewardsStateMachine();
         this.delegators = new AionMap<>();
         this.autoRewardsDelegationDelegators = new AionMap<>();
     }

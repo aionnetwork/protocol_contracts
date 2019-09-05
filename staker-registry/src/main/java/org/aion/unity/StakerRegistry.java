@@ -322,9 +322,7 @@ public class StakerRegistry {
         // query total stake
         BigInteger totalStake = getTotalStake(staker);
 
-        // FIXME: define the conversion, presumably 1 nAmp = 1 stake
-//        long effectiveStake = totalStake / 1;
-
+        // conversion: 1 nAmp = 1 stake
         return totalStake;
     }
 
@@ -492,7 +490,6 @@ public class StakerRegistry {
         return stakers.get(identityAddress).coinbaseAddress;
     }
 
-    // TODO: correct error checking.
     private static Staker requireStakerAndManager(Address staker, Address manager) {
         requireStaker(staker);
         Staker s = stakers.get(staker);
@@ -524,9 +521,8 @@ public class StakerRegistry {
             signingAddresses.put(newSigningAddress, s.identityAddress);
             s.signingAddress = newSigningAddress;
             s.lastSigningAddressUpdate = blockNumber;
+            StakerRegistryEvents.setSigningAddress(staker, newSigningAddress);
         }
-        // todo only if a new address?
-        StakerRegistryEvents.setSigningAddress(staker, newSigningAddress);
     }
 
     /**
@@ -542,8 +538,8 @@ public class StakerRegistry {
         Staker s = requireStakerAndManager(staker, Blockchain.getCaller());
         if (!newCoinbaseAddress.equals(s.coinbaseAddress)) {
             s.coinbaseAddress = newCoinbaseAddress;
+            StakerRegistryEvents.setCoinbaseAddress(staker, newCoinbaseAddress);
         }
-        StakerRegistryEvents.setCoinbaseAddress(staker, newCoinbaseAddress);
     }
 
     @Callable
@@ -586,10 +582,6 @@ public class StakerRegistry {
 
     private static void requirePositive(BigInteger num) {
         require(num != null && num.compareTo(BigInteger.ZERO) > 0);
-    }
-
-    private static void requirePositive(long num) {
-        require(num > 0);
     }
 
     private static void requireNonNull(Object obj) {

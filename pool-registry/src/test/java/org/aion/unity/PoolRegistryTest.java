@@ -23,6 +23,7 @@ import static org.junit.Assert.*;
 public class PoolRegistryTest {
 
     private static BigInteger ENOUGH_BALANCE_TO_TRANSACT = BigInteger.TEN.pow(18 + 5);
+    private static BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
 
     @Rule
     public AvmRule RULE = new AvmRule(false);
@@ -880,7 +881,7 @@ public class PoolRegistryTest {
      * @return
      */
     private BigInteger nStake(int n) {
-        return PoolRegistry.MIN_SELF_STAKE.multiply(BigInteger.valueOf(n));
+        return MIN_SELF_STAKE.multiply(BigInteger.valueOf(n));
     }
 
     private void generateBlock(Address pool, long blockRewards) {

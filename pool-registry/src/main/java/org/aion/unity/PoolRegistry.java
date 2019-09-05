@@ -17,9 +17,8 @@ import java.util.Map;
  * for delegators/pool owners to interact with different pools.
  * <p>
  * Workflow for pool operator:
- * - Register a staker;
  * - Register the staker as a pool;
- * - Set the coinbase address to the address of the pool coinbase contract.
+ * - delegate stake to pool (self bond).
  */
 public class PoolRegistry {
 
@@ -41,6 +40,7 @@ public class PoolRegistry {
 
     static {
         poolCoinbaseContract = hexStringToByteArray("00000869504b0304140008080800d4ad282b000000000000000000000000140004004d4554412d494e462f4d414e49464553542e4d46feca0000f34dcccb4c4b2d2ed10d4b2d2acecccfb35230d433e0e5f24dccccd375ce492c2eb65270e4e5e2e50200504b07082bc2bf352a00000028000000504b0304140008080800d4ad282b00000000000000000000000007000000412e636c6173738d525d53d340143ddb16d286f0fd218a8a9fd80fa45811c556841450a0085206067860b661098134d52465c69fe29b6fbe82ced48e3a3eea8cff49c7bb05ad303ef890cdeeddb3e7de73eefdfef3e31700a3586160930a1843db1e3fe0499b3b6672b1b0270c5f4190a17da954b2b325cb29704f0c49083da0af39c70f8ac9c9ed6d57785e9a61207a2a90ab9115b9bf9bd42d73d6f18529dc746c95a145c274bb64ec1bbbdc7214441822a6f0b3dcb685cbd01a8d9d62d2d0044d858a660d8d502208a095a1e92f8882768646f1b2cc6d8fa13b9a3b2b241ddbd0d0892e151de866505cc25aae6008453762ab1acea1572638cfd0f5afb215f411bf67994eb9c8108cc666355cc2651517d1cfd041b52f8b2249b11c73da11aef9aa069ad37015d724ef754a64903a8691ff3169539f3b7660597865db27036e6240f2dc6250eb71053132cef2f265c320b25a4e9299c0a08a386e338433864d45f9e3b52b729ee90aee907c2a788afb5cca8f6dea1aee6244d2df23919993070dd14d5d3a731f0f54a430468f8586b46c440a197a29f552b0409651bfea86e77d976ca09a1f634262274fcdd5f1ad822c55e7bbdcf176841bc6b48a29d917b6c3d0fb9bedac2b1a9e625632cec93108ab3406392ad81507c2f5353cc3b0d4b048a5654bdbd4dae6bccf8dfd05fe6285176c3aabf952d935c48c650bea4b00219a7e8aca91a25d1011c94a91e7745a450345804c152defd056414f1517e25fa184de2214a47da2822ba137f5733c11fc1caee24615d185c10a86287454e35fa6358c50d7046b9920cd4862f824477f2d03d0f909a9f52a463fe0e17a058fdea36deda87611c138464ec06b040ed07fac0e9e8f57a0e712dfa050eac344c74c054f5ea3272e49b66899df5aab6241de55b1c40eff54a321f003bd0a520aa6fa2896a758000dbf00504b0708db58d443a102000010040000504b0304140008080800d4ad282b00000000000000000000000007000000422e636c6173739d545d4f1341143dd3ddb2edb6c8a2503e5ab41484520a45101001138a316952f40143527990a55d4bb1b4a42c445e8cf12ff003242486c4f80089502304df7df707f83f1af1ceb26d17a889b1e9eedc7be7de33f7cc99d91fbfbf9d0118c334038b4a600ccaaabaa546b26a2e1d79b6bcaa2575090243c34c34f6584be6535a61902750fa323d3181aacfc94872c341468ac1b618254363a89bcae432fa23067b7031dab7c02004fb16dcb80145868846375c703b61c32d37ea2171ab99a129d817afb630af1732b9f4244f6d9129a1f5528317b312da0de8795a35ed460787b7e136792b6ef82fbc4ef2662574c9e8e60b3be1e3d19ecb68db1bbab62621c8e0540b05753b995fdf660805e357b76432562314e3dc42e897d1873067d920c38b41da3b62a46ead456652a982b6b131c9e0b2b812eec918e679ec15436b99fd9aaaaf44a299742ca76b69ad40454db5e212c6648cf3eafad97c6e435773fa829adda4cd1767492c0acfeb6af2f59cbafe5c5dce922fcfe7370b49ed4926aba193b64024dd44b4a30ea43e26c8b3c141bed3e2f3ad22a90c9b84e24ad31c11a4f743f2bc14b7d1d8102ae266a8ff084d21e1089e43f01f1d03b49889136662070b7d41d347b8053e9eedd2c989efc3113a465bbcffc0289aa4b70ca1512c41948c1548b30a8c68c00cf06a7a3c238ae3cdce94b7ec8a4b238d387ffb6e672a9420d7be44cd783f9bddb82addfc84dda0ff89dabe434f80c5ab80c3bbf05bf094ce5d2855b47d6c19933cf042e411caf800d709ba1345dcfd6ed0e2a529fb9e255a44ef7475ca6799f29d3a9e96971b107c5f891bc7f671e8137813034544ac5bd3067b09a3765f73890eff391d6a9bc4ff5e23a11e4326c503a2c86fe64e99e22582012bc1c02e695721c8f578798d62a02645c56f21a2f84f1d7365dcb0a0f8cb5414ff0597e144b888112b1717c4519fa7845e89ee01c37d8c9addff32053afe1781baae08f4fe5af75d35bb17f72e47ad25ff25d63817ebc15fc4eab188356e5c28fa5c997487c86334b65fbd1d95850f2b9074011a09847fdecceab059dd52fbec554b05300f9953c6eaf63f504b07082a6a89950e03000002060000504b0304140008080800d4ad282b00000000000000000000000007000000432e636c6173733d4ebb0ac240109c358991181f69d3d9a985e9ac44d0a0a0a542fa239e72122fa217f1b7ac040b3fc08f12d7082eec6386d9d97dbd1f4f004304048a5d1021dc8b8b8832a177d1aad0461de4ec9acaa351b976611182c974f167065f31af6e39970e7ec126d591d2ca8c0956b797f8f050f760c32734e25c9f8dd02611592109769c6fb879ebbc38a572ae32890e2aac651b84a8827f42935105359ee86bc5b5c54c5062c0e9dfd1b8fd2ea35d4a9d0f504b0708d8f1b600b0000000d8000000504b01021400140008080800d4ad282b2bc2bf352a000000280000001400040000000000000000000000000000004d4554412d494e462f4d414e49464553542e4d46feca0000504b01021400140008080800d4ad282bdb58d443a102000010040000070000000000000000000000000070000000412e636c617373504b01021400140008080800d4ad282b2a6a89950e03000002060000070000000000000000000000000046030000422e636c617373504b01021400140008080800d4ad282bd8f1b600b0000000d8000000070000000000000000000000000089060000432e636c617373504b05060000000004000400e50000006e070000000000000021220000000000000000000000000000000000000000000000000000000000000000");
+        System.arraycopy(Blockchain.getAddress().toByteArray(), 0, poolCoinbaseContract, poolCoinbaseContract.length - Address.LENGTH, Address.LENGTH);
     }
 
     @Callable
@@ -52,9 +52,10 @@ public class PoolRegistry {
     /**
      * Registers a pool in the registry.
      *
-     * @param signingAddress
-     * @param commissionRate the pool commission rate
-     * @return the pool coinbase address
+     * @param signingAddress the signing address fo the pool
+     * @param commissionRate the pool commission rate with 4 decimal places of granularity (between [0, 1000000])
+     * @param metaDataUrl url hosting the metadata json file
+     * @param metaDataContentHash Blake2b hash of the json object hosted at the metadata url
      */
     @Callable
     public static void registerPool(Address signingAddress, int commissionRate, byte[] metaDataUrl, byte[] metaDataContentHash) {
@@ -66,16 +67,11 @@ public class PoolRegistry {
 
         Address caller = Blockchain.getCaller();
 
-        // make sure no one has registered as a staker using this identity
-        require(!isStakerRegistered(caller));
-
         // make sure no one has registered as a pool using this identity
+        // same check is done in StakerRegistry
         require(!pools.containsKey(caller));
 
-        Address poolRegistry =  Blockchain.getAddress();
-
         // step 1: deploy a coinbase contract
-        System.arraycopy(poolRegistry.toByteArray(), 0, poolCoinbaseContract, poolCoinbaseContract.length - Address.LENGTH, Address.LENGTH);
         Result result = Blockchain.create(BigInteger.ZERO, poolCoinbaseContract, Blockchain.getRemainingEnergy());
         require(result.isSuccess());
         Address coinbaseAddress = new Address(result.getReturnData());
@@ -87,7 +83,7 @@ public class PoolRegistry {
         byte[] registerStakerCall = new ABIStreamingEncoder()
                 .encodeOneString("registerStaker")
                 .encodeOneAddress(caller)
-                .encodeOneAddress(poolRegistry)
+                .encodeOneAddress(Blockchain.getAddress())
                 .encodeOneAddress(signingAddress)
                 .encodeOneAddress(coinbaseAddress)
                 .toBytes();
@@ -184,10 +180,10 @@ public class PoolRegistry {
 
         detectBlockRewards(pool);
 
-        return undelegate(Blockchain.getCaller(), pool, amount, true);
+        return undelegate(Blockchain.getCaller(), pool, amount);
     }
 
-    private static long undelegate(Address delegator, Address pool, BigInteger amount, boolean doUndelegate) {
+    private static long undelegate(Address delegator, Address pool, BigInteger amount) {
         PoolState ps = pools.get(pool);
 
         BigInteger previousStake = getOrDefault(ps.delegators, delegator, BigInteger.ZERO);
@@ -195,27 +191,24 @@ public class PoolRegistry {
         require(previousStake.compareTo(amount) >= 0);
         ps.delegators.put(delegator, previousStake.subtract(amount));
 
-        long id = -1;
-        if (doUndelegate) {
-            byte[] data;
-            if (delegator.equals(pool)) {
-                data = new ABIStreamingEncoder()
-                        .encodeOneString("unbondTo")
-                        .encodeOneAddress(pool)
-                        .encodeOneBigInteger(amount)
-                        .encodeOneAddress(delegator)
-                        .toBytes();
-            } else {
-                data = new ABIStreamingEncoder()
-                        .encodeOneString("undelegateTo")
-                        .encodeOneAddress(pool)
-                        .encodeOneBigInteger(amount)
-                        .encodeOneAddress(delegator)
-                        .toBytes();
-            }
-            Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-            id = new ABIDecoder(result.getReturnData()).decodeOneLong();
+        byte[] data;
+        if (delegator.equals(pool)) {
+            data = new ABIStreamingEncoder()
+                    .encodeOneString("unbondTo")
+                    .encodeOneAddress(pool)
+                    .encodeOneBigInteger(amount)
+                    .encodeOneAddress(delegator)
+                    .toBytes();
+        } else {
+            data = new ABIStreamingEncoder()
+                    .encodeOneString("undelegateTo")
+                    .encodeOneAddress(pool)
+                    .encodeOneBigInteger(amount)
+                    .encodeOneAddress(delegator)
+                    .toBytes();
         }
+        Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+        long id = new ABIDecoder(result.getReturnData()).decodeOneLong();
 
         // update rewards state machine
         ps.rewards.onUndelegate(delegator, Blockchain.getBlockNumber(), amount);
@@ -637,7 +630,7 @@ public class PoolRegistry {
         PoolState ps = pools.get(pool);
         require(ps.stakerAddress.equals(Blockchain.getCaller()));
         ps.metaDataContentHash = newMetaDataContentHash;
-        PoolRegistryEvents.updateMetaDataContentHash(pool, newMetaDataContentHash);
+        PoolRegistryEvents.updatedMetaDataContentHash(pool, newMetaDataContentHash);
     }
 
     @Callable
@@ -665,17 +658,6 @@ public class PoolRegistry {
         requirePool(pool);
         requireNoValue();
         return isSelfStakeSatisfied(pool) ? "ACTIVE" : "BROKEN";
-    }
-
-    private static boolean isStakerRegistered(Address staker) {
-        byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("isStaker")
-                .encodeOneAddress(staker)
-                .toBytes();
-        Result result = secureCall(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
-        boolean isStaker = new ABIDecoder(result.getReturnData()).decodeOneBoolean();
-
-        return isStaker;
     }
 
     private static boolean isSelfStakeSatisfied(Address pool) {
@@ -721,10 +703,6 @@ public class PoolRegistry {
 
     private static void requirePositive(BigInteger num) {
         require(num != null && num.compareTo(BigInteger.ZERO) > 0);
-    }
-
-    private static void requirePositive(long num) {
-        require(num > 0);
     }
 
     private static byte[] hexStringToByteArray(String s) {

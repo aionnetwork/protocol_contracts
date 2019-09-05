@@ -45,9 +45,8 @@ public class PoolRewardsStateMachine {
     }
 
     // Initialize pool
-    public PoolRewardsStateMachine(int fee) {
-        assert (fee >= 0 && fee <= 1000000);
-        this.fee = BigInteger.valueOf(fee);
+    public PoolRewardsStateMachine() {
+        this.fee = BigInteger.ZERO;
 
         currentCRR = BigInteger.ZERO;
         prevCRR = BigInteger.ZERO;
