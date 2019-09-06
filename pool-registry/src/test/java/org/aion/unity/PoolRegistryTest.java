@@ -874,6 +874,11 @@ public class PoolRegistryTest {
         assertEquals("BROKEN", result.getDecodedReturnData());
     }
 
+    @Test
+    public void testFallback(){
+        Assert.assertTrue(RULE.balanceTransfer(preminedAddress, poolRegistry, BigInteger.TEN, 50000L, 1L).getReceiptStatus().isFailed());
+    }
+
     /**
      * N unit of MIN_SELF_STAKE.
      *
@@ -891,8 +896,8 @@ public class PoolRegistryTest {
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
-        Address coinbaseAddress = (Address) result.getDecodedReturnData();
-        RULE.balanceTransfer(preminedAddress, coinbaseAddress, BigInteger.valueOf(blockRewards), 1_000_000L, 1);
+        AionAddress coinbaseAddress = new AionAddress(((Address) result.getDecodedReturnData()).toByteArray());
+        RULE.kernel.adjustBalance(coinbaseAddress, RULE.kernel.getBalance(coinbaseAddress).add(BigInteger.valueOf(blockRewards)));
         incrementBlockNumber();
     }
 

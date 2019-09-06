@@ -562,6 +562,11 @@ public class StakerRegistryTest {
         Assert.assertEquals(anotherCoinbaseAddress, result.getDecodedReturnData());
     }
 
+    @Test
+    public void testFallback(){
+        Assert.assertTrue(RULE.balanceTransfer(preminedAddress, stakerRegistry, BigInteger.TEN, 50000L, 1L).getReceiptStatus().isFailed());
+    }
+
     public void tweakBlockNumber(long number) {
         try {
             Field f = TestingState.class.getDeclaredField("blockNumber");

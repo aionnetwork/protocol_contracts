@@ -4,6 +4,7 @@ import avm.Address;
 import avm.Blockchain;
 import avm.Result;
 import org.aion.avm.tooling.abi.Callable;
+import org.aion.avm.tooling.abi.Fallback;
 import org.aion.avm.userlib.AionMap;
 
 import java.math.BigInteger;
@@ -569,6 +570,11 @@ public class StakerRegistry {
         requireStaker(staker);
         requireNoValue();
         return stakers.get(staker).selfBondStake;
+    }
+
+    @Fallback
+    public static void fallback(){
+        Blockchain.revert();
     }
 
     private static void require(boolean condition) {
