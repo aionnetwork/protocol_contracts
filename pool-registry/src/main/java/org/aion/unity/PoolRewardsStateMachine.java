@@ -21,27 +21,21 @@ public class PoolRewardsStateMachine {
 
     // commission is handled separately
     private BigInteger accumulatedCommission = BigInteger.ZERO;
-    private BigInteger withdrawnCommission = BigInteger.ZERO;
 
     private BigInteger outstandingRewards = BigInteger.ZERO; // total coins (as rewards), owned by the pool
 
-    private BigInteger currentRewards = BigInteger.ZERO; // rewards accumulated this period
-
     private Map<Address, BigInteger> settledRewards = new AionMap<>(); // rewards in the "settled" state
-    private Map<Address, BigInteger> withdrawnRewards = new AionMap<>(); // rewards withdrawn from the pool, by each delegator
 
     private Map<Address, StartingInfo> delegations; // total delegations per delegator
 
     BigInteger currentCRR;
-    BigInteger prevCRR;
 
     // todo possible to replace multiplication and division with shift operation
     private static BigInteger precisionInt = new BigInteger("1000000000000000000000000000");
     private static BigInteger feeDivisor = new BigInteger("1000000");
 
-
-    BigInteger getWithdrawnRewards(Address delegator) {
-        return getOrDefault(withdrawnRewards, delegator, BigInteger.ZERO);
+    BigInteger getOutstandingRewards() {
+        return outstandingRewards;
     }
 
     // Initialize pool
@@ -49,7 +43,6 @@ public class PoolRewardsStateMachine {
         this.fee = BigInteger.ZERO;
 
         currentCRR = BigInteger.ZERO;
-        prevCRR = BigInteger.ZERO;
 
         delegations = new AionMap<>();
     }
@@ -99,10 +92,9 @@ public class PoolRewardsStateMachine {
         BigInteger commission = (fee.multiply(accumulatedBlockRewards))
                 .divide(feeDivisor);
 
-        BigInteger shared = accumulatedBlockRewards.subtract(commission);
+        BigInteger currentRewards = accumulatedBlockRewards.subtract(commission);
 
         this.accumulatedCommission = accumulatedCommission.add(commission);
-        this.currentRewards = this.currentRewards.add(shared);
         this.outstandingRewards = this.outstandingRewards.add(accumulatedBlockRewards);
 
         // "reset" the block rewards accumulator
@@ -111,8 +103,6 @@ public class PoolRewardsStateMachine {
         // deal with the CRR computations
         // accumulatedStake > 0
         if (accumulatedStake.signum() == 1) {
-            prevCRR = currentCRR;
-
             // currentRewards (in nAmps) is multiplied by 10^27 to keep precision.
             // This is truncated during the calculation of the unsettled rewards for delegator
             BigInteger crr = currentRewards.multiply(precisionInt).divide(accumulatedStake);
@@ -121,8 +111,6 @@ public class PoolRewardsStateMachine {
             // if there is no stake, then there should be no way to have accumulated rewards
             assert (currentRewards.equals(BigInteger.ZERO));
         }
-
-        currentRewards = BigInteger.ZERO;
     }
 
     private BigInteger calculateUnsettledRewards(Address delegator, long blockNumber) {
@@ -202,8 +190,6 @@ public class PoolRewardsStateMachine {
         // now that all rewards owed to you are settled, you can withdraw them all at once
         BigInteger rewards = getOrDefault(settledRewards, delegator, BigInteger.ZERO);
         settledRewards.remove(delegator);
-
-        withdrawnRewards.put(delegator, rewards.add(getOrDefault(withdrawnRewards, delegator, BigInteger.ZERO)));
         outstandingRewards = outstandingRewards.subtract(rewards);
 
         return rewards;
@@ -213,7 +199,6 @@ public class PoolRewardsStateMachine {
         BigInteger c = accumulatedCommission;
         accumulatedCommission = BigInteger.ZERO;
 
-        withdrawnCommission = withdrawnCommission.add(c);
         outstandingRewards = outstandingRewards.subtract(c);
 
         return c;

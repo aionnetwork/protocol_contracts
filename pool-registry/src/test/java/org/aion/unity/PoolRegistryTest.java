@@ -707,7 +707,6 @@ public class PoolRegistryTest {
 
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("requestCommissionRateChange")
-                .encodeOneAddress(pool)
                 .encodeOneInteger(20)
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
@@ -727,9 +726,9 @@ public class PoolRegistryTest {
         result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
         byte[] info = (byte[]) result.getDecodedReturnData();
-	//100000
+	    //100000
         byte[] expected = new byte[]{0, 1, -122, -96};
-        Assert.assertArrayEquals(expected, Arrays.copyOfRange(info, 32 * 2 + 2 + 1, 32 * 2 + 2 + 1 + 4));
+        Assert.assertArrayEquals(expected, Arrays.copyOfRange(info, 32 + 1 + 1, 32 + 1 + 1 + 4));
 
         tweakBlockNumber(getBlockNumber() +  PoolRegistry.COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD);
 
@@ -754,11 +753,10 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         info = (byte[]) result.getDecodedReturnData();
         expected = new byte[]{0, 0, 0, 20};
-        Assert.assertArrayEquals(expected, Arrays.copyOfRange(info, 32 * 2 + 2 + 1, 32 * 2 + 2 + 1 + 4));
+        Assert.assertArrayEquals(expected, Arrays.copyOfRange(info, 32 + 1 + 1, 32 + 1 + 1 + 4));
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("requestCommissionRateChange")
-                .encodeOneAddress(pool)
                 .encodeOneInteger(30)
                 .toBytes();
         result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
@@ -774,7 +772,6 @@ public class PoolRegistryTest {
 
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("updateMetaDataUrl")
-                .encodeOneAddress(pool)
                 .encodeOneByteArray(newMetaDataUrl)
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
@@ -788,7 +785,6 @@ public class PoolRegistryTest {
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("updateMetaDataContentHash")
-                .encodeOneAddress(pool)
                 .encodeOneByteArray(newMetaDataContentHash)
                 .toBytes();
         result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
@@ -872,6 +868,41 @@ public class PoolRegistryTest {
         result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
         assertEquals("BROKEN", result.getDecodedReturnData());
+    }
+
+    @Test
+    public void testGetOutstandingRewards() {
+        Address pool = setupNewPool(4);
+
+        BigInteger rewards = BigInteger.valueOf(1000);
+        generateBlock(pool, rewards.longValue());
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("getCoinbaseAddressForIdentityAddress")
+                .encodeOneAddress(pool)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        AionAddress coinbaseAddress = new AionAddress(((Address) result.getDecodedReturnData()).toByteArray());
+        assertEquals(rewards, RULE.kernel.getBalance(coinbaseAddress));
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, BigInteger.TEN, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getOutstandingRewards")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        assertEquals(rewards, result.getDecodedReturnData());
+
+        rewards = RULE.kernel.getBalance(coinbaseAddress);
+        assertEquals(BigInteger.ZERO, rewards);
     }
 
     @Test

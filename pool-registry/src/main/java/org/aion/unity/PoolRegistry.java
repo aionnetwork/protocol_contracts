@@ -94,7 +94,7 @@ public class PoolRegistry {
         secureCall(stakerRegistry, BigInteger.ZERO, registerStakerCall, Blockchain.getRemainingEnergy());
 
         // step 3: update pool state
-        PoolState ps = new PoolState(caller, coinbaseAddress, commissionRate, metaDataUrl, metaDataContentHash);
+        PoolState ps = new PoolState(coinbaseAddress, commissionRate, metaDataUrl, metaDataContentHash);
         pools.put(caller, ps);
         PoolRegistryEvents.registeredPool(caller, commissionRate, metaDataContentHash, metaDataUrl);
     }
@@ -102,14 +102,13 @@ public class PoolRegistry {
     /**
      * Updates the signing address of a staker. Owner only.
      *
-     * @param staker the staker address
      * @param newAddress the new signing address
      */
     @Callable
-    public static void setSigningAddress(Address staker, Address newAddress) {
+    public static void setSigningAddress(Address newAddress) {
         requireNonNull(newAddress);
         requireNoValue();
-        require(Blockchain.getCaller().equals(staker));
+        Address staker = Blockchain.getCaller();
         requirePool(staker);
 
         byte[] data = new ABIStreamingEncoder()
@@ -163,8 +162,8 @@ public class PoolRegistry {
         ps.rewards.onDelegate(delegator, Blockchain.getBlockNumber(), value);
 
         // if after the delegation the pool becomes active, update the commission rate
-        if (delegator.equals(ps.stakerAddress) && isSelfStakeSatisfied(pool)) {
-            switchToActive(ps);
+        if (delegator.equals(pool) && isSelfStakeSatisfied(pool)) {
+            switchToActive(pool, ps);
         }
 
         PoolRegistryEvents.delegated(delegator, pool, value);
@@ -221,11 +220,11 @@ public class PoolRegistry {
 
         // if after the un-delegation the state of the pool changes, update the commission rate
         // undelegation from a delegator can make the pool go back into the active state
-        if (!delegator.equals(ps.stakerAddress) && isActive) {
-            switchToActive(ps);
+        if (!delegator.equals(pool) && isActive) {
+            switchToActive(pool, ps);
         }// undelegation from a pool operator can make the pool go into the broken state
-        else if (delegator.equals(ps.stakerAddress) && !isActive) {
-            switchToBroken(ps);
+        else if (delegator.equals(pool) && !isActive) {
+            switchToBroken(pool, ps);
         }
 
         PoolRegistryEvents.undelegated(id, delegator, pool, amount);
@@ -249,7 +248,7 @@ public class PoolRegistry {
 
         // do a withdraw
         BigInteger amount = ps.rewards.onWithdraw(caller, Blockchain.getBlockNumber());
-        if (caller.equals(ps.stakerAddress)) {
+        if (caller.equals(pool)) {
             amount = amount.add(ps.rewards.onWithdrawOperator());
         }
 
@@ -321,7 +320,7 @@ public class PoolRegistry {
         // transfer out of fromPool could make it broken
         // this call can only be from a delegator
         if (isSelfStakeSatisfied(fromPool)) {
-            switchToActive(ps);
+            switchToActive(fromPool, ps);
         }
 
         PoolRegistryEvents.transferredDelegation(id, caller, fromPool, toPool, amount);
@@ -356,7 +355,7 @@ public class PoolRegistry {
         requireNoValue();
 
         PoolState ps = pools.get(pool);
-        return getOrDefault(ps.delegators, ps.stakerAddress, BigInteger.ZERO);
+        return getOrDefault(ps.delegators, pool, BigInteger.ZERO);
     }
 
     /**
@@ -488,7 +487,7 @@ public class PoolRegistry {
 
         // do a withdraw
         BigInteger amount = ps.rewards.onWithdraw(delegator, Blockchain.getBlockNumber());
-        if (delegator.equals(ps.stakerAddress)) {
+        if (delegator.equals(pool)) {
             amount = amount.add(ps.rewards.onWithdrawOperator());
         }
 
@@ -556,7 +555,7 @@ public class PoolRegistry {
         // query withdraw amount from rewards state machine
         PoolState ps = pools.get(pool);
         BigInteger amount = ps.rewards.onWithdraw(caller, Blockchain.getBlockNumber());
-        if (caller.equals(ps.stakerAddress)) {
+        if (caller.equals(pool)) {
             amount = amount.add(ps.rewards.onWithdrawOperator());
         }
 
@@ -569,12 +568,12 @@ public class PoolRegistry {
     }
 
     @Callable
-    public static long requestCommissionRateChange(Address pool, int newCommissionRate) {
+    public static long requestCommissionRateChange(int newCommissionRate) {
         requireNoValue();
+        Address pool = Blockchain.getCaller();
         requirePool(pool);
         // 4 decimal places granularity for commission rate
         require(newCommissionRate >= 0 && newCommissionRate <= 1000000);
-        require(pools.get(pool).stakerAddress.equals(Blockchain.getCaller()));
 
         long id = nextCommissionRateUpdateRequestId++;
         pendingCommissionUpdates.put(id, new CommissionUpdate(pool, newCommissionRate, Blockchain.getBlockNumber()));
@@ -597,7 +596,7 @@ public class PoolRegistry {
 
         PoolState ps = pools.get(commissionUpdate.pool);
         // only the pool owner can finalize the new commission rate
-        require(ps.stakerAddress.equals(Blockchain.getCaller()));
+        require(commissionUpdate.pool.equals(Blockchain.getCaller()));
 
         // commission rate in pool state is updated even in broken state to stay consistent with other meta data updates performed by the pool owner
         ps.commissionRate = commissionUpdate.newCommissionRate;
@@ -616,23 +615,23 @@ public class PoolRegistry {
     }
 
     @Callable
-    public static void updateMetaDataUrl(Address pool, byte[] newMetaDataUrl){
+    public static void updateMetaDataUrl(byte[] newMetaDataUrl){
         requireNoValue();
+        Address pool = Blockchain.getCaller();
         requirePool(pool);
         requireNonNull(newMetaDataUrl);
         PoolState ps = pools.get(pool);
-        require(ps.stakerAddress.equals(Blockchain.getCaller()));
         ps.metaDataUrl = newMetaDataUrl;
         PoolRegistryEvents.updatedMetaDataUrl(pool, newMetaDataUrl);
     }
 
     @Callable
-    public static void updateMetaDataContentHash(Address pool, byte[] newMetaDataContentHash){
+    public static void updateMetaDataContentHash(byte[] newMetaDataContentHash){
         requireNoValue();
+        Address pool = Blockchain.getCaller();
         requirePool(pool);
         require(newMetaDataContentHash != null && newMetaDataContentHash.length == 32);
         PoolState ps = pools.get(pool);
-        require(ps.stakerAddress.equals(Blockchain.getCaller()));
         ps.metaDataContentHash = newMetaDataContentHash;
         PoolRegistryEvents.updatedMetaDataContentHash(pool, newMetaDataContentHash);
     }
@@ -643,7 +642,6 @@ public class PoolRegistry {
         requireNoValue();
         PoolState ps = pools.get(pool);
         return new ABIStreamingEncoder()
-                .encodeOneAddress(ps.stakerAddress)
                 .encodeOneAddress(ps.coinbaseAddress)
                 .encodeOneInteger(ps.commissionRate)
                 .encodeOneByteArray(ps.metaDataUrl)
@@ -664,6 +662,13 @@ public class PoolRegistry {
         return isSelfStakeSatisfied(pool) ? "ACTIVE" : "BROKEN";
     }
 
+    @Callable
+    public static BigInteger getOutstandingRewards(Address pool){
+        requirePool(pool);
+        requireNoValue();
+        return pools.get(pool).rewards.getOutstandingRewards();
+    }
+
     @Fallback
     public static void fallback(){
         if(!Blockchain.getCaller().equals(currentPoolCoinbaseAddress)) {
@@ -676,23 +681,23 @@ public class PoolRegistry {
 
         BigInteger totalStake = getTotalStakeCall(pool);
         PoolState ps = pools.get(pool);
-        BigInteger selfStake = getOrDefault(ps.delegators, ps.stakerAddress, BigInteger.ZERO);
+        BigInteger selfStake = getOrDefault(ps.delegators, pool, BigInteger.ZERO);
 
         return selfStake.compareTo(MIN_SELF_STAKE) >= 0 &&
                 (selfStake.multiply(BigInteger.valueOf(100))).divide(totalStake).compareTo(MIN_SELF_STAKE_PERCENTAGE) >= 0;
     }
 
-    private static void switchToActive(PoolState ps) {
+    private static void switchToActive(Address pool, PoolState ps) {
         if(ps.rewards.isFeeSetToZero() && ps.commissionRate != 0) {
             ps.rewards.setCommissionRate(ps.commissionRate);
-            PoolRegistryEvents.changedPoolState(ps.stakerAddress, true);
+            PoolRegistryEvents.changedPoolState(pool, true);
         }
     }
 
-    private static void switchToBroken(PoolState ps) {
+    private static void switchToBroken(Address pool, PoolState ps) {
         if(!ps.rewards.isFeeSetToZero()) {
             ps.rewards.setCommissionRate(0);
-            PoolRegistryEvents.changedPoolState(ps.stakerAddress, false);
+            PoolRegistryEvents.changedPoolState(pool, false);
         }
     }
 

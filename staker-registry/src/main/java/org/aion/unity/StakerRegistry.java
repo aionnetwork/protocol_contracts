@@ -26,7 +26,6 @@ public class StakerRegistry {
     public static final BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
 
     private static class Staker {
-        private Address identityAddress;
         private Address managementAddress;
         private Address signingAddress;
         private Address coinbaseAddress;
@@ -40,8 +39,7 @@ public class StakerRegistry {
         // the sum of stakes.values() should always equal totalStake
         private Map<Address, BigInteger> stakes;
 
-        public Staker(Address identityAddress, Address managementAddress, Address signingAddress, Address coinbaseAddress, long lastSigningAddressUpdate) {
-            this.identityAddress = identityAddress;
+        public Staker(Address managementAddress, Address signingAddress, Address coinbaseAddress, long lastSigningAddressUpdate) {
             this.managementAddress = managementAddress;
             this.signingAddress = signingAddress;
             this.coinbaseAddress = coinbaseAddress;
@@ -111,7 +109,7 @@ public class StakerRegistry {
 
         signingAddresses.put(signingAddress, identityAddress);
 
-        stakers.put(identityAddress, new Staker(identityAddress, managementAddress, signingAddress, coinbaseAddress, Blockchain.getBlockNumber()));
+        stakers.put(identityAddress, new Staker(managementAddress, signingAddress, coinbaseAddress, Blockchain.getBlockNumber()));
         StakerRegistryEvents.registeredStaker(identityAddress, managementAddress, signingAddress, coinbaseAddress);
     }
 
@@ -519,7 +517,7 @@ public class StakerRegistry {
 
             // the old signing address is removed and can be used again by another staker
             signingAddresses.remove(s.signingAddress);
-            signingAddresses.put(newSigningAddress, s.identityAddress);
+            signingAddresses.put(newSigningAddress, staker);
             s.signingAddress = newSigningAddress;
             s.lastSigningAddressUpdate = blockNumber;
             StakerRegistryEvents.setSigningAddress(staker, newSigningAddress);
