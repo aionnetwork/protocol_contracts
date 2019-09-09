@@ -1,50 +1,24 @@
 package org.aion.unity;
 
-import avm.Address;
 import avm.Blockchain;
-import org.aion.avm.userlib.AionMap;
 
 import java.math.BigInteger;
-import java.util.Map;
 
 /**
  * See https://github.com/ali-sharif/f1-fee-distribution for a PoC implementation of the F1 algorithm
  * TODO: need more tests for this class
  */
 public class PoolRewardsStateMachine {
-    // pool variables
-    private BigInteger fee; // 0-100%
-
-    // state variables
-    private BigInteger accumulatedStake = BigInteger.ZERO; // stake accumulated in the pool
-    private BigInteger accumulatedBlockRewards = BigInteger.ZERO; // rewards paid to pool per block
-
-    // commission is handled separately
-    private BigInteger accumulatedCommission = BigInteger.ZERO;
-
-    private BigInteger outstandingRewards = BigInteger.ZERO; // total coins (as rewards), owned by the pool
-
-    private Map<Address, BigInteger> settledRewards = new AionMap<>(); // rewards in the "settled" state
-
-    private Map<Address, StartingInfo> delegations; // total delegations per delegator
-
-    BigInteger currentCRR;
 
     // todo possible to replace multiplication and division with shift operation
     private static BigInteger precisionInt = new BigInteger("1000000000000000000000000000");
     private static BigInteger feeDivisor = new BigInteger("1000000");
 
-    BigInteger getOutstandingRewards() {
-        return outstandingRewards;
-    }
+    PoolStorageObjects.PoolRewards currentPoolRewards;
 
     // Initialize pool
-    public PoolRewardsStateMachine() {
-        this.fee = BigInteger.ZERO;
-
-        currentCRR = BigInteger.ZERO;
-
-        delegations = new AionMap<>();
+    public PoolRewardsStateMachine(PoolStorageObjects.PoolRewards poolRewards){
+        currentPoolRewards = poolRewards;
     }
 
     /* ----------------------------------------------------------------------
@@ -54,31 +28,33 @@ public class PoolRewardsStateMachine {
     /**
      * @return the bonded stake that just "left"
      */
-    private BigInteger leave(Address delegator, long blockNumber) {
-        assert (delegator != null && delegations.containsKey(delegator)); // sanity check
-
+    private BigInteger leave(PoolStorageObjects.DelegatorInfo delegatorInfo, long blockNumber) {
         incrementPeriod();
-        BigInteger rewards = calculateUnsettledRewards(delegator, blockNumber);
+        BigInteger rewards = calculateUnsettledRewards(delegatorInfo, blockNumber);
 
-        settledRewards.put(delegator, rewards.add(getOrDefault(settledRewards, delegator, BigInteger.ZERO)));
+        delegatorInfo.settledRewards = rewards.add(delegatorInfo.settledRewards);
 
-        StartingInfo startingInfo = delegations.get(delegator);
-        BigInteger stake = startingInfo.stake;
+        BigInteger stake = delegatorInfo.stake;
+        // reset delegator Info
+        delegatorInfo.stake = BigInteger.ZERO;
+        delegatorInfo.startingCrrBlockNumber = 0;
+        delegatorInfo.startingCrr = BigInteger.ZERO;
 
-        delegations.remove(delegator);
+        // sanity check
+        assert stake.compareTo(currentPoolRewards.accumulatedStake) <= 0;
 
-        accumulatedStake = accumulatedStake.subtract(stake);
+        currentPoolRewards.accumulatedStake = currentPoolRewards.accumulatedStake.subtract(stake);
 
         return stake;
     }
 
-    private void join(Address delegator, long blockNumber, BigInteger stake) {
-        assert (delegator != null && !delegations.containsKey(delegator)); // sanity check
-
-        // add this new delegation to our store
-        delegations.put(delegator, new StartingInfo(stake, blockNumber, currentCRR));
-
-        accumulatedStake = accumulatedStake.add(stake);
+    private void join(PoolStorageObjects.DelegatorInfo delegatorInfo, long blockNumber, BigInteger stake) {
+        // update delegator info with this new delegation
+        // stake is the total stake of the delegator
+        delegatorInfo.stake = stake;
+        delegatorInfo.startingCrrBlockNumber = blockNumber;
+        delegatorInfo.startingCrr = currentPoolRewards.currentCRR;
+        currentPoolRewards.accumulatedStake = currentPoolRewards.accumulatedStake.add(stake);
     }
 
     /* ----------------------------------------------------------------------
@@ -89,87 +65,80 @@ public class PoolRewardsStateMachine {
         // Blockchain.println("Increment period: acc_rewards = " + accumulatedBlockRewards);
 
         // deal with the block rewards
-        BigInteger commission = (fee.multiply(accumulatedBlockRewards))
+        BigInteger commission = (BigInteger.valueOf(currentPoolRewards.appliedCommissionRate).multiply(currentPoolRewards.accumulatedBlockRewards))
                 .divide(feeDivisor);
 
-        BigInteger currentRewards = accumulatedBlockRewards.subtract(commission);
+        BigInteger currentRewards = currentPoolRewards.accumulatedBlockRewards.subtract(commission);
 
-        this.accumulatedCommission = accumulatedCommission.add(commission);
-        this.outstandingRewards = this.outstandingRewards.add(accumulatedBlockRewards);
+        currentPoolRewards.accumulatedCommission = currentPoolRewards.accumulatedCommission.add(commission);
+        currentPoolRewards.outstandingRewards = currentPoolRewards.outstandingRewards.add(currentPoolRewards.accumulatedBlockRewards);
 
         // "reset" the block rewards accumulator
-        accumulatedBlockRewards = BigInteger.ZERO;
+        currentPoolRewards.accumulatedBlockRewards = BigInteger.ZERO;
 
         // deal with the CRR computations
         // accumulatedStake > 0
-        if (accumulatedStake.signum() == 1) {
+        if (currentPoolRewards.accumulatedStake.signum() == 1) {
             // currentRewards (in nAmps) is multiplied by 10^27 to keep precision.
             // This is truncated during the calculation of the unsettled rewards for delegator
-            BigInteger crr = currentRewards.multiply(precisionInt).divide(accumulatedStake);
-            currentCRR = currentCRR.add(crr);
+            BigInteger crr = currentRewards.multiply(precisionInt).divide(currentPoolRewards.accumulatedStake);
+            currentPoolRewards.currentCRR = currentPoolRewards.currentCRR.add(crr);
         } else {
             // if there is no stake, then there should be no way to have accumulated rewards
             assert (currentRewards.equals(BigInteger.ZERO));
         }
     }
 
-    private BigInteger calculateUnsettledRewards(Address delegator, long blockNumber) {
-        StartingInfo startingInfo = delegations.get(delegator);
+    private BigInteger calculateUnsettledRewards(PoolStorageObjects.DelegatorInfo delegatorInfo, long blockNumber) {
+        //if a delegator has not delegated yet or it has un-delegated the full stake amount, the stake will be zero and unsettledRewards will be zero as well.
 
-        if (startingInfo == null) {
+        // cannot calculate delegation rewards for blocks before stake was delegated
+        assert (delegatorInfo.startingCrrBlockNumber <= blockNumber);
+
+        // if a new period was created this block, then no rewards could be "settled" at this block
+        if (delegatorInfo.startingCrrBlockNumber == blockNumber) {
             return BigInteger.ZERO;
         }
 
-        // cannot calculate delegation rewards for blocks before stake was delegated
-        assert (startingInfo.blockNumber <= blockNumber);
-
-        // if a new period was created this block, then no rewards could be "settled" at this block
-        if (startingInfo.blockNumber == blockNumber)
-            return BigInteger.ZERO;
-
-        BigInteger stake = startingInfo.stake;
-
         // return stake * (ending - starting)
-        BigInteger startingCRR = startingInfo.crr;
-        BigInteger endingCRR = currentCRR;
+        BigInteger startingCRR = delegatorInfo.startingCrr;
+        BigInteger endingCRR = currentPoolRewards.currentCRR;
         BigInteger differenceCRR = endingCRR.subtract(startingCRR);
 
         Blockchain.println("CCR: start = " + startingCRR + ", end = " + endingCRR + ", diff = " + differenceCRR);
 
         // truncate the precision value
-        return differenceCRR.multiply(stake).divide(precisionInt);
+        return differenceCRR.multiply(delegatorInfo.stake).divide(precisionInt);
     }
 
     /* ----------------------------------------------------------------------
      * Contract Lifecycle Functions
      * ----------------------------------------------------------------------*/
-    public void onUndelegate(Address delegator, long blockNumber, BigInteger stake) {
-        assert (delegations.containsKey(delegator));
-        BigInteger prevBond = delegations.get(delegator).stake;
+    public void onUndelegate(PoolStorageObjects.DelegatorInfo delegatorInfo, long blockNumber, BigInteger stake) {
+        BigInteger prevBond = delegatorInfo.stake;
         assert (stake.compareTo(prevBond) <= 0); // make sure the amount of undelegate requested is legal.
 
-        BigInteger unbondedStake = leave(delegator, blockNumber);
+        BigInteger unbondedStake = leave(delegatorInfo, blockNumber);
         assert (unbondedStake.equals(prevBond));
 
         // if they didn't fully un-bond, re-bond the remaining amount
         BigInteger nextBond = prevBond.subtract(stake);
         // nextBond > 0
         if (nextBond.signum() == 1) {
-            join(delegator, blockNumber, nextBond);
+            join(delegatorInfo, blockNumber, nextBond);
         }
     }
 
-    public void onDelegate(Address delegator, long blockNumber, BigInteger stake) {
-        assert (stake.signum() >= 0);
-
+    public void onDelegate(PoolStorageObjects.DelegatorInfo delegatorInfo, long blockNumber, BigInteger stake) {
         BigInteger prevBond = BigInteger.ZERO;
-        if (delegations.containsKey(delegator))
-            prevBond = leave(delegator, blockNumber);
-        else
+        if (!delegatorInfo.stake.equals(BigInteger.ZERO)) {
+            prevBond = leave(delegatorInfo, blockNumber);
+        } else {
             incrementPeriod();
+        }
 
         BigInteger nextBond = prevBond.add(stake);
-        join(delegator, blockNumber, nextBond);
+        join(delegatorInfo, blockNumber, nextBond);
     }
 
     /**
@@ -178,28 +147,28 @@ public class PoolRewardsStateMachine {
      * for withdraw, can be less than the amount settled, in which case, it's not obvious if we should perform
      * a settlement ("leave") or save on gas and just withdraw out the rewards.
      */
-    public BigInteger onWithdraw(Address delegator, long blockNumber) {
-        if (delegations.containsKey(delegator)) {
+    public BigInteger onWithdraw(PoolStorageObjects.DelegatorInfo delegatorInfo, long blockNumber) {
+        if (!delegatorInfo.stake.equals(BigInteger.ZERO)) {
             // do a "leave-and-join"
-            BigInteger unbondedStake = leave(delegator, blockNumber);
-            join(delegator, blockNumber, unbondedStake);
+            BigInteger unbondedStake = leave(delegatorInfo, blockNumber);
+            join(delegatorInfo, blockNumber, unbondedStake);
         }
 
         // if I don't see a delegation, then you must have been settled already.
 
         // now that all rewards owed to you are settled, you can withdraw them all at once
-        BigInteger rewards = getOrDefault(settledRewards, delegator, BigInteger.ZERO);
-        settledRewards.remove(delegator);
-        outstandingRewards = outstandingRewards.subtract(rewards);
+        BigInteger rewards = delegatorInfo.settledRewards;
+        delegatorInfo.settledRewards = BigInteger.ZERO;
+        currentPoolRewards.outstandingRewards = currentPoolRewards.outstandingRewards.subtract(rewards);
 
         return rewards;
     }
 
     public BigInteger onWithdrawOperator() {
-        BigInteger c = accumulatedCommission;
-        accumulatedCommission = BigInteger.ZERO;
+        BigInteger c = currentPoolRewards.accumulatedCommission;
+        currentPoolRewards.accumulatedCommission = BigInteger.ZERO;
 
-        outstandingRewards = outstandingRewards.subtract(c);
+        currentPoolRewards.outstandingRewards = currentPoolRewards.outstandingRewards.subtract(c);
 
         return c;
     }
@@ -208,42 +177,19 @@ public class PoolRewardsStateMachine {
         // blockReward > 0
         assert (blockNumber > 0 && blockReward.signum() == 1); // sanity check
 
-        accumulatedBlockRewards =  accumulatedBlockRewards.add(blockReward);
+        currentPoolRewards.accumulatedBlockRewards = currentPoolRewards.accumulatedBlockRewards.add(blockReward);
     }
 
-    public BigInteger getRewards(Address delegator, long blockNumber) {
-        BigInteger unsettledRewards = calculateUnsettledRewards(delegator, blockNumber);
-        BigInteger settledRewards = getOrDefault(this.settledRewards, delegator, BigInteger.ZERO);
+    // todo check for pool owner
+    public BigInteger getRewards(PoolStorageObjects.DelegatorInfo delegatorInfo, long blockNumber) {
+        BigInteger unsettledRewards = calculateUnsettledRewards(delegatorInfo, blockNumber);
+        BigInteger settledRewards = delegatorInfo.settledRewards;
 
         return unsettledRewards.add(settledRewards);
     }
 
-    public void setCommissionRate(int newRate) {
+    public void setAppliedCommissionRate(int newRate) {
         incrementPeriod();
-        fee = BigInteger.valueOf(newRate);
-    }
-
-    private static <K, V> V getOrDefault(Map<K, V> map, K key, V defaultValue) {
-        if (map.containsKey(key)) {
-            return map.get(key);
-        } else {
-            return defaultValue;
-        }
-    }
-
-    public boolean isFeeSetToZero() {
-        return fee.signum() == 0;
-    }
-
-    private static class StartingInfo {
-        public BigInteger stake;             // amount of coins being delegated
-        public long blockNumber;       // block number at which delegation was created
-        public BigInteger crr;
-
-        public StartingInfo(BigInteger stake, long blockNumber, BigInteger crr) {
-            this.stake = stake;
-            this.blockNumber = blockNumber;
-            this.crr = crr;
-        }
+        currentPoolRewards.appliedCommissionRate = newRate;
     }
 }
