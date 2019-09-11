@@ -644,8 +644,9 @@ public class PoolRegistry {
         return new ABIStreamingEncoder()
                 .encodeOneAddress(ps.coinbaseAddress)
                 .encodeOneInteger(ps.commissionRate)
-                .encodeOneByteArray(ps.metaDataUrl)
+                .encodeOneBoolean(isSelfStakeSatisfied(pool))
                 .encodeOneByteArray(ps.metaDataContentHash)
+                .encodeOneByteArray(ps.metaDataUrl)
                 .toBytes();
     }
 
