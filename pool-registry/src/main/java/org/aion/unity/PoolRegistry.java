@@ -607,6 +607,7 @@ public class PoolRegistry {
         // make sure the pool is active, so that pool owner can't change the commission rate after it has been set to 0 as a punishment
         // if the pool is not active, the commission fee in rewards is set when it becomes active
         if(isSelfStakeSatisfied(commissionUpdate.pool)) {
+            detectBlockRewards(commissionUpdate.pool);
             ps.rewards.setCommissionRate(commissionUpdate.newCommissionRate);
         }
 
