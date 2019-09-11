@@ -5,18 +5,14 @@ import avm.Blockchain;
 import avm.Result;
 import org.aion.avm.tooling.abi.Callable;
 import org.aion.avm.tooling.abi.Fallback;
-import org.aion.avm.userlib.AionMap;
 
 import java.math.BigInteger;
-import java.util.Map;
 
 /**
  * A staker registry manages the staker database, and provides an interface for delegators
  * to delegate/undelegate for a staker.
  */
 public class StakerRegistry {
-
-    // TODO: replace object graph-based collections with key-value storage.
 
     public static final long SIGNING_ADDRESS_COOLING_PERIOD = 6 * 60 * 24 * 7;
     public static final long UNDELEGATE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
@@ -25,66 +21,8 @@ public class StakerRegistry {
     // 1000 Aions
     public static final BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
 
-    private static class Staker {
-        private Address managementAddress;
-        private Address signingAddress;
-        private Address coinbaseAddress;
-
-        private long lastSigningAddressUpdate;
-
-        private BigInteger totalStake;
-        private BigInteger selfBondStake;
-
-        // maps addresses to the stakes those addresses have sent to this staker
-        // the sum of stakes.values() should always equal totalStake
-        private Map<Address, BigInteger> stakes;
-
-        public Staker(Address managementAddress, Address signingAddress, Address coinbaseAddress, long lastSigningAddressUpdate) {
-            this.managementAddress = managementAddress;
-            this.signingAddress = signingAddress;
-            this.coinbaseAddress = coinbaseAddress;
-            this.lastSigningAddressUpdate = lastSigningAddressUpdate;
-            this.totalStake = BigInteger.ZERO;
-            this.stakes = new AionMap<>();
-            this.selfBondStake = BigInteger.ZERO;
-        }
-    }
-
-    private static class PendingUndelegate {
-        private Address recipient;
-        private BigInteger value;
-        private long blockNumber;
-
-        public PendingUndelegate(Address recipient, BigInteger value, long blockNumber) {
-            this.recipient = recipient;
-            this.value = value;
-            this.blockNumber = blockNumber;
-        }
-    }
-
-    private static class PendingTransfer {
-        private Address initiator;
-        private Address toStaker;
-        private Address recipient;
-        private BigInteger value;
-        private long blockNumber;
-
-        public PendingTransfer(Address initiator, Address toStaker, Address recipient, BigInteger value, long blockNumber) {
-            this.initiator = initiator;
-            this.toStaker = toStaker;
-            this.recipient = recipient;
-            this.value = value;
-            this.blockNumber = blockNumber;
-        }
-    }
-
-    private static Map<Address, Staker> stakers = new AionMap<>();
-    private static Map<Address, Address> signingAddresses = new AionMap<>();
-
     private static long nextUndelegateId = 0;
-    private static Map<Long, PendingUndelegate> pendingUndelegates = new AionMap<>();
     private static long nextTransferId = 0;
-    private static Map<Long, PendingTransfer> pendingTransfers = new AionMap<>();
 
     /**
      * Registers a staker. The caller address will be the identification
@@ -104,12 +42,16 @@ public class StakerRegistry {
         requireNonNull(coinbaseAddress);
         requireNoValue();
 
-        require(!signingAddresses.containsKey(signingAddress));
-        require(!stakers.containsKey(identityAddress));
+        require(StakerRegistryStorage.getIdentityAddress(signingAddress) == null);
+        require(StakerRegistryStorage.getStakerStakeInfo(identityAddress) == null);
 
-        signingAddresses.put(signingAddress, identityAddress);
+        // signingAddress -> identityAddress
+        StakerRegistryStorage.putIdentityAddress(signingAddress, identityAddress);
 
-        stakers.put(identityAddress, new Staker(managementAddress, signingAddress, coinbaseAddress, Blockchain.getBlockNumber()));
+        StakerRegistryStorage.putManagementAddress(identityAddress, managementAddress);
+        StakerRegistryStorage.putStakerAddressInfo(identityAddress, new StakerStorageObjects.AddressInfo(signingAddress, coinbaseAddress, Blockchain.getBlockNumber()));
+        StakerRegistryStorage.putStakerStakeInfo(identityAddress, new StakerStorageObjects.StakeInfo());
+
         StakerRegistryEvents.registeredStaker(identityAddress, managementAddress, signingAddress, coinbaseAddress);
     }
 
@@ -123,13 +65,16 @@ public class StakerRegistry {
         Address caller = Blockchain.getCaller();
         BigInteger amount = Blockchain.getValue();
 
-        requireStaker(staker);
+        StakerStorageObjects.StakeInfo stakeInfo = validateAndGetStakeInfo(staker);
         requirePositive(amount);
 
-        Staker s = stakers.get(staker);
-        s.totalStake = s.totalStake.add(amount);
-        BigInteger previousStake = getOrDefault(s.stakes, caller, BigInteger.ZERO);
-        putOrRemove(s.stakes, caller, previousStake.add(amount));
+        stakeInfo.totalStake = stakeInfo.totalStake.add(amount);
+        StakerRegistryStorage.putStakerStakeInfo(staker, stakeInfo);
+
+        BigInteger previousStake = StakerRegistryStorage.getDelegatorStake(staker, caller);
+        // stake is always positive
+        StakerRegistryStorage.putDelegatorStake(staker, caller, previousStake.add(amount));
+
         StakerRegistryEvents.delegated(caller, staker, amount);
     }
 
@@ -158,25 +103,29 @@ public class StakerRegistry {
     public static long undelegateTo(Address staker, BigInteger amount, Address recipient) {
         Address caller = Blockchain.getCaller();
 
-        requireStaker(staker);
+        StakerStorageObjects.StakeInfo stakeInfo = validateAndGetStakeInfo(staker);
         requirePositive(amount);
         requireNonNull(recipient);
         requireNoValue();
 
-        Staker s = stakers.get(staker);
-        BigInteger previousStake = getOrDefault(stakers.get(staker).stakes, caller, BigInteger.ZERO);
+        BigInteger previousStake = StakerRegistryStorage.getDelegatorStake(staker, caller);
 
         // check previous stake
         require(amount.compareTo(previousStake) <= 0);
+        //sanity check
+        assert amount.compareTo(stakeInfo.totalStake) <= 0;
 
         // update stake
-        s.totalStake = s.totalStake.subtract(amount);
-        putOrRemove(s.stakes, caller, previousStake.subtract(amount));
+        stakeInfo.totalStake = stakeInfo.totalStake.subtract(amount);
+        StakerRegistryStorage.putStakerStakeInfo(staker, stakeInfo);
+
+        // if stake is zero, delegator will be removed from storage
+        StakerRegistryStorage.putDelegatorStake(staker, caller, previousStake.subtract(amount));
 
         // create pending un-delegate
         long id = nextUndelegateId++;
-        PendingUndelegate undelegate = new PendingUndelegate(recipient, amount, Blockchain.getBlockNumber());
-        pendingUndelegates.put(id, undelegate);
+        StakerStorageObjects.PendingUndelegate undelegate = new StakerStorageObjects.PendingUndelegate(recipient, amount, Blockchain.getBlockNumber());
+        StakerRegistryStorage.putPendingUndelegte(id, undelegate);
         StakerRegistryEvents.undelegated(id, caller, staker, recipient, amount);
 
         return id;
@@ -208,26 +157,30 @@ public class StakerRegistry {
     public static long transferDelegationTo(Address fromStaker, Address toStaker, BigInteger amount, Address recipient) {
         Address caller = Blockchain.getCaller();
 
-        requireStaker(fromStaker);
-        requireStaker(toStaker);
+        StakerStorageObjects.StakeInfo stakeInfo = validateAndGetStakeInfo(fromStaker);
+        validateAndGetStakeInfo(toStaker);
         requirePositive(amount);
         require(!fromStaker.equals(toStaker));
         requireNoValue();
 
-        Staker s = stakers.get(fromStaker);
-        BigInteger previousStake = getOrDefault(s.stakes, caller, BigInteger.ZERO);
+        BigInteger previousStake = StakerRegistryStorage.getDelegatorStake(fromStaker, caller);
 
         // check previous stake
         require(amount.compareTo(previousStake) <= 0);
+        //sanity check
+        assert amount.compareTo(stakeInfo.totalStake) <= 0;
 
         // update stake
-        s.totalStake = s.totalStake.subtract(amount);
-        putOrRemove(s.stakes, caller, previousStake.subtract(amount));
+        stakeInfo.totalStake = stakeInfo.totalStake.subtract(amount);
+        StakerRegistryStorage.putStakerStakeInfo(fromStaker, stakeInfo);
+
+        // if stake is zero, delegator will be removed froms storage
+        StakerRegistryStorage.putDelegatorStake(fromStaker, caller, previousStake.subtract(amount));
 
         // create pending transfer
         long id = nextTransferId++;
-        PendingTransfer transfer = new PendingTransfer(caller, toStaker, recipient, amount, Blockchain.getBlockNumber());
-        pendingTransfers.put(id, transfer);
+        StakerStorageObjects.PendingTransfer transfer = new StakerStorageObjects.PendingTransfer(caller, toStaker, recipient, amount, Blockchain.getBlockNumber());
+        StakerRegistryStorage.putPendingTransfer(id, transfer);
         StakerRegistryEvents.transferredDelegation(id, fromStaker, toStaker, recipient, amount);
 
         return id;
@@ -243,14 +196,14 @@ public class StakerRegistry {
         requireNoValue();
 
         // check existence
-        PendingUndelegate undelegate = pendingUndelegates.get(id);
+        StakerStorageObjects.PendingUndelegate undelegate = StakerRegistryStorage.getPendingUndelegate(id);
         requireNonNull(undelegate);
 
         // lock-up period check
         require(Blockchain.getBlockNumber() >= undelegate.blockNumber + UNDELEGATE_LOCK_UP_PERIOD);
 
         // remove the undelegate
-        pendingUndelegates.remove(id);
+        StakerRegistryStorage.putPendingUndelegte(id, null);
 
         // do a value transfer
         secureCall(undelegate.recipient, undelegate.value, new byte[0], Blockchain.getRemainingEnergy());
@@ -267,7 +220,7 @@ public class StakerRegistry {
         requireNoValue();
 
         // check existence
-        PendingTransfer transfer = pendingTransfers.get(id);
+        StakerStorageObjects.PendingTransfer transfer = StakerRegistryStorage.getPendingTransfer(id);
         requireNonNull(transfer);
 
         // only the initiator can finalize the transfer, mainly because
@@ -278,13 +231,18 @@ public class StakerRegistry {
         require(Blockchain.getBlockNumber() >= transfer.blockNumber + TRANSFER_LOCK_UP_PERIOD);
 
         // remove the transfer
-        pendingTransfers.remove(id);
+        StakerRegistryStorage.putPendingTransfer(id, null);
 
         // credit the stake to the designated pool of the recipient
-        Staker s = stakers.get(transfer.toStaker);
-        BigInteger previousStake = getOrDefault(s.stakes, transfer.recipient, BigInteger.ZERO);
-        s.totalStake = s.totalStake.add(transfer.value);
-        putOrRemove(s.stakes, transfer.recipient, previousStake.add(transfer.value));
+        Address toStaker = transfer.toStaker;
+        StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(toStaker);
+        stakeInfo.totalStake = stakeInfo.totalStake.add(transfer.value);
+        StakerRegistryStorage.putStakerStakeInfo(toStaker, stakeInfo);
+
+        BigInteger previousStake = StakerRegistryStorage.getDelegatorStake(toStaker, transfer.recipient);
+        // stake is always positive
+        StakerRegistryStorage.putDelegatorStake(toStaker, transfer.recipient, previousStake.add(transfer.value));
+
         StakerRegistryEvents.finalizedDelegationTransfer(id);
     }
 
@@ -303,23 +261,24 @@ public class StakerRegistry {
         requireNoValue();
 
         // if not a staker
-        Address staker = signingAddresses.get(signingAddress);
+        Address staker = StakerRegistryStorage.getIdentityAddress(signingAddress);
         if (staker == null) {
             return BigInteger.ZERO;
         }
 
         // if coinbase addresses do not match
-        if (!stakers.get(staker).coinbaseAddress.equals(coinbaseAddress)) {
+        if (!StakerRegistryStorage.getStakerAddressInfo(staker).coinbaseAddress.equals(coinbaseAddress)) {
             return BigInteger.ZERO;
         }
 
         // if not active
-        if (!isActive(staker)) {
+        StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(staker);
+        if (!isMinimumSelfBondSatisfied(stakeInfo.selfBondStake)) {
             return BigInteger.ZERO;
         }
 
         // query total stake
-        BigInteger totalStake = getTotalStake(staker);
+        BigInteger totalStake = stakeInfo.totalStake;
 
         // conversion: 1 nAmp = 1 stake
         return totalStake;
@@ -333,10 +292,10 @@ public class StakerRegistry {
      */
     @Callable
     public static BigInteger getTotalStake(Address staker) {
-        requireStaker(staker);
+        StakerStorageObjects.StakeInfo stakeInfo = validateAndGetStakeInfo(staker);
         requireNoValue();
 
-        return stakers.get(staker).totalStake;
+        return stakeInfo.totalStake;
     }
 
 
@@ -349,11 +308,11 @@ public class StakerRegistry {
      */
     @Callable
     public static BigInteger getStake(Address staker, Address delegator) {
-        requireStaker(staker);
+        validateAndGetStakeInfo(staker);
         requireNonNull(delegator);
         requireNoValue();
 
-        return getOrDefault(stakers.get(staker).stakes, delegator, BigInteger.ZERO);
+        return StakerRegistryStorage.getDelegatorStake(staker, delegator);
     }
 
     /**
@@ -367,9 +326,11 @@ public class StakerRegistry {
         requirePositive(amount);
         requireStakerAndManager(staker, Blockchain.getCaller());
 
-        Staker s = stakers.get(staker);
-        s.selfBondStake = s.selfBondStake.add(amount);
-        s.totalStake = s.totalStake.add(amount);
+        StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(staker);
+
+        stakeInfo.selfBondStake = stakeInfo.selfBondStake.add(amount);
+        stakeInfo.totalStake = stakeInfo.totalStake.add(amount);
+        StakerRegistryStorage.putStakerStakeInfo(staker, stakeInfo);
 
         StakerRegistryEvents.bonded(staker, amount);
     }
@@ -402,16 +363,19 @@ public class StakerRegistry {
         requirePositive(amount);
         requireNoValue();
 
-        Staker s = stakers.get(staker);
+        StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(staker);
 
-        require(amount.compareTo(s.selfBondStake) <= 0);
+        require(amount.compareTo(stakeInfo.selfBondStake) <= 0);
+        //sanity check
+        assert amount.compareTo(stakeInfo.totalStake) <= 0;
 
-        s.selfBondStake = s.selfBondStake.subtract(amount);
-        s.totalStake = s.totalStake.subtract(amount);
+        stakeInfo.selfBondStake = stakeInfo.selfBondStake.subtract(amount);
+        stakeInfo.totalStake = stakeInfo.totalStake.subtract(amount);
+        StakerRegistryStorage.putStakerStakeInfo(staker, stakeInfo);
 
         long id = nextUndelegateId++;
-        PendingUndelegate undelegate = new PendingUndelegate(recipient, amount, Blockchain.getBlockNumber());
-        pendingUndelegates.put(id, undelegate);
+        StakerStorageObjects.PendingUndelegate undelegate = new StakerStorageObjects.PendingUndelegate(recipient, amount, Blockchain.getBlockNumber());
+        StakerRegistryStorage.putPendingUndelegte(id, undelegate);
 
         StakerRegistryEvents.unbonded(id, staker, recipient, amount);
 
@@ -426,7 +390,9 @@ public class StakerRegistry {
      */
     @Callable
     public static boolean isStaker(Address staker) {
-        return stakers.containsKey(staker);
+        requireNoValue();
+        requireNonNull(staker);
+        return StakerRegistryStorage.getStakerStakeInfo(staker) != null;
     }
 
     /**
@@ -437,12 +403,10 @@ public class StakerRegistry {
      */
     @Callable
     public static boolean isActive(Address staker) {
-        requireNonNull(staker);
+        StakerStorageObjects.StakeInfo stakeInfo = validateAndGetStakeInfo(staker);
         requireNoValue();
 
-        Staker s = stakers.get(staker);
-
-        return s.selfBondStake.compareTo(MIN_SELF_STAKE) >= 0;
+        return isMinimumSelfBondSatisfied(stakeInfo.selfBondStake);
     }
 
     /**
@@ -453,10 +417,12 @@ public class StakerRegistry {
      */
     @Callable
     public static Address getSigningAddress(Address staker) {
-        requireStaker(staker);
+        requireNonNull(staker);
+        StakerStorageObjects.AddressInfo addressInfo = StakerRegistryStorage.getStakerAddressInfo(staker);
+        requireNonNull(addressInfo);
         requireNoValue();
 
-        return stakers.get(staker).signingAddress;
+        return addressInfo.signingAddress;
     }
 
     /**
@@ -467,10 +433,12 @@ public class StakerRegistry {
      */
     @Callable
     public static Address getCoinbaseAddressForIdentityAddress(Address staker) {
-        requireStaker(staker);
+        requireNonNull(staker);
+        StakerStorageObjects.AddressInfo addressInfo = StakerRegistryStorage.getStakerAddressInfo(staker);
+        requireNonNull(addressInfo);
         requireNoValue();
 
-        return stakers.get(staker).coinbaseAddress;
+        return addressInfo.coinbaseAddress;
     }
 
     /**
@@ -483,18 +451,16 @@ public class StakerRegistry {
     public static Address getCoinbaseAddressForSigningAddress(Address signingAddress) {
         requireNoValue();
 
-        Address identityAddress = signingAddresses.get(signingAddress);
-        requireStaker(identityAddress);
+        Address identityAddress = StakerRegistryStorage.getIdentityAddress(signingAddress);
+        requireNonNull(identityAddress);
 
-        return stakers.get(identityAddress).coinbaseAddress;
+        return StakerRegistryStorage.getStakerAddressInfo(identityAddress).coinbaseAddress;
     }
 
-    private static Staker requireStakerAndManager(Address staker, Address manager) {
-        requireStaker(staker);
-        Staker s = stakers.get(staker);
-        require(s.managementAddress.equals(manager));
-
-        return s;
+    private static void requireStakerAndManager(Address staker, Address manager) {
+        requireNonNull(staker);
+        Address managementAddress = StakerRegistryStorage.getManagementAddress(staker);
+        require(managementAddress != null && managementAddress.equals(manager));
     }
     /**
      * Updates the signing address of a staker. Owner only.
@@ -505,21 +471,26 @@ public class StakerRegistry {
     public static void setSigningAddress(Address staker, Address newSigningAddress) {
         requireNonNull(newSigningAddress);
         requireNoValue();
+        requireStakerAndManager(staker, Blockchain.getCaller());
 
-        Staker s =  requireStakerAndManager(staker, Blockchain.getCaller());
-        if (!newSigningAddress.equals(s.signingAddress)) {
+        StakerStorageObjects.AddressInfo addressInfo = StakerRegistryStorage.getStakerAddressInfo(staker);
+
+        if (!newSigningAddress.equals(addressInfo.signingAddress)) {
             // check last update
             long blockNumber = Blockchain.getBlockNumber();
-            require(blockNumber >= s.lastSigningAddressUpdate + SIGNING_ADDRESS_COOLING_PERIOD);
+            require(blockNumber >= addressInfo.lastSigningAddressUpdate + SIGNING_ADDRESS_COOLING_PERIOD);
 
             // check duplicated signing address
-            require(!signingAddresses.containsKey(newSigningAddress));
+            require(StakerRegistryStorage.getIdentityAddress(newSigningAddress) == null);
 
             // the old signing address is removed and can be used again by another staker
-            signingAddresses.remove(s.signingAddress);
-            signingAddresses.put(newSigningAddress, staker);
-            s.signingAddress = newSigningAddress;
-            s.lastSigningAddressUpdate = blockNumber;
+            StakerRegistryStorage.putIdentityAddress(addressInfo.signingAddress, null);
+            StakerRegistryStorage.putIdentityAddress(newSigningAddress, staker);
+
+            addressInfo.signingAddress = newSigningAddress;
+            addressInfo.lastSigningAddressUpdate = blockNumber;
+            StakerRegistryStorage.putStakerAddressInfo(staker, addressInfo);
+
             StakerRegistryEvents.setSigningAddress(staker, newSigningAddress);
         }
     }
@@ -533,41 +504,22 @@ public class StakerRegistry {
     public static void setCoinbaseAddress(Address staker, Address newCoinbaseAddress) {
         requireNonNull(newCoinbaseAddress);
         requireNoValue();
+        requireStakerAndManager(staker, Blockchain.getCaller());
 
-        Staker s = requireStakerAndManager(staker, Blockchain.getCaller());
-        if (!newCoinbaseAddress.equals(s.coinbaseAddress)) {
-            s.coinbaseAddress = newCoinbaseAddress;
+        StakerStorageObjects.AddressInfo addressInfo = StakerRegistryStorage.getStakerAddressInfo(staker);
+
+        if (!newCoinbaseAddress.equals(addressInfo.coinbaseAddress)) {
+            addressInfo.coinbaseAddress = newCoinbaseAddress;
+            StakerRegistryStorage.putStakerAddressInfo(staker, addressInfo);
             StakerRegistryEvents.setCoinbaseAddress(staker, newCoinbaseAddress);
         }
     }
 
     @Callable
-    public static long[] getPendingUndelegateIds() {
-        requireNoValue();
-        long[] pendingUndelegateIds = new long[pendingUndelegates.keySet().size()];
-        int i = 0;
-        for (long id : pendingUndelegates.keySet()) {
-            pendingUndelegateIds[i++] = id;
-        }
-        return pendingUndelegateIds;
-    }
-
-    @Callable
-    public static long[] getPendingTransferIds() {
-        requireNoValue();
-        long[] pendingTransferIds = new long[pendingTransfers.keySet().size()];
-        int i = 0;
-        for (long id : pendingTransfers.keySet()) {
-            pendingTransferIds[i++] = id;
-        }
-        return pendingTransferIds;
-    }
-
-    @Callable
     public static BigInteger getSelfBondStake(Address staker) {
-        requireStaker(staker);
+        StakerStorageObjects.StakeInfo stakeInfo = validateAndGetStakeInfo(staker);
         requireNoValue();
-        return stakers.get(staker).selfBondStake;
+        return stakeInfo.selfBondStake;
     }
 
     @Fallback
@@ -575,13 +527,21 @@ public class StakerRegistry {
         Blockchain.revert();
     }
 
+    private static boolean isMinimumSelfBondSatisfied(BigInteger selfBondStake){
+        return selfBondStake.compareTo(MIN_SELF_STAKE) >= 0;
+    }
+
     private static void require(boolean condition) {
         // now implements as un-catchable
         Blockchain.require(condition);
     }
 
-    private static void requireStaker(Address staker) {
-        require(staker != null && stakers.containsKey(staker));
+    // validate the staker has been registered and return its stake info
+    private static StakerStorageObjects.StakeInfo validateAndGetStakeInfo(Address staker) {
+        requireNonNull(staker);
+        StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(staker);
+        requireNonNull(stakeInfo);
+        return stakeInfo;
     }
 
     private static void requirePositive(BigInteger num) {
@@ -594,22 +554,6 @@ public class StakerRegistry {
 
     private static void requireNoValue() {
         require(Blockchain.getValue().equals(BigInteger.ZERO));
-    }
-
-    private static <K, V extends BigInteger> void putOrRemove(Map<K, V> map, K key, V value) {
-        if (value == null || value.compareTo(BigInteger.ZERO) == 0) {
-            map.remove(key);
-        } else {
-            map.put(key, value);
-        }
-    }
-
-    private static <K, V> V getOrDefault(Map<K, V> map, K key, V defaultValue) {
-        if (map.containsKey(key)) {
-            return map.get(key);
-        } else {
-            return defaultValue;
-        }
     }
 
     private static void secureCall(Address targetAddress, BigInteger value, byte[] data, long energyLimit) {

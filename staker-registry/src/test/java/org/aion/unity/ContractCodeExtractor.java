@@ -5,9 +5,12 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.spongycastle.util.encoders.Hex;
 
+/**
+ * Used to get the jar bytes of the StakerRegistry contract
+ */
 public class ContractCodeExtractor {
 
-    private Class[] otherClasses = {StakerRegistryEvents.class};
+    private Class[] otherClasses = {StakerRegistryEvents.class, StakerStorageObjects.class, StakerRegistryStorage.class};
 
     @Rule
     public AvmRule RULE = new AvmRule(false);
