@@ -272,7 +272,7 @@ public class PoolRegistryTest {
         txData = new ABIStreamingEncoder()
                 .encodeOneString("enableAutoRewardsDelegation")
                 .encodeOneAddress(pool)
-                .encodeOneInteger(20)
+                .encodeOneInteger(200000)
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());

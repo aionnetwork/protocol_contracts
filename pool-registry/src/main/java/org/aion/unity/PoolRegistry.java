@@ -59,7 +59,7 @@ public class PoolRegistry {
     @Callable
     public static void registerPool(Address signingAddress, int commissionRate, byte[] metaDataUrl, byte[] metaDataContentHash) {
         // sanity check
-        require(commissionRate >= 0 && commissionRate <= 1000000);
+        requireValidPercentage(commissionRate);
         requireNoValue();
         requireNonNull(metaDataUrl);
         require(metaDataContentHash != null && metaDataContentHash.length == 32);
@@ -439,12 +439,12 @@ public class PoolRegistry {
      * Enables auto-redelegation on a pool.
      *
      * @param pool the pool address
-     * @param feePercentage the auto-redelegation fee
+     * @param feePercentage the auto-redelegation fee, with 4 decimal places of granularity (between [0, 1000000])
      */
     @Callable
     public static void enableAutoRewardsDelegation(Address pool, int feePercentage) {
         requirePool(pool);
-        require(feePercentage >= 0 && feePercentage <= 100);
+        requireValidPercentage(feePercentage);
         requireNoValue();
 
         Address caller = Blockchain.getCaller();
@@ -500,7 +500,7 @@ public class PoolRegistry {
         // amount > 0
         if (amount.signum() == 1) {
             // rounded down
-            BigInteger fee = (amount.multiply(BigInteger.valueOf(feePercentage))).divide(BigInteger.valueOf(100));
+            BigInteger fee = (amount.multiply(BigInteger.valueOf(feePercentage))).divide(BigInteger.valueOf(1000000));
             BigInteger remaining = amount.subtract(fee);
 
             Blockchain.println("Auto delegation: fee = " + fee + ", remaining = " + remaining);
@@ -510,25 +510,6 @@ public class PoolRegistry {
 
             delegate(delegator, pool, remaining, true, stateMachine, delegatorInfo);
         }
-    }
-
-    /**
-     * Delegates to a pool and enables auto-redelegation.
-     *
-     * @param pool the pool address
-     * @param fee the auto-redelegation fee
-     */
-    @Callable
-    public static void delegateAndEnableAutoRedelegation(Address pool, int fee) {
-        PoolStorageObjects.PoolRewards poolRewards = validateAndGetPoolRewards(pool);
-        require(fee >= 0 && fee <= 100);
-        requirePositive(Blockchain.getValue());
-
-        Address delegator = Blockchain.getCaller();
-        PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(pool, delegator);
-        PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(poolRewards);
-        delegate(delegator, pool, Blockchain.getValue(), true, stateMachine, delegatorInfo);
-        enableAutoRewardsDelegation(pool, fee);
     }
 
     /**
@@ -594,7 +575,7 @@ public class PoolRegistry {
         Address pool = Blockchain.getCaller();
         requirePool(pool);
         // 4 decimal places granularity for commission rate
-        require(newCommissionRate >= 0 && newCommissionRate <= 1000000);
+        requireValidPercentage(newCommissionRate);
 
         long id = nextCommissionRateUpdateRequestId++;
         PoolRegistryStorage.putPendingCommissionUpdate(id, new PoolStorageObjects.CommissionUpdate(pool, newCommissionRate, Blockchain.getBlockNumber()));
@@ -770,6 +751,11 @@ public class PoolRegistry {
 
     private static void requirePositive(BigInteger num) {
         require(num != null && num.compareTo(BigInteger.ZERO) > 0);
+    }
+
+    // ensures the fee percentage is valid, with 4 decimal places
+    private static void requireValidPercentage(int value){
+        require(value >= 0 && value <= 1000000);
     }
 
     private static byte[] hexStringToByteArray(String s) {
