@@ -34,6 +34,9 @@ public class PoolRegistry {
     // used for validating the sender address of a value transfer
     private static Address reentrantPoolCoinbaseAddress;
 
+    // used for keeping track of the reentrant value transfers from the reentrantPoolCoinbaseAddress and stakerRegistry
+    private static BigInteger reentrantValueTransferAmount;
+
     private static long nextCommissionRateUpdateRequestId = 0;
 
     static {
@@ -178,12 +181,14 @@ public class PoolRegistry {
      *
      * @param pool   the pool address
      * @param amount the amount of stake to undelegate
+     * @param fee the amount of stake that will be transferred to the account that invokes finalizeUndelegate
      */
     @Callable
-    public static long undelegate(Address pool, BigInteger amount) {
+    public static long undelegate(Address pool, BigInteger amount, BigInteger fee) {
         PoolStorageObjects.PoolRewards poolRewards = validateAndGetPoolRewards(pool);
 
         requirePositive(amount);
+        require(fee.signum() >= 0 && fee.compareTo(amount) <= 0);
         requireNoValue();
 
         PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(poolRewards);
@@ -203,6 +208,7 @@ public class PoolRegistry {
                     .encodeOneAddress(pool)
                     .encodeOneBigInteger(amount)
                     .encodeOneAddress(delegator)
+                    .encodeOneBigInteger(fee)
                     .toBytes();
         } else {
             data = new ABIStreamingEncoder()
@@ -210,6 +216,7 @@ public class PoolRegistry {
                     .encodeOneAddress(pool)
                     .encodeOneBigInteger(amount)
                     .encodeOneAddress(delegator)
+                    .encodeOneBigInteger(fee)
                     .toBytes();
         }
         Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
@@ -233,7 +240,7 @@ public class PoolRegistry {
 
         PoolRegistryStorage.putPoolRewards(pool, stateMachine.currentPoolRewards);
 
-        PoolRegistryEvents.undelegated(id, delegator, pool, amount);
+        PoolRegistryEvents.undelegated(id, delegator, pool, amount, fee);
         return id;
     }
 
@@ -270,10 +277,11 @@ public class PoolRegistry {
      * @param fromPool the from pool address
      * @param toPool   the to pool address
      * @param amount   the amount of stake to transfer
+     * @param fee the amount of stake that will be transferred to the account that invokes finalizeTransfer
      * @return the pending transfer id
      */
     @Callable
-    public static long transferDelegation(Address fromPool, Address toPool, BigInteger amount) {
+    public static long transferDelegation(Address fromPool, Address toPool, BigInteger amount, BigInteger fee) {
         Address caller = Blockchain.getCaller();
 
         PoolStorageObjects.PoolRewards fromPoolRewards = validateAndGetPoolRewards(fromPool);
@@ -284,6 +292,9 @@ public class PoolRegistry {
         require(!fromPool.equals(toPool));
         // make sure the self bond stake value is not changing in either the fromPool or toPool
         require(!caller.equals(fromPool) && !caller.equals(toPool));
+
+        // fee should be less than the amount for the delegate to be successful and not revert
+        require(fee.signum() >= 0 && fee.compareTo(amount) < 0);
 
         PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(fromPoolRewards);
         PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(fromPool, caller);
@@ -305,6 +316,7 @@ public class PoolRegistry {
                 .encodeOneAddress(toPool)
                 .encodeOneBigInteger(amount)
                 .encodeOneAddress(Blockchain.getAddress())
+                .encodeOneBigInteger(fee)
                 .toBytes();
 
         Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
@@ -321,7 +333,7 @@ public class PoolRegistry {
         PoolRegistryStorage.putPoolRewards(fromPool, fromPoolRewards);
         PoolRegistryStorage.putPoolRewards(toPool, toPoolRewards);
 
-        PoolRegistryEvents.transferredDelegation(id, caller, fromPool, toPool, amount);
+        PoolRegistryEvents.transferredDelegation(id, caller, fromPool, toPool, amount, fee);
         return id;
     }
 
@@ -390,7 +402,16 @@ public class PoolRegistry {
                 .encodeOneString("finalizeUndelegate")
                 .encodeOneLong(id)
                 .toBytes();
+
+        // call stakerRegistry to finalize the undelegate and transfer the value to the recipient
         secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+
+        // At this point the StakerRegistry has transferred the fee amount to this contract in a re-entrant call.
+        // This is a safe assumption since these two contracts are tightly coupled. Thus, the fee amount is not explicitly stored to save energy.
+        assert reentrantValueTransferAmount != null;
+        // transfer the fee to the caller
+        secureCall(Blockchain.getCaller(), reentrantValueTransferAmount, new byte[0], Blockchain.getRemainingEnergy());
+        reentrantValueTransferAmount = null;
     }
 
     /**
@@ -412,12 +433,20 @@ public class PoolRegistry {
 
         secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
 
+        // At this point the StakerRegistry has transferred the fee amount to this contract in a re-entrant call.
+        // This is a safe assumption since these two contracts are tightly coupled. Thus, the fee amount is not explicitly stored to save energy.
+        assert reentrantValueTransferAmount != null;
+        // transfer fee
+        secureCall(Blockchain.getCaller(), reentrantValueTransferAmount, new byte[0], Blockchain.getRemainingEnergy());
+        BigInteger remainingTransferValue = transfer.amount.subtract(reentrantValueTransferAmount);
+        reentrantValueTransferAmount = null;
+
         // remove transfer
         PoolRegistryStorage.putPendingTransfer(id, null);
 
         PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(PoolRegistryStorage.getPoolRewards(transfer.toPool));
         PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(transfer.toPool, transfer.initiator);
-        delegate(transfer.initiator, transfer.toPool, transfer.amount, false, stateMachine, delegatorInfo);
+        delegate(transfer.initiator, transfer.toPool, remainingTransferValue, false, stateMachine, delegatorInfo);
     }
 
     /**
@@ -696,9 +725,12 @@ public class PoolRegistry {
 
     @Fallback
     public static void fallback(){
-        if(!Blockchain.getCaller().equals(reentrantPoolCoinbaseAddress)) {
+        Address caller = Blockchain.getCaller();
+        if(!caller.equals(reentrantPoolCoinbaseAddress) && !caller.equals(stakerRegistry)) {
             Blockchain.revert();
         }
+        assert reentrantValueTransferAmount == null;
+        reentrantValueTransferAmount = Blockchain.getValue();
     }
 
     // note that self stake value is read from storage. So any updates to pool's self stake should be written before calling this method
@@ -793,7 +825,9 @@ public class PoolRegistry {
             // pool's coinbase address is stored for the re-entrant call to ensure only coinbase addresses can transfer value to the PoolRegistry
             reentrantPoolCoinbaseAddress = coinbaseAddress;
             secureCall(coinbaseAddress, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+            assert (reentrantValueTransferAmount.equals(balance));
             reentrantPoolCoinbaseAddress = null;
+            reentrantValueTransferAmount = null;
 
             rewardsStateMachine.onBlock(Blockchain.getBlockNumber(), balance);
 

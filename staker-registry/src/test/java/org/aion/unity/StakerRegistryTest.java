@@ -1,13 +1,19 @@
 package org.aion.unity;
 
 import avm.Address;
+import org.aion.avm.core.util.LogSizeUtils;
 import org.aion.avm.embed.AvmRule;
+import org.aion.avm.userlib.abi.ABIDecoder;
 import org.aion.avm.userlib.abi.ABIStreamingEncoder;
 import org.aion.kernel.TestingState;
+import org.aion.types.Log;
 import org.junit.*;
 
 import java.lang.reflect.Field;
 import java.math.BigInteger;
+
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 
 
 public class StakerRegistryTest {
@@ -91,9 +97,23 @@ public class StakerRegistryTest {
                 .encodeOneString("undelegate")
                 .encodeOneAddress(stakerAddress)
                 .encodeOneBigInteger(unvoteAmount)
+                .encodeOneBigInteger(BigInteger.ZERO)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        long id = (long) result.getDecodedReturnData();
+
+        assertEquals(1, result.getLogs().size());
+        Log poolRegistryEvent = result.getLogs().get(0);
+        assertArrayEquals(LogSizeUtils.truncatePadTopic("Undelegated".getBytes()),
+                poolRegistryEvent.copyOfTopics().get(0));
+        assertEquals(id, new BigInteger(poolRegistryEvent.copyOfTopics().get(1)).longValue());
+        assertArrayEquals(preminedAddress.toByteArray(), poolRegistryEvent.copyOfTopics().get(2));
+        assertArrayEquals(stakerAddress.toByteArray(), poolRegistryEvent.copyOfTopics().get(3));
+        ABIDecoder decoder = new ABIDecoder(poolRegistryEvent.copyOfData());
+        assertEquals(preminedAddress, decoder.decodeOneAddress());
+        assertEquals(unvoteAmount, decoder.decodeOneBigInteger());
+        assertEquals(BigInteger.ZERO, decoder.decodeOneBigInteger());
 
         // query the stake
         txData = new ABIStreamingEncoder()
@@ -152,6 +172,7 @@ public class StakerRegistryTest {
                 .encodeOneString("undelegate")
                 .encodeOneAddress(stakerAddress)
                 .encodeOneBigInteger(voteAmount)
+                .encodeOneBigInteger(BigInteger.ZERO)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
@@ -236,6 +257,7 @@ public class StakerRegistryTest {
                 .encodeOneString("undelegate")
                 .encodeOneAddress(stakerAddress)
                 .encodeOneBigInteger(voteAmount)
+                .encodeOneBigInteger(BigInteger.ZERO)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
@@ -268,6 +290,7 @@ public class StakerRegistryTest {
                 .encodeOneAddress(stakerAddress)
                 .encodeOneAddress(stakerAddress2)
                 .encodeOneBigInteger(voteAmount)
+                .encodeOneBigInteger(BigInteger.ZERO)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         long id = (long) result.getDecodedReturnData();
@@ -429,6 +452,7 @@ public class StakerRegistryTest {
                 .encodeOneAddress(stakerAddress)
                 .encodeOneAddress(stakerAddress2)
                 .encodeOneBigInteger(transferAmount)
+                .encodeOneBigInteger(BigInteger.ZERO)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         long id = (long) result.getDecodedReturnData();
@@ -543,6 +567,7 @@ public class StakerRegistryTest {
                 .encodeOneString("undelegate")
                 .encodeOneAddress(stakerAddress)
                 .encodeOneBigInteger(unvoteAmount)
+                .encodeOneBigInteger(BigInteger.ZERO)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         long id = (long) result.getDecodedReturnData();

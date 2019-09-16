@@ -2,8 +2,8 @@ package org.aion.unity;
 
 import avm.Address;
 import avm.Blockchain;
-import org.aion.avm.userlib.AionBuffer;
 import org.aion.avm.userlib.AionUtilities;
+import org.aion.avm.userlib.abi.ABIStreamingEncoder;
 
 import java.math.BigInteger;
 
@@ -26,20 +26,20 @@ public class PoolRegistryEvents {
                 value.toByteArray());
     }
 
-    // identity
-    protected static void undelegated(long id, Address delegator, Address pool, BigInteger amount) {
+    protected static void undelegated(long id, Address delegator, Address pool, BigInteger amount, BigInteger fee) {
+        // 32 bytes for the  BigInteger value and 2 bytes for the encoding tokens
+        byte[] data = new byte[(32 + 2) * 2];
+        new ABIStreamingEncoder(data).encodeOneBigInteger(amount).encodeOneBigInteger(fee);
         Blockchain.log("ADSUndelegated".getBytes(),
                 AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
                 delegator.toByteArray(),
                 pool.toByteArray(),
-                amount.toByteArray());
+                data);
     }
 
-    protected static void transferredDelegation(long id, Address caller, Address fromPool, Address toPool, BigInteger amount) {
-        byte[] data = AionBuffer.allocate(Address.LENGTH + 32) //64
-                .putAddress(toPool)
-                .put32ByteInt(amount)
-                .getArray();
+    protected static void transferredDelegation(long id, Address caller, Address fromPool, Address toPool, BigInteger amount, BigInteger fee) {
+        byte[] data = new byte[Address.LENGTH + 1 + (32 + 2) * 2];
+        new ABIStreamingEncoder(data).encodeOneAddress(toPool).encodeOneBigInteger(amount).encodeOneBigInteger(fee);
         Blockchain.log("ADSDelegationTransferred".getBytes(),
                 AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
                 caller.toByteArray(),

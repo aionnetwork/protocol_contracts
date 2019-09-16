@@ -63,26 +63,29 @@ public class StakerStorageObjects {
     static class PendingUndelegate {
         Address recipient;
         BigInteger value;
+        BigInteger fee;
         long blockNumber;
 
-        protected PendingUndelegate(Address recipient, BigInteger value, long blockNumber) {
+        protected PendingUndelegate(Address recipient, BigInteger value, BigInteger fee, long blockNumber) {
             this.recipient = recipient;
             this.value = value;
+            this.fee = fee;
             this.blockNumber = blockNumber;
         }
 
         protected byte[] serialize() {
-            int length = Address.LENGTH + 32 + Long.BYTES;
+            int length = Address.LENGTH + 32 * 2 + Long.BYTES;
             AionBuffer aionBuffer = AionBuffer.allocate(length);
             aionBuffer.putAddress(recipient);
             aionBuffer.put32ByteInt(value);
+            aionBuffer.put32ByteInt(fee);
             aionBuffer.putLong(blockNumber);
             return aionBuffer.getArray();
         }
 
         protected static PendingUndelegate from(byte[] serializedBytes) {
             AionBuffer buffer = AionBuffer.wrap(serializedBytes);
-            return new PendingUndelegate(buffer.getAddress(), buffer.get32ByteInt(), buffer.getLong());
+            return new PendingUndelegate(buffer.getAddress(), buffer.get32ByteInt(), buffer.get32ByteInt(), buffer.getLong());
         }
     }
 
@@ -91,30 +94,33 @@ public class StakerStorageObjects {
         Address toStaker;
         Address recipient;
         BigInteger value;
+        BigInteger fee;
         long blockNumber;
 
-        protected PendingTransfer(Address initiator, Address toStaker, Address recipient, BigInteger value, long blockNumber) {
+        protected PendingTransfer(Address initiator, Address toStaker, Address recipient, BigInteger value, BigInteger fee, long blockNumber) {
             this.initiator = initiator;
             this.toStaker = toStaker;
             this.recipient = recipient;
             this.value = value;
+            this.fee = fee;
             this.blockNumber = blockNumber;
         }
 
         protected byte[] serialize() {
-            int length = Address.LENGTH * 3 + 32 + Long.BYTES;
+            int length = Address.LENGTH * 3 + 32 * 2 + Long.BYTES;
             AionBuffer aionBuffer = AionBuffer.allocate(length);
             aionBuffer.putAddress(initiator);
             aionBuffer.putAddress(toStaker);
             aionBuffer.putAddress(recipient);
             aionBuffer.put32ByteInt(value);
+            aionBuffer.put32ByteInt(fee);
             aionBuffer.putLong(blockNumber);
             return aionBuffer.getArray();
         }
 
         protected static PendingTransfer from(byte[] serializedBytes) {
             AionBuffer buffer = AionBuffer.wrap(serializedBytes);
-            return new PendingTransfer(buffer.getAddress(), buffer.getAddress(), buffer.getAddress(), buffer.get32ByteInt(), buffer.getLong());
+            return new PendingTransfer(buffer.getAddress(), buffer.getAddress(), buffer.getAddress(), buffer.get32ByteInt(), buffer.get32ByteInt(), buffer.getLong());
         }
     }
 }

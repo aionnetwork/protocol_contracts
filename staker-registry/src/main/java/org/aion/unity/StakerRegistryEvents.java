@@ -2,8 +2,8 @@ package org.aion.unity;
 
 import avm.Address;
 import avm.Blockchain;
-import org.aion.avm.userlib.AionBuffer;
 import org.aion.avm.userlib.AionUtilities;
+import org.aion.avm.userlib.abi.ABIStreamingEncoder;
 
 import java.math.BigInteger;
 
@@ -38,11 +38,9 @@ public class StakerRegistryEvents {
                 value.toByteArray());
     }
 
-    protected static void undelegated(long id, Address delegator, Address staker, Address recipient, BigInteger amount) {
-        byte[] amountBytes = amount.toByteArray();
-        byte[] data = new byte[Address.LENGTH + amountBytes.length];
-        System.arraycopy(recipient.toByteArray(), 0, data, 0, Address.LENGTH);
-        System.arraycopy(amountBytes, 0, data, Address.LENGTH, amountBytes.length);
+    protected static void undelegated(long id, Address delegator, Address staker, Address recipient, BigInteger amount, BigInteger fee) {
+        byte[] data = new byte[Address.LENGTH + 1 + ((32 + 2) * 2)];
+        new ABIStreamingEncoder(data).encodeOneAddress(recipient).encodeOneBigInteger(amount).encodeOneBigInteger(fee);
 
         Blockchain.log("Undelegated".getBytes(),
                 AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
@@ -51,11 +49,10 @@ public class StakerRegistryEvents {
                 data);
     }
 
-    protected static void transferredDelegation(long id, Address fromStaker, Address toStaker, Address recipient, BigInteger amount) {
-        byte[] data = AionBuffer.allocate(Address.LENGTH + 32) //64
-                .putAddress(toStaker)
-                .put32ByteInt(amount)
-                .getArray();
+    protected static void transferredDelegation(long id, Address fromStaker, Address toStaker, Address recipient, BigInteger amount, BigInteger fee) {
+        byte[] data = new byte[Address.LENGTH + 1 + ((32 + 2) * 2)];
+        new ABIStreamingEncoder(data).encodeOneAddress(toStaker).encodeOneBigInteger(amount).encodeOneBigInteger(fee);
+
         Blockchain.log("DelegationTransferred".getBytes(),
                 AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
                 fromStaker.toByteArray(),
