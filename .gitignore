@@ -22,3 +22,6 @@ dist/
 # JVM crash dumps
 hs_err_pid*
 
+# Contract jar files
+stakerRegistry.jar
+poolRegistry.jar
