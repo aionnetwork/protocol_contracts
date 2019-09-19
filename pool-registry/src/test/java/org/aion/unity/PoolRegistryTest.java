@@ -1402,6 +1402,21 @@ public class PoolRegistryTest {
     }
 
     @Test
+    public void testSetSigningAddress(){
+        Address pool1 = setupNewPool(10);
+        tweakBlockNumber(getBlockNumber() +  6 * 60 * 24 * 7);
+
+        Address newSigningAddress = RULE.getRandomAddress(BigInteger.ZERO);
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("setSigningAddress")
+                .encodeOneAddress(newSigningAddress)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(pool1, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+    }
+
+    @Test
     public void testFallback(){
         Assert.assertTrue(RULE.balanceTransfer(preminedAddress, poolRegistry, BigInteger.TEN, 50000L, 1L).getReceiptStatus().isFailed());
     }

@@ -84,13 +84,15 @@ public class PoolRegistry {
         /*
         registerStaker(Address identityAddress, Address managementAddress, Address signingAddress, Address coinbaseAddress)
          */
-        byte[] registerStakerCall = new ABIStreamingEncoder()
-                .encodeOneString("registerStaker")
+        String methodName = "registerStaker";
+        // encoded data is directly written to the byte array to reduce energy usage
+        byte[] registerStakerCall = new byte[getStringSize(methodName) + getAddressSize() * 4];
+        new ABIStreamingEncoder(registerStakerCall)
+                .encodeOneString(methodName)
                 .encodeOneAddress(caller)
                 .encodeOneAddress(Blockchain.getAddress())
                 .encodeOneAddress(signingAddress)
-                .encodeOneAddress(coinbaseAddress)
-                .toBytes();
+                .encodeOneAddress(coinbaseAddress);
         secureCall(stakerRegistry, BigInteger.ZERO, registerStakerCall, Blockchain.getRemainingEnergy());
 
         // step 3: store pool info
@@ -112,11 +114,13 @@ public class PoolRegistry {
         Address staker = Blockchain.getCaller();
         requirePool(staker);
 
-        byte[] data = new ABIStreamingEncoder()
-                .encodeOneString("setSigningAddress")
+        String methodName = "setSigningAddress";
+        // encoded data is directly written to the byte array to reduce energy usage
+        byte[] data = new byte[getStringSize(methodName) + getAddressSize() * 2];
+        new ABIStreamingEncoder(data)
+                .encodeOneString(methodName)
                 .encodeOneAddress(staker)
-                .encodeOneAddress(newAddress)
-                .toBytes();
+                .encodeOneAddress(newAddress);
         secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
     }
 
@@ -145,18 +149,17 @@ public class PoolRegistry {
     private static void delegate(Address delegator, Address pool, BigInteger value, boolean doDelegate, PoolRewardsStateMachine stateMachine, PoolStorageObjects.DelegatorInfo delegatorInfo) {
 
         if (doDelegate) {
-            byte[] data;
+            String methodName;
             if (delegator.equals(pool)) {
-                data = new ABIStreamingEncoder()
-                        .encodeOneString("bond")
-                        .encodeOneAddress(pool)
-                        .toBytes();
+                methodName = "bond";
             } else {
-                data = new ABIStreamingEncoder()
-                        .encodeOneString("delegate")
-                        .encodeOneAddress(pool)
-                        .toBytes();
+                methodName = "delegate";
             }
+            // encoded data is directly written to the byte array to reduce energy usage
+            byte[] data = new byte[getStringSize(methodName) + getAddressSize()];
+            new ABIStreamingEncoder(data)
+                    .encodeOneString(methodName)
+                    .encodeOneAddress(pool);
             secureCall(stakerRegistry, value, data, Blockchain.getRemainingEnergy());
         }
 
@@ -201,24 +204,20 @@ public class PoolRegistry {
 
         require(previousStake.compareTo(amount) >= 0);
 
-        byte[] data;
+        String methodName;
         if (delegator.equals(pool)) {
-            data = new ABIStreamingEncoder()
-                    .encodeOneString("unbondTo")
-                    .encodeOneAddress(pool)
-                    .encodeOneBigInteger(amount)
-                    .encodeOneAddress(delegator)
-                    .encodeOneBigInteger(fee)
-                    .toBytes();
+            methodName = "unbondTo";
         } else {
-            data = new ABIStreamingEncoder()
-                    .encodeOneString("undelegateTo")
-                    .encodeOneAddress(pool)
-                    .encodeOneBigInteger(amount)
-                    .encodeOneAddress(delegator)
-                    .encodeOneBigInteger(fee)
-                    .toBytes();
+            methodName = "undelegateTo";
         }
+        // encoded data is directly written to the byte array to reduce energy usage
+        byte[] data = new byte[getStringSize(methodName) + getBigIntegerSize() * 2 + getAddressSize() * 2];
+        new ABIStreamingEncoder(data)
+                .encodeOneString(methodName)
+                .encodeOneAddress(pool)
+                .encodeOneBigInteger(amount)
+                .encodeOneAddress(delegator)
+                .encodeOneBigInteger(fee);
         Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
         long id = new ABIDecoder(result.getReturnData()).decodeOneLong();
 
@@ -310,14 +309,16 @@ public class PoolRegistry {
         stateMachine.onUndelegate(delegatorInfo, Blockchain.getBlockNumber(), amount);
         PoolRegistryStorage.putDelegator(fromPool, caller, delegatorInfo);
 
-        byte[] data = new ABIStreamingEncoder()
-                .encodeOneString("transferDelegationTo")
+        String methodName = "transferDelegationTo";
+        // encoded data is directly written to the byte array to reduce energy usage
+        byte[] data = new byte[getStringSize(methodName) + getBigIntegerSize() * 2 + getAddressSize() * 3];
+        new ABIStreamingEncoder(data)
+                .encodeOneString(methodName)
                 .encodeOneAddress(fromPool)
                 .encodeOneAddress(toPool)
                 .encodeOneBigInteger(amount)
                 .encodeOneAddress(Blockchain.getAddress())
-                .encodeOneBigInteger(fee)
-                .toBytes();
+                .encodeOneBigInteger(fee);
 
         Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
         long id = new ABIDecoder(result.getReturnData()).decodeOneLong();
@@ -381,10 +382,11 @@ public class PoolRegistry {
     }
 
     private static BigInteger getTotalStakeCall(Address pool){
-        byte[] data = new ABIStreamingEncoder()
-                .encodeOneString("getTotalStake")
-                .encodeOneAddress(pool)
-                .toBytes();
+        String methodName = "getTotalStake";
+        byte[] data = new byte[getStringSize(methodName) + getAddressSize()];
+        new ABIStreamingEncoder(data)
+                .encodeOneString(methodName)
+                .encodeOneAddress(pool);
         Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
         return new ABIDecoder(result.getReturnData()).decodeOneBigInteger();
     }
@@ -398,10 +400,12 @@ public class PoolRegistry {
     public static void finalizeUndelegate(long id) {
         requireNoValue();
 
-        byte[] data = new ABIStreamingEncoder()
-                .encodeOneString("finalizeUndelegate")
-                .encodeOneLong(id)
-                .toBytes();
+        String methodName = "finalizeUndelegate";
+        // encoded data is directly written to the byte array to reduce energy usage
+        byte[] data = new byte[getStringSize(methodName) + 1 + Long.BYTES];
+        new ABIStreamingEncoder(data)
+                .encodeOneString(methodName)
+                .encodeOneLong(id);
 
         // call stakerRegistry to finalize the undelegate and transfer the value to the recipient
         secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
@@ -426,10 +430,12 @@ public class PoolRegistry {
         PoolStorageObjects.StakeTransfer transfer = PoolRegistryStorage.getPendingTransfer(id);
         require(transfer != null);
 
-        byte[] data = new ABIStreamingEncoder()
+        String methodName = "finalizeTransfer";
+        // encoded data is directly written to the byte array to reduce energy usage
+        byte[] data = new byte[getStringSize(methodName) + 1 + Long.BYTES];
+        new ABIStreamingEncoder(data)
                 .encodeOneString("finalizeTransfer")
-                .encodeOneLong(id)
-                .toBytes();
+                .encodeOneLong(id);
 
         secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
 
@@ -694,13 +700,15 @@ public class PoolRegistry {
         System.arraycopy(metadata, 0, metaDataHash, 0, 32);
         System.arraycopy(metadata, 32, metaDataUrl, 0, metaDataUrl.length);
 
-        return new ABIStreamingEncoder()
+        // byte[] encoded length = (byte) token + (short) length + array length
+        byte[] info = new byte[getAddressSize() + (1 + Integer.BYTES) + (1 + 1) + (1 + Short.BYTES) * 2 + metadata.length];
+        new ABIStreamingEncoder(info)
                 .encodeOneAddress(rewards.coinbaseAddress)
                 .encodeOneInteger(rewards.commissionRate)
                 .encodeOneBoolean(isSelfStakeSatisfied(pool))
                 .encodeOneByteArray(metaDataHash)
-                .encodeOneByteArray(metaDataUrl)
-                .toBytes();
+                .encodeOneByteArray(metaDataUrl);
+        return info;
     }
 
     /**
@@ -817,10 +825,12 @@ public class PoolRegistry {
         BigInteger balance = Blockchain.getBalance(coinbaseAddress);
         // balance > 0
         if (balance.signum() == 1) {
-            byte[] data = new ABIStreamingEncoder()
-                    .encodeOneString("transfer")
-                    .encodeOneBigInteger(balance)
-                    .toBytes();
+            String methodName = "transfer";
+            // encoded data is directly written to the byte array to reduce energy usage
+            byte[] data = new byte[getStringSize(methodName) + getBigIntegerSize()];
+            new ABIStreamingEncoder(data)
+                    .encodeOneString(methodName)
+                    .encodeOneBigInteger(balance);
 
             // pool's coinbase address is stored for the re-entrant call to ensure only coinbase addresses can transfer value to the PoolRegistry
             reentrantPoolCoinbaseAddress = coinbaseAddress;
@@ -833,5 +843,20 @@ public class PoolRegistry {
 
             Blockchain.println("New block rewards: " + balance);
         }
+    }
+
+    private static int getStringSize(String value){
+        // (byte) token + (short) length + value length
+        return 1 + Short.BYTES + value.getBytes().length;
+    }
+
+    private static int getAddressSize(){
+        // (byte) token + Address length
+        return 1 + 32;
+    }
+
+    private static int getBigIntegerSize(){
+        // (byte) token + (byte) length + max BigInteger length
+        return 1 + 1 + 32;
     }
 }
