@@ -139,7 +139,7 @@ public class PoolRegistry {
         requirePositive(value);
 
         PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(poolRewards);
-        detectBlockRewards(poolRewards.coinbaseAddress, stateMachine);
+        detectBlockRewards(stateMachine);
 
         PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(pool, caller);
 
@@ -195,7 +195,7 @@ public class PoolRegistry {
         requireNoValue();
 
         PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(poolRewards);
-        detectBlockRewards(poolRewards.coinbaseAddress, stateMachine);
+        detectBlockRewards(stateMachine);
 
         Address delegator = Blockchain.getCaller();
 
@@ -255,7 +255,7 @@ public class PoolRegistry {
         requireNoValue();
 
         PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(poolRewards);
-        detectBlockRewards(poolRewards.coinbaseAddress, stateMachine);
+        detectBlockRewards(stateMachine);
 
         PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(pool, caller);
         // do a withdraw
@@ -284,7 +284,7 @@ public class PoolRegistry {
         Address caller = Blockchain.getCaller();
 
         PoolStorageObjects.PoolRewards fromPoolRewards = validateAndGetPoolRewards(fromPool);
-        PoolStorageObjects.PoolRewards toPoolRewards = validateAndGetPoolRewards(toPool);
+        requirePool(toPool);
 
         requirePositive(amount);
         requireNoValue();
@@ -298,9 +298,9 @@ public class PoolRegistry {
         PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(fromPoolRewards);
         PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(fromPool, caller);
 
-        detectBlockRewards(fromPoolRewards.coinbaseAddress, stateMachine);
-        //    todo can only the fromPool be considered? accumulatedBlockRewards can be removed in that case
-        detectBlockRewards(toPoolRewards.coinbaseAddress, new PoolRewardsStateMachine(toPoolRewards));
+        // movement of stake to toPool happens during finalization,
+        // so detecting the block rewards for toPool happens during finalization
+        detectBlockRewards(stateMachine);
 
         BigInteger previousStake1 = delegatorInfo.stake;
         require(previousStake1.compareTo(amount) >= 0);
@@ -332,7 +332,6 @@ public class PoolRegistry {
         }
 
         PoolRegistryStorage.putPoolRewards(fromPool, fromPoolRewards);
-        PoolRegistryStorage.putPoolRewards(toPool, toPoolRewards);
 
         PoolRegistryEvents.transferredDelegation(id, caller, fromPool, toPool, amount, fee);
         return id;
@@ -452,6 +451,9 @@ public class PoolRegistry {
 
         PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(PoolRegistryStorage.getPoolRewards(transfer.toPool));
         PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(transfer.toPool, transfer.initiator);
+
+        detectBlockRewards(stateMachine);
+
         delegate(transfer.initiator, transfer.toPool, remainingTransferValue, false, stateMachine, delegatorInfo);
     }
 
@@ -517,7 +519,7 @@ public class PoolRegistry {
         requireNoValue();
 
         PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(rewards);
-        detectBlockRewards(rewards.coinbaseAddress, stateMachine);
+        detectBlockRewards(stateMachine);
 
         int feePercentage = PoolRegistryStorage.getAutoDelegationFee(pool, delegator);
         // check auto-redelegation authorization, -1 indicates it was not found in storage
@@ -578,7 +580,7 @@ public class PoolRegistry {
         requireNoValue();
 
         PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(poolRewards);
-        detectBlockRewards(poolRewards.coinbaseAddress, stateMachine);
+        detectBlockRewards(stateMachine);
 
         PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(pool, caller);
         // query withdraw amount from rewards state machine
@@ -645,7 +647,7 @@ public class PoolRegistry {
         // if the pool is not active, the commission fee in rewards is set when it becomes active
         if(isSelfStakeSatisfied(commissionUpdate.pool)) {
             PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(rewards);
-            detectBlockRewards(rewards.coinbaseAddress, stateMachine);
+            detectBlockRewards(stateMachine);
             stateMachine.setAppliedCommissionRate(commissionUpdate.newCommissionRate);
         }
 
@@ -821,7 +823,8 @@ public class PoolRegistry {
         return result;
     }
 
-    private static void detectBlockRewards(Address coinbaseAddress, PoolRewardsStateMachine rewardsStateMachine) {
+    private static void detectBlockRewards(PoolRewardsStateMachine rewardsStateMachine) {
+        Address coinbaseAddress = rewardsStateMachine.currentPoolRewards.coinbaseAddress;
         BigInteger balance = Blockchain.getBalance(coinbaseAddress);
         // balance > 0
         if (balance.signum() == 1) {
