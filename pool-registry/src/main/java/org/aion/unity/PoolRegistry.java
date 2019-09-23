@@ -563,8 +563,22 @@ public class PoolRegistry {
         requireNoValue();
 
         PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(poolRewards);
-        // NOTE: this might not include the latest block rewards, so it might return an amount less than the current outstanding reward of a delegator
-        return stateMachine.getRewards(PoolRegistryStorage.getDelegator(pool, delegator), Blockchain.getBlockNumber());
+
+        // update block rewards without transferring the balance
+        BigInteger balance = Blockchain.getBalance(poolRewards.coinbaseAddress);
+
+        if (balance.signum() == 1) {
+            stateMachine.onBlock(Blockchain.getBlockNumber(), balance);
+        }
+        PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(pool, delegator);
+        // query withdraw amount from rewards state machine.
+        // Updated values are only stored when the rewards are withdrawn
+        BigInteger amount = stateMachine.onWithdraw(delegatorInfo, Blockchain.getBlockNumber());
+        if (delegator.equals(pool)) {
+            amount = amount.add(stateMachine.onWithdrawOperator());
+        }
+
+        return amount;
     }
 
     /**

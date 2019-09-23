@@ -1433,7 +1433,7 @@ public class PoolRegistryTest {
 
     private void generateBlock(Address pool, long blockRewards) {
         AionAddress coinbaseAddress = new AionAddress(getCoinbaseAddress(pool).toByteArray());
-        RULE.kernel.adjustBalance(coinbaseAddress, RULE.kernel.getBalance(coinbaseAddress).add(BigInteger.valueOf(blockRewards)));
+        RULE.kernel.adjustBalance(coinbaseAddress, BigInteger.valueOf(blockRewards));
         incrementBlockNumber();
     }
 

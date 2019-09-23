@@ -180,14 +180,6 @@ public class PoolRewardsStateMachine {
         currentPoolRewards.accumulatedBlockRewards = currentPoolRewards.accumulatedBlockRewards.add(blockReward);
     }
 
-    // todo check for pool owner
-    public BigInteger getRewards(PoolStorageObjects.DelegatorInfo delegatorInfo, long blockNumber) {
-        BigInteger unsettledRewards = calculateUnsettledRewards(delegatorInfo, blockNumber);
-        BigInteger settledRewards = delegatorInfo.settledRewards;
-
-        return unsettledRewards.add(settledRewards);
-    }
-
     public void setAppliedCommissionRate(int newRate) {
         incrementPeriod();
         currentPoolRewards.appliedCommissionRate = newRate;
