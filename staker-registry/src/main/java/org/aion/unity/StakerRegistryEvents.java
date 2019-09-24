@@ -83,4 +83,10 @@ public class StakerRegistryEvents {
                 recipient.toByteArray(),
                 amountBI.toByteArray());
     }
+
+    protected static void changedState(Address staker, boolean state){
+        Blockchain.log("StateChanged".getBytes(),
+                staker.toByteArray(),
+                new byte[]{(byte) (state ? 1 : 0)});
+    }
 }

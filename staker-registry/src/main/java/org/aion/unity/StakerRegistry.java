@@ -50,6 +50,9 @@ public class StakerRegistry {
         StakerRegistryStorage.putManagementAddress(identityAddress, managementAddress);
         StakerRegistryStorage.putStakerAddressInfo(identityAddress, new StakerStorageObjects.AddressInfo(signingAddress, coinbaseAddress, Blockchain.getBlockNumber()));
         StakerRegistryStorage.putStakerStakeInfo(identityAddress, new StakerStorageObjects.StakeInfo());
+        // default state for new stakers is set as false. This can only be explicitly changed by the management address.
+        // ability to produce blocks depends on both the state and the self bond requirement.
+        StakerRegistryStorage.putState(identityAddress, false);
 
         StakerRegistryEvents.registeredStaker(identityAddress, managementAddress, signingAddress, coinbaseAddress);
     }
@@ -234,6 +237,22 @@ public class StakerRegistry {
     }
 
     /**
+     * Updates the state of a staker
+     *
+     * @param staker identity address of the staker
+     * @param newState new state, true equals ACTIVE and false equals BROKEN
+     */
+    @Callable
+    public static void setState(Address staker, boolean newState){
+        requireStakerAndManager(staker, Blockchain.getCaller());
+        boolean currentState = StakerRegistryStorage.getState(staker);
+        if(currentState != newState) {
+            StakerRegistryStorage.putState(staker, newState);
+            StakerRegistryEvents.changedState(staker, newState);
+        }
+    }
+
+    /**
      * Returns the effective stake, after conversion and status check, of a staker.
      *
      * Designed for kernel usage only.
@@ -260,7 +279,7 @@ public class StakerRegistry {
 
         // if not active
         StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(staker);
-        if (!isMinimumSelfBondSatisfied(stakeInfo.selfBondStake)) {
+        if (!isStakerActive(staker, stakeInfo.selfBondStake)) {
             return BigInteger.ZERO;
         }
 
@@ -379,7 +398,7 @@ public class StakerRegistry {
         StakerStorageObjects.StakeInfo stakeInfo = validateAndGetStakeInfo(staker);
         requireNoValue();
 
-        return isMinimumSelfBondSatisfied(stakeInfo.selfBondStake);
+        return isStakerActive(staker, stakeInfo.selfBondStake);
     }
 
     /**
@@ -502,8 +521,8 @@ public class StakerRegistry {
         Blockchain.revert();
     }
 
-    private static boolean isMinimumSelfBondSatisfied(BigInteger selfBondStake){
-        return selfBondStake.compareTo(MIN_SELF_STAKE) >= 0;
+    private static boolean isStakerActive(Address staker, BigInteger selfBondStake){
+        return selfBondStake.compareTo(MIN_SELF_STAKE) >= 0 && StakerRegistryStorage.getState(staker);
     }
 
     private static void require(boolean condition) {

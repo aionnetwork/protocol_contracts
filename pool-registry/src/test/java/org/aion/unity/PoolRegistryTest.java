@@ -144,7 +144,7 @@ public class PoolRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
-        assertEquals(stake.add(nStake(1)), result.getDecodedReturnData());
+        assertEquals(stake.add(nStake(1)), ((BigInteger[]) result.getDecodedReturnData())[0]);
     }
 
     @Test
@@ -262,7 +262,7 @@ public class PoolRegistryTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
-        stake = (BigInteger) result.getDecodedReturnData();
+        stake = ((BigInteger[]) result.getDecodedReturnData())[0];
         assertEquals(nStake(1).add(BigInteger.ONE), stake);
 
         txData = new ABIStreamingEncoder()
@@ -271,7 +271,7 @@ public class PoolRegistryTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
-        stake = (BigInteger) result.getDecodedReturnData();
+        stake = ((BigInteger[]) result.getDecodedReturnData())[0];
         assertEquals(nStake(1).add(BigInteger.ONE), stake);
 
         txData = new ABIStreamingEncoder()
@@ -457,7 +457,7 @@ public class PoolRegistryTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
-        BigInteger stake = (BigInteger) result.getDecodedReturnData();
+        BigInteger stake = ((BigInteger[]) result.getDecodedReturnData())[0];
         assertEquals(nStake(1).add(BigInteger.TWO), stake);
 
         // query the self stake of the pool
@@ -513,7 +513,7 @@ public class PoolRegistryTest {
                 .toBytes();
         result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
-        stake = (BigInteger) result.getDecodedReturnData();
+        stake = ((BigInteger[]) result.getDecodedReturnData())[0];
         assertEquals(nStake(1).add(BigInteger.ONE), stake);
 
         txData = new ABIStreamingEncoder()
@@ -557,7 +557,7 @@ public class PoolRegistryTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
-        stake = (BigInteger) result.getDecodedReturnData();
+        stake = ((BigInteger[]) result.getDecodedReturnData())[0];
         assertEquals(nStake(1).add(BigInteger.ONE), stake);
 
         txData = new ABIStreamingEncoder()
@@ -592,7 +592,7 @@ public class PoolRegistryTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
-        stake = (BigInteger) result.getDecodedReturnData();
+        stake = ((BigInteger[]) result.getDecodedReturnData())[0];
         assertEquals(nStake(1).add(BigInteger.TWO), stake);
 
         txData = new ABIStreamingEncoder()
@@ -712,7 +712,7 @@ public class PoolRegistryTest {
                 .toBytes();
         result = RULE.call(pool1, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
-        BigInteger stake = (BigInteger) result.getDecodedReturnData();
+        BigInteger stake = ((BigInteger[]) result.getDecodedReturnData())[0];
         assertEquals(nStake(1), stake);
     }
 
@@ -931,20 +931,13 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
+        // delegation would put the pool into a broken state, so it's reverted
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
                 .encodeOneAddress(pool)
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, nStake(100), txData);
-        assertTrue(result.getReceiptStatus().isSuccess());
-
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("getPoolStatus")
-                .encodeOneAddress(pool)
-                .toBytes();
-        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
-        Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        assertEquals("BROKEN", result.getDecodedReturnData());
+        assertTrue(result.getReceiptStatus().isFailed());
     }
 
     @Test

@@ -12,7 +12,7 @@ public class PoolRegistryStorage {
         DELEGATION, // pool address, delegator address -> stake, settledRewards, crr, starting period block number
         AUTO_REWARDS_DELEGATION, //pool address, auto delegator -> fee
         POOL_META_DATA, // pool address -> metadata content hash, metadata url
-        POOL_REWARDS, // pool address -> coinbase address, applied fee, fee, crr, outstanding rewards, total stake, accumulated block rewards
+        POOL_REWARDS, // pool address -> coinbase address, fee, crr, outstanding rewards, total stake, accumulated block rewards, isActive, pendingStake
         PENDING_COMMISSION_RATE, // commission rate change id -> pool address, new commission rate, block number
         PENDING_TRANSFER, // transfer id -> initiator, from pool, to pool, amount
         COINBASE_CONTRACT // -> coinbase contract bytes

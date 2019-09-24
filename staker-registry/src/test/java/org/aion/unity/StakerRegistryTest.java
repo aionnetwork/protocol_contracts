@@ -55,6 +55,14 @@ public class StakerRegistryTest {
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("setState")
+                .encodeOneAddress(stakerAddress)
+                .encodeOneBoolean(true)
+                .toBytes();
+        result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
     }
 
     @Test
@@ -665,6 +673,26 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isFailed());
+    }
+
+    @Test
+    public void setStateTest(){
+        //only management address should be able to change the state
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("setState")
+                .encodeOneAddress(stakerAddress)
+                .encodeOneBoolean(false)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isFailed());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("setState")
+                .encodeOneAddress(stakerAddress)
+                .encodeOneBoolean(false)
+                .toBytes();
+        result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
     }
 
     @Test

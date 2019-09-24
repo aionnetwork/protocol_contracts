@@ -148,6 +148,15 @@ public class PoolRegistry {
 
     private static void delegate(Address delegator, Address pool, BigInteger value, boolean doDelegate, PoolRewardsStateMachine stateMachine, PoolStorageObjects.DelegatorInfo delegatorInfo) {
 
+        BigInteger totalStakeAfterDelegation = stateMachine.currentPoolRewards.accumulatedStake.add(value);
+        BigInteger poolSelfStake = getSelfStake(pool);
+
+        // delegators should not be able to put the pool into a broken state by delegating an amount over the capacity,
+        // or delegate to a pool in broken state
+        if(!delegator.equals(pool) && !isSelfStakeSatisfied(poolSelfStake, totalStakeAfterDelegation, stateMachine.currentPoolRewards.pendingStake)){
+            Blockchain.revert();
+        }
+
         if (doDelegate) {
             String methodName;
             if (delegator.equals(pool)) {
@@ -169,9 +178,14 @@ public class PoolRegistry {
         // update delegator information in storage.
         PoolRegistryStorage.putDelegator(pool, delegator, delegatorInfo);
 
-        // if after the delegation the pool becomes active, update the commission rate
-        if (delegator.equals(pool) && isSelfStakeSatisfied(pool, stateMachine.currentPoolRewards.accumulatedStake)) {
-            switchToActive(pool, stateMachine);
+        // if the pool was broken and delegation is from the pool operator, it might go into an active state
+        if (delegator.equals(pool) && !stateMachine.currentPoolRewards.isActive) {
+            BigInteger poolStake = poolSelfStake.add(value);
+            if (isSelfStakeSatisfied(poolStake, totalStakeAfterDelegation, stateMachine.currentPoolRewards.pendingStake)) {
+                // set pool state as active
+                stateMachine.currentPoolRewards.isActive = true;
+                setStateInStakerRegistry(pool, true);
+            }
         }
 
         PoolRegistryStorage.putPoolRewards(pool, stateMachine.currentPoolRewards);
@@ -204,6 +218,8 @@ public class PoolRegistry {
 
         require(previousStake.compareTo(amount) >= 0);
 
+        BigInteger poolStake = getSelfStake(pool);
+
         String methodName;
         if (delegator.equals(pool)) {
             methodName = "unbondTo";
@@ -226,15 +242,15 @@ public class PoolRegistry {
 
         PoolRegistryStorage.putDelegator(pool, delegator, delegatorInfo);
 
-        boolean isActive = isSelfStakeSatisfied(pool, poolRewards.accumulatedStake);
-
-        // if after the un-delegation the state of the pool changes, update the commission rate
-        // undelegation from a delegator can make the pool go back into the active state
-        if (!delegator.equals(pool) && isActive) {
-            switchToActive(pool, stateMachine);
-        }// undelegation from a pool operator can make the pool go into the broken state
-        else if (delegator.equals(pool) && !isActive) {
-            switchToBroken(pool, stateMachine);
+        // After the un-delegation the state of the pool might change
+        // undelegation from a delegator can make a broken pool go into the active state
+        if (!delegator.equals(pool) && !poolRewards.isActive && isSelfStakeSatisfied(poolStake, poolRewards.accumulatedStake, poolRewards.pendingStake)) {
+            stateMachine.currentPoolRewards.isActive = true;
+            setStateInStakerRegistry(pool, true);
+        }// undelegation from a pool operator can make an active pool go into the broken state
+        else if (delegator.equals(pool) && poolRewards.isActive && !isSelfStakeSatisfied(poolStake.subtract(amount), poolRewards.accumulatedStake, poolRewards.pendingStake)) {
+            stateMachine.currentPoolRewards.isActive = false;
+            setStateInStakerRegistry(pool, false);
         }
 
         PoolRegistryStorage.putPoolRewards(pool, stateMachine.currentPoolRewards);
@@ -284,16 +300,23 @@ public class PoolRegistry {
         Address caller = Blockchain.getCaller();
 
         PoolStorageObjects.PoolRewards fromPoolRewards = validateAndGetPoolRewards(fromPool);
-        requirePool(toPool);
+        PoolStorageObjects.PoolRewards toPoolRewards = validateAndGetPoolRewards(toPool);
 
         requirePositive(amount);
         requireNoValue();
         require(!fromPool.equals(toPool));
+        // should not be able to transfer to a broken pool
+        require(toPoolRewards.isActive);
+
         // make sure the self bond stake value is not changing in either the fromPool or toPool
         require(!caller.equals(fromPool) && !caller.equals(toPool));
 
         // fee should be less than the amount for the delegate to be successful and not revert
         require(fee.signum() >= 0 && fee.compareTo(amount) < 0);
+
+        // ensure transfer will not put the to pool in a broken state
+        toPoolRewards.pendingStake = toPoolRewards.pendingStake.add(amount).subtract(fee);
+        require(isSelfStakeSatisfied(getSelfStake(toPool), toPoolRewards.accumulatedStake, toPoolRewards.pendingStake));
 
         PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(fromPoolRewards);
         PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(fromPool, caller);
@@ -324,13 +347,16 @@ public class PoolRegistry {
         PoolStorageObjects.StakeTransfer transfer = new PoolStorageObjects.StakeTransfer(caller, fromPool, toPool, amount);
         PoolRegistryStorage.putPendingTransfer(id, transfer);
 
-        // transfer out of fromPool could make it broken
+        // transfer out of a broken fromPool could make it active
         // this call can only be from a delegator
-        if (isSelfStakeSatisfied(fromPool, fromPoolRewards.accumulatedStake)) {
-            switchToActive(fromPool, stateMachine);
+        if (!fromPoolRewards.isActive && isSelfStakeSatisfied(getSelfStake(fromPool), fromPoolRewards.accumulatedStake, fromPoolRewards.pendingStake)) {
+            stateMachine.currentPoolRewards.isActive = true;
+            setStateInStakerRegistry(fromPool, true);
         }
 
         PoolRegistryStorage.putPoolRewards(fromPool, fromPoolRewards);
+        // update the pending stake in to pool to reflect the transfer value
+        PoolRegistryStorage.putPoolRewards(toPool, toPoolRewards);
 
         PoolRegistryEvents.transferredDelegation(id, caller, fromPool, toPool, amount, fee);
         return id;
@@ -356,13 +382,14 @@ public class PoolRegistry {
      * Returns the total stake of a pool.
      *
      * @param pool the pool address
-     * @return the amount of stake
+     * @return the amount of stake. returned array has two elements:
+     * first element represents the total stake of the pool, and the second element represents the stake that was transferred but has not been finalized yet.
      */
     @Callable
-    public static BigInteger getTotalStake(Address pool) {
+    public static BigInteger[] getTotalStake(Address pool) {
         PoolStorageObjects.PoolRewards rewards = validateAndGetPoolRewards(pool);
         requireNoValue();
-        return rewards.accumulatedStake;
+        return new BigInteger[]{rewards.accumulatedStake, rewards.pendingStake};
     }
 
     /**
@@ -423,8 +450,13 @@ public class PoolRegistry {
 
         // remove transfer
         PoolRegistryStorage.putPendingTransfer(id, null);
+        PoolStorageObjects.PoolRewards rewards = PoolRegistryStorage.getPoolRewards(transfer.toPool);
 
-        PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(PoolRegistryStorage.getPoolRewards(transfer.toPool));
+        // subtract the transfer amount from pending stake
+        assert remainingTransferValue.compareTo(rewards.pendingStake) <= 0;
+        rewards.pendingStake = rewards.pendingStake.subtract(remainingTransferValue);
+
+        PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(rewards);
         PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(transfer.toPool, transfer.initiator);
 
         detectBlockRewards(stateMachine);
@@ -632,13 +664,9 @@ public class PoolRegistry {
         // remove request
         PoolRegistryStorage.putPendingCommissionUpdate(id, null);
 
-        // make sure the pool is active, so that pool owner can't change the commission rate after it has been set to 0 as a punishment
-        // if the pool is not active, the commission fee in rewards is set when it becomes active
-        if(isSelfStakeSatisfied(commissionUpdate.pool, rewards.accumulatedStake)) {
-            PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(rewards);
-            detectBlockRewards(stateMachine);
-            stateMachine.setAppliedCommissionRate(commissionUpdate.newCommissionRate);
-        }
+        PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(rewards);
+        detectBlockRewards(stateMachine);
+        stateMachine.setCommissionRate(commissionUpdate.newCommissionRate);
 
         PoolRegistryStorage.putPoolRewards(commissionUpdate.pool, rewards);
 
@@ -684,7 +712,7 @@ public class PoolRegistry {
     public static byte[] getPoolInfo(Address pool) {
         requireNoValue();
         PoolStorageObjects.PoolRewards rewards = validateAndGetPoolRewards(pool);
-
+        BigInteger selfStake = getSelfStake(pool);
         byte[] metadata = PoolRegistryStorage.getPoolMetaData(pool);
         byte[] metaDataUrl = new byte[metadata.length - 32];
         byte[] metaDataHash = new byte[32];
@@ -696,7 +724,7 @@ public class PoolRegistry {
         new ABIStreamingEncoder(info)
                 .encodeOneAddress(rewards.coinbaseAddress)
                 .encodeOneInteger(rewards.commissionRate)
-                .encodeOneBoolean(isSelfStakeSatisfied(pool, rewards.accumulatedStake))
+                .encodeOneBoolean(isSelfStakeSatisfied(selfStake, rewards.accumulatedStake, rewards.pendingStake))
                 .encodeOneByteArray(metaDataHash)
                 .encodeOneByteArray(metaDataUrl);
         return info;
@@ -711,8 +739,9 @@ public class PoolRegistry {
     @Callable
     public static String getPoolStatus(Address pool) {
         PoolStorageObjects.PoolRewards poolRewards = validateAndGetPoolRewards(pool);
+        BigInteger selfStake = getSelfStake(pool);
         requireNoValue();
-        return isSelfStakeSatisfied(pool, poolRewards.accumulatedStake) ? "ACTIVE" : "BROKEN";
+        return isSelfStakeSatisfied(selfStake, poolRewards.accumulatedStake, poolRewards.pendingStake) ? "ACTIVE" : "BROKEN";
     }
 
     @Callable
@@ -732,26 +761,25 @@ public class PoolRegistry {
         reentrantValueTransferAmount = Blockchain.getValue();
     }
 
-    // note that self stake value is read from storage. So any updates to pool's self stake should be written before calling this method
-    private static boolean isSelfStakeSatisfied(Address pool, BigInteger totalStake) {
-        BigInteger selfStake = PoolRegistryStorage.getDelegator(pool, pool).stake;
+    private static BigInteger getSelfStake(Address pool){
+        return PoolRegistryStorage.getDelegator(pool, pool).stake;
+    }
 
+    // checks both minimum self bond percentage and minimum self bond value for pool
+    private static boolean isSelfStakeSatisfied(BigInteger selfStake, BigInteger currentTotalStake, BigInteger pendingStake) {
+        BigInteger totalStake = currentTotalStake.add(pendingStake);
         return selfStake.compareTo(MIN_SELF_STAKE) >= 0 &&
                 (selfStake.multiply(BigInteger.valueOf(100))).divide(totalStake).compareTo(MIN_SELF_STAKE_PERCENTAGE) >= 0;
     }
 
-    private static void switchToActive(Address pool, PoolRewardsStateMachine rewardsStateMachine) {
-        if(rewardsStateMachine.currentPoolRewards.appliedCommissionRate == 0 && rewardsStateMachine.currentPoolRewards.commissionRate != 0) {
-            rewardsStateMachine.setAppliedCommissionRate(rewardsStateMachine.currentPoolRewards.commissionRate);
-            PoolRegistryEvents.changedPoolState(pool, true);
-        }
-    }
-
-    private static void switchToBroken(Address pool, PoolRewardsStateMachine rewardsStateMachine) {
-        if(rewardsStateMachine.currentPoolRewards.appliedCommissionRate != 0) {
-            rewardsStateMachine.setAppliedCommissionRate(0);
-            PoolRegistryEvents.changedPoolState(pool, false);
-        }
+    private static void setStateInStakerRegistry(Address pool, boolean state) {
+        String methodName = "setState";
+        byte[] txData = new byte[getStringSize(methodName) + getAddressSize() + (1 + 1)];
+        new ABIStreamingEncoder(txData)
+                .encodeOneString(methodName)
+                .encodeOneAddress(pool)
+                .encodeOneBoolean(state);
+        secureCall(stakerRegistry, BigInteger.ZERO, txData, Blockchain.getRemainingEnergy());
     }
 
     private static void require(boolean condition) {

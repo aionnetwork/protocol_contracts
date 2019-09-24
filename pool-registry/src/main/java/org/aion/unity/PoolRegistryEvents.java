@@ -91,14 +91,10 @@ public class PoolRegistryEvents {
                 BigInteger.valueOf(id).toByteArray());
     }
 
-    protected static void changedPoolState(Address pool, boolean isActive) {
-        Blockchain.log("ADSPoolStateChanged".getBytes(),
-                pool.toByteArray(),
-                new byte[]{(byte) (isActive ? 1 : 0)});
-    }
     // following events are implemented only in StakerRegistry
 //    - finalizedUndelegate
 //    - finalizedTransfer
 //    - setSigningAddress
+//    - changedState
 
 }

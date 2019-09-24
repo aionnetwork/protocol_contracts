@@ -48,14 +48,14 @@ public class PoolStorageObjects {
         BigInteger outstandingRewards = BigInteger.ZERO;
         BigInteger currentCRR = BigInteger.ZERO;
         BigInteger accumulatedBlockRewards = BigInteger.ZERO;
-
+        // stake that is transferred to the pool but not finalized yet
+        BigInteger pendingStake = BigInteger.ZERO;
         Address coinbaseAddress;
 
         // commission rate set by the pool owner
         int commissionRate;
 
-        // fee used for calculating rewards and also applying punishment of not meeting the self bond percentage minimum
-        int appliedCommissionRate;
+        boolean isActive;
 
         protected PoolRewards(Address coinbaseAddress, int commissionRate) {
             this.coinbaseAddress = coinbaseAddress;
@@ -63,36 +63,37 @@ public class PoolStorageObjects {
         }
 
         private PoolRewards(BigInteger accumulatedStake, BigInteger accumulatedCommission, BigInteger outstandingRewards, BigInteger currentCRR,
-                            BigInteger accumulatedBlockRewards, Address coinbaseAddress, int appliedCommissionRate, int commissionRate) {
+                            BigInteger accumulatedBlockRewards, BigInteger pendingStake, Address coinbaseAddress, int commissionRate, boolean isActive) {
             this.accumulatedStake = accumulatedStake;
             this.accumulatedCommission = accumulatedCommission;
             this.outstandingRewards = outstandingRewards;
             this.currentCRR = currentCRR;
-            this.appliedCommissionRate = appliedCommissionRate;
             this.accumulatedBlockRewards = accumulatedBlockRewards;
+            this.pendingStake = pendingStake;
             this.coinbaseAddress = coinbaseAddress;
             this.commissionRate = commissionRate;
+            this.isActive = isActive;
         }
 
         protected byte[] serialize() {
-            int length = 32 * 5 + Address.LENGTH + Integer.BYTES * 2;
+            int length = 32 * 6 + Address.LENGTH + Integer.BYTES + 1;
             AionBuffer aionBuffer = AionBuffer.allocate(length);
             aionBuffer.put32ByteInt(accumulatedStake);
             aionBuffer.put32ByteInt(accumulatedCommission);
             aionBuffer.put32ByteInt(outstandingRewards);
             aionBuffer.put32ByteInt(currentCRR);
             aionBuffer.put32ByteInt(accumulatedBlockRewards);
+            aionBuffer.put32ByteInt(pendingStake);
             aionBuffer.putAddress(coinbaseAddress);
-            aionBuffer.putInt(appliedCommissionRate);
             aionBuffer.putInt(commissionRate);
-
+            aionBuffer.putBoolean(isActive);
             return aionBuffer.getArray();
         }
 
         protected static PoolRewards from(byte[] serializedBytes) {
             AionBuffer buffer = AionBuffer.wrap(serializedBytes);
             return new PoolRewards(buffer.get32ByteInt(), buffer.get32ByteInt(), buffer.get32ByteInt(), buffer.get32ByteInt(),
-                    buffer.get32ByteInt(), buffer.getAddress(), buffer.getInt(), buffer.getInt());
+                    buffer.get32ByteInt(), buffer.get32ByteInt(), buffer.getAddress(), buffer.getInt(), buffer.getBoolean());
         }
     }
 

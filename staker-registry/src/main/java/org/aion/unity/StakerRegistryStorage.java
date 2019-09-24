@@ -15,7 +15,8 @@ public class StakerRegistryStorage {
         SIGNING_ADDRESS, // staker signingAddress -> staker identityAddress
         MANAGEMENT_ADDRESS, // staker identityAddress -> staker managementAddress
         PENDING_UNDELEGATE, // undelegateId -> recipient, value, block number
-        PENDING_TRANSFER // transferId -> initiator, toStaker, recipient, value, block number
+        PENDING_TRANSFER, // transferId -> initiator, toStaker, recipient, value, block number
+        STATE, // staker identityAddress -> state
     }
 
     /**
@@ -159,6 +160,30 @@ public class StakerRegistryStorage {
         byte[] key = getKey(StorageSlots.PENDING_TRANSFER, BigInteger.valueOf(transferId).toByteArray());
         byte[] value = Blockchain.getStorage(key);
         return value == null ? null : StakerStorageObjects.PendingTransfer.from(value);
+    }
+
+    /**
+     * Puts staker state into storage
+     *
+     * @param identityAddress identity address of the staker
+     * @param state           staker state
+     */
+    protected static void putState(Address identityAddress, boolean state) {
+        byte[] key = getKey(StorageSlots.STATE, identityAddress.toByteArray());
+        byte[] value = new byte[]{(byte) (state ? 1 : 0)};
+        Blockchain.putStorage(key, value);
+    }
+
+    /**
+     * Gets a staker state from storage
+     *
+     * @param identityAddress identity address of the staker
+     * @return state true means an active state and false is broken state
+     */
+    protected static boolean getState(Address identityAddress){
+        byte[] key = getKey(StorageSlots.STATE, identityAddress.toByteArray());
+        byte[] value = Blockchain.getStorage(key);
+        return value[0] != 0;
     }
 
     private static byte[] getKey(Enum storageSlot, byte[] key) {

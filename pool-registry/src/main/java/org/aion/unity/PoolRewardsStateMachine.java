@@ -65,7 +65,7 @@ public class PoolRewardsStateMachine {
         // Blockchain.println("Increment period: acc_rewards = " + accumulatedBlockRewards);
 
         // deal with the block rewards
-        BigInteger commission = (BigInteger.valueOf(currentPoolRewards.appliedCommissionRate).multiply(currentPoolRewards.accumulatedBlockRewards))
+        BigInteger commission = (BigInteger.valueOf(currentPoolRewards.commissionRate).multiply(currentPoolRewards.accumulatedBlockRewards))
                 .divide(feeDivisor);
 
         BigInteger currentRewards = currentPoolRewards.accumulatedBlockRewards.subtract(commission);
@@ -180,8 +180,8 @@ public class PoolRewardsStateMachine {
         currentPoolRewards.accumulatedBlockRewards = currentPoolRewards.accumulatedBlockRewards.add(blockReward);
     }
 
-    public void setAppliedCommissionRate(int newRate) {
+    public void setCommissionRate(int newRate) {
         incrementPeriod();
-        currentPoolRewards.appliedCommissionRate = newRate;
+        currentPoolRewards.commissionRate = newRate;
     }
 }
