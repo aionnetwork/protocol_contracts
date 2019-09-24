@@ -170,7 +170,7 @@ public class PoolRegistry {
         PoolRegistryStorage.putDelegator(pool, delegator, delegatorInfo);
 
         // if after the delegation the pool becomes active, update the commission rate
-        if (delegator.equals(pool) && isSelfStakeSatisfied(pool)) {
+        if (delegator.equals(pool) && isSelfStakeSatisfied(pool, stateMachine.currentPoolRewards.accumulatedStake)) {
             switchToActive(pool, stateMachine);
         }
 
@@ -226,7 +226,7 @@ public class PoolRegistry {
 
         PoolRegistryStorage.putDelegator(pool, delegator, delegatorInfo);
 
-        boolean isActive = isSelfStakeSatisfied(pool);
+        boolean isActive = isSelfStakeSatisfied(pool, poolRewards.accumulatedStake);
 
         // if after the un-delegation the state of the pool changes, update the commission rate
         // undelegation from a delegator can make the pool go back into the active state
@@ -309,7 +309,7 @@ public class PoolRegistry {
         stateMachine.onUndelegate(delegatorInfo, Blockchain.getBlockNumber(), amount);
         PoolRegistryStorage.putDelegator(fromPool, caller, delegatorInfo);
 
-        String methodName = "transferDelegationTo";
+        String methodName = "transferDelegation";
         // encoded data is directly written to the byte array to reduce energy usage
         byte[] data = new byte[getStringSize(methodName) + getBigIntegerSize() * 2 + getAddressSize() * 3];
         new ABIStreamingEncoder(data)
@@ -317,7 +317,6 @@ public class PoolRegistry {
                 .encodeOneAddress(fromPool)
                 .encodeOneAddress(toPool)
                 .encodeOneBigInteger(amount)
-                .encodeOneAddress(Blockchain.getAddress())
                 .encodeOneBigInteger(fee);
 
         Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
@@ -327,7 +326,7 @@ public class PoolRegistry {
 
         // transfer out of fromPool could make it broken
         // this call can only be from a delegator
-        if (isSelfStakeSatisfied(fromPool)) {
+        if (isSelfStakeSatisfied(fromPool, fromPoolRewards.accumulatedStake)) {
             switchToActive(fromPool, stateMachine);
         }
 
@@ -354,20 +353,6 @@ public class PoolRegistry {
     }
 
     /**
-     * Returns the self-bond stake to a pool.
-     *
-     * @param pool the pool address
-     * @return the amount of stake
-     */
-    @Callable
-    public static BigInteger getSelfStake(Address pool) {
-        requirePool(pool);
-        requireNoValue();
-
-        return PoolRegistryStorage.getDelegator(pool, pool).stake;
-    }
-
-    /**
      * Returns the total stake of a pool.
      *
      * @param pool the pool address
@@ -375,19 +360,9 @@ public class PoolRegistry {
      */
     @Callable
     public static BigInteger getTotalStake(Address pool) {
-        requirePool(pool);
+        PoolStorageObjects.PoolRewards rewards = validateAndGetPoolRewards(pool);
         requireNoValue();
-        return getTotalStakeCall(pool);
-    }
-
-    private static BigInteger getTotalStakeCall(Address pool){
-        String methodName = "getTotalStake";
-        byte[] data = new byte[getStringSize(methodName) + getAddressSize()];
-        new ABIStreamingEncoder(data)
-                .encodeOneString(methodName)
-                .encodeOneAddress(pool);
-        Result result = secureCall(stakerRegistry, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
-        return new ABIDecoder(result.getReturnData()).decodeOneBigInteger();
+        return rewards.accumulatedStake;
     }
 
     /**
@@ -659,7 +634,7 @@ public class PoolRegistry {
 
         // make sure the pool is active, so that pool owner can't change the commission rate after it has been set to 0 as a punishment
         // if the pool is not active, the commission fee in rewards is set when it becomes active
-        if(isSelfStakeSatisfied(commissionUpdate.pool)) {
+        if(isSelfStakeSatisfied(commissionUpdate.pool, rewards.accumulatedStake)) {
             PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(rewards);
             detectBlockRewards(stateMachine);
             stateMachine.setAppliedCommissionRate(commissionUpdate.newCommissionRate);
@@ -721,7 +696,7 @@ public class PoolRegistry {
         new ABIStreamingEncoder(info)
                 .encodeOneAddress(rewards.coinbaseAddress)
                 .encodeOneInteger(rewards.commissionRate)
-                .encodeOneBoolean(isSelfStakeSatisfied(pool))
+                .encodeOneBoolean(isSelfStakeSatisfied(pool, rewards.accumulatedStake))
                 .encodeOneByteArray(metaDataHash)
                 .encodeOneByteArray(metaDataUrl);
         return info;
@@ -735,9 +710,9 @@ public class PoolRegistry {
      */
     @Callable
     public static String getPoolStatus(Address pool) {
-        requirePool(pool);
+        PoolStorageObjects.PoolRewards poolRewards = validateAndGetPoolRewards(pool);
         requireNoValue();
-        return isSelfStakeSatisfied(pool) ? "ACTIVE" : "BROKEN";
+        return isSelfStakeSatisfied(pool, poolRewards.accumulatedStake) ? "ACTIVE" : "BROKEN";
     }
 
     @Callable
@@ -758,8 +733,7 @@ public class PoolRegistry {
     }
 
     // note that self stake value is read from storage. So any updates to pool's self stake should be written before calling this method
-    private static boolean isSelfStakeSatisfied(Address pool) {
-        BigInteger totalStake = getTotalStakeCall(pool);
+    private static boolean isSelfStakeSatisfied(Address pool, BigInteger totalStake) {
         BigInteger selfStake = PoolRegistryStorage.getDelegator(pool, pool).stake;
 
         return selfStake.compareTo(MIN_SELF_STAKE) >= 0 &&

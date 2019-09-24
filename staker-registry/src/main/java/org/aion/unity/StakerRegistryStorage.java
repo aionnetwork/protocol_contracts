@@ -10,40 +10,12 @@ public class StakerRegistryStorage {
 
     // used for deriving storage key
     private enum StorageSlots {
-        DELEGATION, // staker identityAddress, delegator -> delegator stake
         STAKE_INFO, // staker identityAddress -> total stake, self bond stake
         ADDRESS_INFO, // staker identityAddress -> staker signingAddress, coinbaseAddress
         SIGNING_ADDRESS, // staker signingAddress -> staker identityAddress
         MANAGEMENT_ADDRESS, // staker identityAddress -> staker managementAddress
         PENDING_UNDELEGATE, // undelegateId -> recipient, value, block number
         PENDING_TRANSFER // transferId -> initiator, toStaker, recipient, value, block number
-    }
-
-    /**
-     * Puts delegate info for a staker into storage
-     *
-     * @param identityAddress staker identity address
-     * @param delegator       delegator address
-     * @param amount          stake amount. Zero will remove the delegator from storage.
-     */
-    protected static void putDelegatorStake(Address identityAddress, Address delegator, BigInteger amount) {
-        byte[] key = getKey(StorageSlots.DELEGATION, concatAddresses(identityAddress.toByteArray(), delegator.toByteArray()));
-        // check if value is zero
-        byte[] value = amount.signum() == 0 ? null : amount.toByteArray();
-        Blockchain.putStorage(key, value);
-    }
-
-    /**
-     * Retrieves the delegator's stake from storage
-     *
-     * @param identityAddress staker identity address
-     * @param delegator       delegator address
-     * @return if delegator address is present in storage, delegated stake, zero otherwise
-     */
-    protected static BigInteger getDelegatorStake(Address identityAddress, Address delegator) {
-        byte[] key = getKey(StorageSlots.DELEGATION, concatAddresses(identityAddress.toByteArray(), delegator.toByteArray()));
-        byte[] value = Blockchain.getStorage(key);
-        return value == null ? BigInteger.ZERO : new BigInteger(value);
     }
 
     /**
@@ -187,13 +159,6 @@ public class StakerRegistryStorage {
         byte[] key = getKey(StorageSlots.PENDING_TRANSFER, BigInteger.valueOf(transferId).toByteArray());
         byte[] value = Blockchain.getStorage(key);
         return value == null ? null : StakerStorageObjects.PendingTransfer.from(value);
-    }
-
-    private static byte[] concatAddresses(byte[] address1, byte[] address2) {
-        byte[] result = new byte[Address.LENGTH * 2];
-        System.arraycopy(address1, 0, result, 0, Address.LENGTH);
-        System.arraycopy(address2, 0, result, Address.LENGTH, Address.LENGTH);
-        return result;
     }
 
     private static byte[] getKey(Enum storageSlot, byte[] key) {

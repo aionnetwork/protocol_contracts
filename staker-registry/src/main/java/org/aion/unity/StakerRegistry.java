@@ -9,8 +9,7 @@ import org.aion.avm.tooling.abi.Fallback;
 import java.math.BigInteger;
 
 /**
- * A staker registry manages the staker database, and provides an interface for delegators
- * to delegate/undelegate for a staker.
+ * A staker registry manages the staker database.
  */
 public class StakerRegistry {
 
@@ -57,33 +56,32 @@ public class StakerRegistry {
 
     /**
      * Delegates to a staker. Any liquid coins, passed along the call, become locked stake.
+     * This can only be called by the management address of the staker and it's mainly used to support pools.
+     * Note that the delegated amount will not be counted towards the self bond value.
      *
      * @param staker the address of the staker
      */
     @Callable
     public static void delegate(Address staker) {
-        Address caller = Blockchain.getCaller();
-        BigInteger amount = Blockchain.getValue();
+        requireStakerAndManager(staker, Blockchain.getCaller());
 
-        StakerStorageObjects.StakeInfo stakeInfo = validateAndGetStakeInfo(staker);
+        BigInteger amount = Blockchain.getValue();
         requirePositive(amount);
 
-        stakeInfo.totalStake = stakeInfo.totalStake.add(amount);
+        StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(staker);
+
+        stakeInfo.otherStake = stakeInfo.otherStake.add(amount);
         StakerRegistryStorage.putStakerStakeInfo(staker, stakeInfo);
 
-        BigInteger previousStake = StakerRegistryStorage.getDelegatorStake(staker, caller);
-        // stake is always positive
-        StakerRegistryStorage.putDelegatorStake(staker, caller, previousStake.add(amount));
-
-        StakerRegistryEvents.delegated(caller, staker, amount);
+        StakerRegistryEvents.delegated(staker, amount);
     }
 
     /**
-     * Un-delegates to a staker. After a successful undelegate, the locked coins will be released
+     * Un-delegates from a staker. After a successful undelegate, the locked coins will be released
      * to the original delegator, subject to lock-up period.
      *
      * @param staker the address of the staker
-     * @param amount the amount of stake
+     * @param amount the amount of stake to undelegate. Self bond stake cannot be undelegated
      * @param fee the amount of stake that will be transferred to the account that invokes finalizeUndelegate
      * @return a pending undelegation identifier
      */
@@ -93,49 +91,44 @@ public class StakerRegistry {
     }
 
     /**
-     * Un-delegates for a staker, and receives the released fund using another account.
+     * Un-delegates from a staker, and receives the released fund using another account.
      *
      * @param staker   the address of the staker
-     * @param amount   the amount of stake
+     * @param amount   the amount of stake to undelegate. Self bond stake cannot be undelegated
      * @param recipient the receiving address
      * @param fee the amount of stake that will be transferred to the account that invokes finalizeUndelegate
      * @return a pending un-delegation identifier
      */
     @Callable
     public static long undelegateTo(Address staker, BigInteger amount, Address recipient, BigInteger fee) {
-        Address caller = Blockchain.getCaller();
+        requireStakerAndManager(staker, Blockchain.getCaller());
 
-        StakerStorageObjects.StakeInfo stakeInfo = validateAndGetStakeInfo(staker);
         requirePositive(amount);
         requireNonNull(recipient);
         requireNoValue();
         require(fee.signum() >= 0 && fee.compareTo(amount) <= 0);
 
-        BigInteger previousStake = StakerRegistryStorage.getDelegatorStake(staker, caller);
+        StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(staker);
 
         // check previous stake
-        require(amount.compareTo(previousStake) <= 0);
-        //sanity check
-        assert amount.compareTo(stakeInfo.totalStake) <= 0;
+        require(amount.compareTo(stakeInfo.otherStake) <= 0);
 
         // update stake
-        stakeInfo.totalStake = stakeInfo.totalStake.subtract(amount);
+        stakeInfo.otherStake = stakeInfo.otherStake.subtract(amount);
         StakerRegistryStorage.putStakerStakeInfo(staker, stakeInfo);
-
-        // if stake is zero, delegator will be removed from storage
-        StakerRegistryStorage.putDelegatorStake(staker, caller, previousStake.subtract(amount));
 
         // create pending un-delegate
         long id = nextUndelegateId++;
         StakerStorageObjects.PendingUndelegate undelegate = new StakerStorageObjects.PendingUndelegate(recipient, amount, fee, Blockchain.getBlockNumber());
         StakerRegistryStorage.putPendingUndelegte(id, undelegate);
-        StakerRegistryEvents.undelegated(id, caller, staker, recipient, amount, fee);
+        StakerRegistryEvents.undelegated(id, staker, recipient, amount, fee);
 
         return id;
     }
 
     /**
      * Transfers stake from one staker to another staker.
+     * Note that fromStaker's self bond stake cannot be transferred and the transfer value will not be counted towards toStaker's self bond.
      *
      * @param fromStaker the address of the staker to transfer stake from
      * @param toStaker   the address of the staker to transfer stake to
@@ -145,24 +138,10 @@ public class StakerRegistry {
      */
     @Callable
     public static long transferDelegation(Address fromStaker, Address toStaker, BigInteger amount, BigInteger fee) {
-        return transferDelegationTo(fromStaker, toStaker, amount, Blockchain.getCaller(), fee);
-    }
-
-    /**
-     * Transfers stake from one staker to another staker, and designates a new owner of the stake.
-     *
-     * @param fromStaker the address of the staker to transfer stake from
-     * @param toStaker   the address of the staker to transfer stake to
-     * @param amount     the amount of stake
-     * @param recipient  the new owner of the stake being transferred
-     * @param fee the amount of stake that will be transferred to the account that invokes finalizeTransfer
-     * @return a pending transfer identifier
-     */
-    @Callable
-    public static long transferDelegationTo(Address fromStaker, Address toStaker, BigInteger amount, Address recipient, BigInteger fee) {
         Address caller = Blockchain.getCaller();
+        requireStakerAndManager(fromStaker, caller);
 
-        StakerStorageObjects.StakeInfo stakeInfo = validateAndGetStakeInfo(fromStaker);
+        StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(fromStaker);
         validateAndGetStakeInfo(toStaker);
         requirePositive(amount);
         require(!fromStaker.equals(toStaker));
@@ -170,25 +149,18 @@ public class StakerRegistry {
         // fee should be less than the amount for the delegate to be successful and not revert
         require(fee.signum() >= 0 && fee.compareTo(amount) < 0);
 
-        BigInteger previousStake = StakerRegistryStorage.getDelegatorStake(fromStaker, caller);
-
         // check previous stake
-        require(amount.compareTo(previousStake) <= 0);
-        //sanity check
-        assert amount.compareTo(stakeInfo.totalStake) <= 0;
+        require(amount.compareTo(stakeInfo.otherStake) <= 0);
 
         // update stake
-        stakeInfo.totalStake = stakeInfo.totalStake.subtract(amount);
+        stakeInfo.otherStake = stakeInfo.otherStake.subtract(amount);
         StakerRegistryStorage.putStakerStakeInfo(fromStaker, stakeInfo);
-
-        // if stake is zero, delegator will be removed froms storage
-        StakerRegistryStorage.putDelegatorStake(fromStaker, caller, previousStake.subtract(amount));
 
         // create pending transfer
         long id = nextTransferId++;
-        StakerStorageObjects.PendingTransfer transfer = new StakerStorageObjects.PendingTransfer(caller, toStaker, recipient, amount, fee, Blockchain.getBlockNumber());
+        StakerStorageObjects.PendingTransfer transfer = new StakerStorageObjects.PendingTransfer(caller, toStaker, amount, fee, Blockchain.getBlockNumber());
         StakerRegistryStorage.putPendingTransfer(id, transfer);
-        StakerRegistryEvents.transferredDelegation(id, fromStaker, toStaker, recipient, amount, fee);
+        StakerRegistryEvents.transferredDelegation(id, fromStaker, toStaker, amount, fee);
 
         return id;
     }
@@ -234,10 +206,11 @@ public class StakerRegistry {
         // check existence
         StakerStorageObjects.PendingTransfer transfer = StakerRegistryStorage.getPendingTransfer(id);
         requireNonNull(transfer);
+        Address caller = Blockchain.getCaller();
 
         // only the initiator can finalize the transfer, mainly because
         // the pool registry needs to keep track of stake transfers.
-        require(Blockchain.getCaller().equals(transfer.initiator));
+        require(caller.equals(transfer.initiator));
 
         // lock-up period check
         require(Blockchain.getBlockNumber() >= transfer.blockNumber + TRANSFER_LOCK_UP_PERIOD);
@@ -251,15 +224,11 @@ public class StakerRegistry {
         BigInteger remainingTransferValue = transfer.value.subtract(transfer.fee);
 
         StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(toStaker);
-        stakeInfo.totalStake = stakeInfo.totalStake.add(remainingTransferValue);
+        stakeInfo.otherStake = stakeInfo.otherStake.add(remainingTransferValue);
         StakerRegistryStorage.putStakerStakeInfo(toStaker, stakeInfo);
 
-        BigInteger previousStake = StakerRegistryStorage.getDelegatorStake(toStaker, transfer.recipient);
-        // stake is always positive
-        StakerRegistryStorage.putDelegatorStake(toStaker, transfer.recipient, previousStake.add(remainingTransferValue));
-
         // transfer the fee to the caller
-        secureCall(Blockchain.getCaller(), transfer.fee, new byte[0], Blockchain.getRemainingEnergy());
+        secureCall(caller, transfer.fee, new byte[0], Blockchain.getRemainingEnergy());
 
         StakerRegistryEvents.finalizedDelegationTransfer(id);
     }
@@ -296,7 +265,7 @@ public class StakerRegistry {
         }
 
         // query total stake
-        BigInteger totalStake = stakeInfo.totalStake;
+        BigInteger totalStake = stakeInfo.otherStake.add(stakeInfo.selfBondStake);
 
         // conversion: 1 nAmp = 1 stake
         return totalStake;
@@ -313,28 +282,13 @@ public class StakerRegistry {
         StakerStorageObjects.StakeInfo stakeInfo = validateAndGetStakeInfo(staker);
         requireNoValue();
 
-        return stakeInfo.totalStake;
+        // returns the sum of delegated stake and self bond stake
+        return stakeInfo.otherStake.add(stakeInfo.selfBondStake);
     }
 
-
     /**
-     * Returns the stake from a delegator to a staker.
+     * Bonds the stake to the staker. Any liquid coins, passed along the call, are counted as part of the self-bond stake.
      *
-     * @param staker the address of the staker
-     * @param delegator  the address of the delegator
-     * @return the amount of stake
-     */
-    @Callable
-    public static BigInteger getStake(Address staker, Address delegator) {
-        validateAndGetStakeInfo(staker);
-        requireNonNull(delegator);
-        requireNoValue();
-
-        return StakerRegistryStorage.getDelegatorStake(staker, delegator);
-    }
-
-    /**
-     * Bonds the stake to the staker (self-bond stake)
      * @param staker the address of the staker
      */
     @Callable
@@ -347,7 +301,6 @@ public class StakerRegistry {
         StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(staker);
 
         stakeInfo.selfBondStake = stakeInfo.selfBondStake.add(amount);
-        stakeInfo.totalStake = stakeInfo.totalStake.add(amount);
         StakerRegistryStorage.putStakerStakeInfo(staker, stakeInfo);
 
         StakerRegistryEvents.bonded(staker, amount);
@@ -356,6 +309,7 @@ public class StakerRegistry {
     /**
      * Unbonds for a staker, After a successful unbond, the locked coins will be released to the original bonder (management address).
      * This is subject to lock-up period.
+     *
      * @param staker the address of the staker
      * @param amount the amount of stake
      * @param fee the amount of stake that will be transferred to the account that invokes finalizeUndelegate
@@ -369,6 +323,7 @@ public class StakerRegistry {
     /**
      * Unbonds for a staker, After a successful unbond, the locked coins will be released to the specified account.
      * This is subject to lock-up period.
+     *
      * @param staker the address of the staker
      * @param amount the amount of stake
      * @param recipient the receiving address
@@ -387,11 +342,8 @@ public class StakerRegistry {
         StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(staker);
 
         require(amount.compareTo(stakeInfo.selfBondStake) <= 0);
-        //sanity check
-        assert amount.compareTo(stakeInfo.totalStake) <= 0;
 
         stakeInfo.selfBondStake = stakeInfo.selfBondStake.subtract(amount);
-        stakeInfo.totalStake = stakeInfo.totalStake.subtract(amount);
         StakerRegistryStorage.putStakerStakeInfo(staker, stakeInfo);
 
         long id = nextUndelegateId++;
@@ -484,7 +436,8 @@ public class StakerRegistry {
         require(managementAddress != null && managementAddress.equals(manager));
     }
     /**
-     * Updates the signing address of a staker. Owner only.
+     * Updates the signing address of a staker.
+     * Can only be invoked by the management address.
      *
      * @param newSigningAddress the new signing address
      */
@@ -517,7 +470,8 @@ public class StakerRegistry {
     }
 
     /**
-     * Updates the coinbase address of a staker. Owner only.
+     * Updates the coinbase address of a staker.
+     * Can only be invoked by the management address.
      *
      * @param newCoinbaseAddress the new coinbase address
      */

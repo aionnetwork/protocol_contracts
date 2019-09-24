@@ -31,32 +31,31 @@ public class StakerRegistryEvents {
                 newAddress.toByteArray());
     }
 
-    protected static void delegated(Address delegator, Address staker, BigInteger value) {
+    protected static void delegated(Address staker, BigInteger value) {
         Blockchain.log("delegated".getBytes(),
-                delegator.toByteArray(),
                 staker.toByteArray(),
                 value.toByteArray());
     }
 
-    protected static void undelegated(long id, Address delegator, Address staker, Address recipient, BigInteger amount, BigInteger fee) {
-        byte[] data = new byte[Address.LENGTH + 1 + ((32 + 2) * 2)];
-        new ABIStreamingEncoder(data).encodeOneAddress(recipient).encodeOneBigInteger(amount).encodeOneBigInteger(fee);
+    protected static void undelegated(long id, Address staker, Address recipient, BigInteger amount, BigInteger fee) {
+        byte[] data = new byte[(32 + 2) * 2];
+        new ABIStreamingEncoder(data).encodeOneBigInteger(amount).encodeOneBigInteger(fee);
 
         Blockchain.log("Undelegated".getBytes(),
                 AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
-                delegator.toByteArray(),
                 staker.toByteArray(),
+                recipient.toByteArray(),
                 data);
     }
 
-    protected static void transferredDelegation(long id, Address fromStaker, Address toStaker, Address recipient, BigInteger amount, BigInteger fee) {
-        byte[] data = new byte[Address.LENGTH + 1 + ((32 + 2) * 2)];
-        new ABIStreamingEncoder(data).encodeOneAddress(toStaker).encodeOneBigInteger(amount).encodeOneBigInteger(fee);
+    protected static void transferredDelegation(long id, Address fromStaker, Address toStaker, BigInteger amount, BigInteger fee) {
+        byte[] data = new byte[(32 + 2) * 2];
+        new ABIStreamingEncoder(data).encodeOneBigInteger(amount).encodeOneBigInteger(fee);
 
         Blockchain.log("DelegationTransferred".getBytes(),
                 AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
                 fromStaker.toByteArray(),
-                recipient.toByteArray(),
+                toStaker.toByteArray(),
                 data);
     }
 
