@@ -12,11 +12,6 @@ public class StakerStorageObjects {
         // stake that is counted towards self bond. This is done by invoking bond()
         BigInteger selfBondStake;
 
-        protected StakeInfo() {
-            otherStake = BigInteger.ZERO;
-            selfBondStake = BigInteger.ZERO;
-        }
-
         protected StakeInfo(BigInteger otherStake, BigInteger selfBondStake) {
             this.otherStake = otherStake;
             this.selfBondStake = selfBondStake;

@@ -55,7 +55,8 @@ public class PoolStorageObjects {
         // commission rate set by the pool owner
         int commissionRate;
 
-        boolean isActive;
+        // default is set to true because pools can only register if they pass in the minimum self bond value
+        boolean isActive = true;
 
         protected PoolRewards(Address coinbaseAddress, int commissionRate) {
             this.coinbaseAddress = coinbaseAddress;

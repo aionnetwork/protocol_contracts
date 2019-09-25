@@ -53,6 +53,7 @@ public class PoolRegistry {
 
     /**
      * Registers a pool in the registry.
+     * Note that the minimum self bond value should be passed along the call.
      *
      * @param signingAddress the signing address fo the pool
      * @param commissionRate the pool commission rate with 4 decimal places of granularity (between [0, 1000000])
@@ -63,9 +64,12 @@ public class PoolRegistry {
     public static void registerPool(Address signingAddress, int commissionRate, byte[] metaDataUrl, byte[] metaDataContentHash) {
         // sanity check
         requireValidPercentage(commissionRate);
-        requireNoValue();
         requireNonNull(metaDataUrl);
         require(metaDataContentHash != null && metaDataContentHash.length == 32);
+
+        // ensure minimum self stake is passed to the contract
+        BigInteger selfStake = Blockchain.getValue();
+        require(selfStake.compareTo(MIN_SELF_STAKE) >= 0);
 
         Address caller = Blockchain.getCaller();
 
@@ -93,10 +97,20 @@ public class PoolRegistry {
                 .encodeOneAddress(Blockchain.getAddress())
                 .encodeOneAddress(signingAddress)
                 .encodeOneAddress(coinbaseAddress);
-        secureCall(stakerRegistry, BigInteger.ZERO, registerStakerCall, Blockchain.getRemainingEnergy());
+        secureCall(stakerRegistry, selfStake, registerStakerCall, Blockchain.getRemainingEnergy());
 
-        // step 3: store pool info
-        PoolRegistryStorage.putPoolRewards(caller, new PoolStorageObjects.PoolRewards(coinbaseAddress, commissionRate));
+        // pool is initialized in active state
+        PoolStorageObjects.PoolRewards rewards = new PoolStorageObjects.PoolRewards(coinbaseAddress, commissionRate);
+
+        PoolStorageObjects.DelegatorInfo delegatorInfo = new PoolStorageObjects.DelegatorInfo();
+        PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(rewards);
+
+        // step 3: update the self bond stake
+        stateMachine.onDelegate(delegatorInfo, Blockchain.getBlockNumber(), selfStake);
+
+        // step 4: store pool info
+        PoolRegistryStorage.putDelegator(caller, caller, delegatorInfo);
+        PoolRegistryStorage.putPoolRewards(caller, rewards);
         PoolRegistryStorage.putPoolMetaData(caller, metaDataContentHash, metaDataUrl);
 
         PoolRegistryEvents.registeredPool(caller, commissionRate, metaDataContentHash, metaDataUrl);

@@ -26,6 +26,7 @@ public class StakerRegistry {
     /**
      * Registers a staker. The caller address will be the identification
      * address of the new staker.
+     * Note that the minimum self bond value should be passed along the call.
      *
      * @param identityAddress  the identity of the staker; can't be changed
      * @param managementAddress  the address with management rights. can't be changed.
@@ -39,20 +40,25 @@ public class StakerRegistry {
         requireNonNull(managementAddress);
         requireNonNull(signingAddress);
         requireNonNull(coinbaseAddress);
-        requireNoValue();
 
         require(StakerRegistryStorage.getIdentityAddress(signingAddress) == null);
         require(StakerRegistryStorage.getStakerStakeInfo(identityAddress) == null);
+
+        BigInteger selfStake = Blockchain.getValue();
+        require(selfStake.compareTo(MIN_SELF_STAKE) >= 0);
 
         // signingAddress -> identityAddress
         StakerRegistryStorage.putIdentityAddress(signingAddress, identityAddress);
 
         StakerRegistryStorage.putManagementAddress(identityAddress, managementAddress);
         StakerRegistryStorage.putStakerAddressInfo(identityAddress, new StakerStorageObjects.AddressInfo(signingAddress, coinbaseAddress, Blockchain.getBlockNumber()));
-        StakerRegistryStorage.putStakerStakeInfo(identityAddress, new StakerStorageObjects.StakeInfo());
-        // default state for new stakers is set as false. This can only be explicitly changed by the management address.
+
+        StakerStorageObjects.StakeInfo stakeInfo = new StakerStorageObjects.StakeInfo(BigInteger.ZERO, selfStake);
+
+        StakerRegistryStorage.putStakerStakeInfo(identityAddress, stakeInfo);
+        // default state for new stakers is set as true. This can only be explicitly changed by the management address.
         // ability to produce blocks depends on both the state and the self bond requirement.
-        StakerRegistryStorage.putState(identityAddress, false);
+        StakerRegistryStorage.putState(identityAddress, true);
 
         StakerRegistryEvents.registeredStaker(identityAddress, managementAddress, signingAddress, coinbaseAddress);
     }

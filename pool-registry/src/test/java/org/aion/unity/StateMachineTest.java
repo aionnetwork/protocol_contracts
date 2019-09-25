@@ -55,7 +55,7 @@ public class StateMachineTest {
         fee = fee * 10000;
         Address newPool = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
 
-        // STEP-1 register a new pool
+        // register a new pool
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("registerPool")
                 .encodeOneAddress(newPool)
@@ -64,15 +64,7 @@ public class StateMachineTest {
                 .encodeOneByteArray(new byte[32])
                 .toBytes();
 
-        AvmRule.ResultWrapper result = RULE.call(newPool, poolRegistry, BigInteger.ZERO, txData, 2_000_000L, 1L);
-        Assert.assertTrue(result.getReceiptStatus().isSuccess());
-
-        // STEP-2 do self-stake
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("delegate")
-                .encodeOneAddress(newPool)
-                .toBytes();
-        result = RULE.call(newPool, poolRegistry, nStake(1), txData);
+        AvmRule.ResultWrapper result = RULE.call(newPool, poolRegistry, MIN_SELF_STAKE, txData, 2_000_000L, 1L);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         // verify now

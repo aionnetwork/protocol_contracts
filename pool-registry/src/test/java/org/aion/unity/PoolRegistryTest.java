@@ -58,7 +58,7 @@ public class PoolRegistryTest {
         fee = fee * 10000;
         Address newPool = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
 
-        // STEP-1 register a new pool
+        // register a new pool
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("registerPool")
                 .encodeOneAddress(newPool)
@@ -67,15 +67,7 @@ public class PoolRegistryTest {
                 .encodeOneByteArray(new byte[32])
                 .toBytes();
 
-        AvmRule.ResultWrapper result = RULE.call(newPool, poolRegistry, BigInteger.ZERO, txData, 2_000_000L, 1L);
-        Assert.assertTrue(result.getReceiptStatus().isSuccess());
-
-        // STEP-2 do self-stake
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("delegate")
-                .encodeOneAddress(newPool)
-                .toBytes();
-        result = RULE.call(newPool, poolRegistry, nStake(1), txData);
+        AvmRule.ResultWrapper result = RULE.call(newPool, poolRegistry, nStake(1), txData, 2_000_000L, 1L);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         // verify now
@@ -886,34 +878,10 @@ public class PoolRegistryTest {
                 .encodeOneByteArray(new byte[32])
                 .toBytes();
 
-        AvmRule.ResultWrapper result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData, 2_000_000L, 1L);
+        AvmRule.ResultWrapper result = RULE.call(pool, poolRegistry, MIN_SELF_STAKE, txData, 2_000_000L, 1L);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         Address delegator = RULE.getRandomAddress(nStake(105));
-
-        // delegator stake 1 wei
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("delegate")
-                .encodeOneAddress(pool)
-                .toBytes();
-        result = RULE.call(pool, poolRegistry, BigInteger.ONE, txData);
-        assertTrue(result.getReceiptStatus().isSuccess());
-
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("getPoolStatus")
-                .encodeOneAddress(pool)
-                .toBytes();
-        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
-        Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        assertEquals("BROKEN", result.getDecodedReturnData());
-
-        // pool stake 1 wei
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("delegate")
-                .encodeOneAddress(pool)
-                .toBytes();
-        result = RULE.call(pool, poolRegistry, nStake(1), txData);
-        assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("getPoolStatus")
@@ -938,6 +906,23 @@ public class PoolRegistryTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, nStake(100), txData);
         assertTrue(result.getReceiptStatus().isFailed());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("undelegate")
+                .encodeOneAddress(pool)
+                .encodeOneBigInteger(nStake(1))
+                .encodeOneBigInteger(BigInteger.ZERO)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getPoolStatus")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        assertEquals("BROKEN", result.getDecodedReturnData());
     }
 
     @Test
@@ -1428,6 +1413,33 @@ public class PoolRegistryTest {
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(pool1, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+    }
+
+    @Test
+    public void testRegisterPool(){
+        Address newPool = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("registerPool")
+                .encodeOneAddress(newPool)
+                .encodeOneInteger(10)
+                .encodeOneByteArray("https://".getBytes())
+                .encodeOneByteArray(new byte[32])
+                .toBytes();
+
+        AvmRule.ResultWrapper result = RULE.call(newPool, poolRegistry, nStake(1).divide(BigInteger.TWO), txData, 2_000_000L, 1L);
+        Assert.assertTrue(result.getReceiptStatus().isFailed());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("registerPool")
+                .encodeOneAddress(newPool)
+                .encodeOneInteger(10)
+                .encodeOneByteArray("https://".getBytes())
+                .encodeOneByteArray(new byte[32])
+                .toBytes();
+
+        result = RULE.call(newPool, poolRegistry, nStake(1).multiply(BigInteger.TWO), txData, 2_000_000L, 1L);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
     }
 
     @Test
