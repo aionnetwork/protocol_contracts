@@ -70,7 +70,7 @@ public class StakerRegistryTest {
 
         // query the coinbase address
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getCoinbaseAddressForIdentityAddress")
+                .encodeOneString("getCoinbaseAddress")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
@@ -492,7 +492,7 @@ public class StakerRegistryTest {
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getCoinbaseAddressForIdentityAddress")
+                .encodeOneString("getCoinbaseAddress")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
@@ -562,19 +562,12 @@ public class StakerRegistryTest {
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getCoinbaseAddressForSigningAddress")
-                .encodeOneAddress(signingAddress)
-                .toBytes();
-        result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
-        Assert.assertFalse(result.getReceiptStatus().isSuccess());
-
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("getCoinbaseAddressForSigningAddress")
-                .encodeOneAddress(anotherSigningAddress)
+                .encodeOneString("getSigningAddress")
+                .encodeOneAddress(stakerAddress)
                 .toBytes();
         result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(coinbaseAddress, result.getDecodedReturnData());
+        Assert.assertEquals(anotherSigningAddress, result.getDecodedReturnData());
 
         Address newStakerAddress = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
 
@@ -590,12 +583,12 @@ public class StakerRegistryTest {
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getCoinbaseAddressForSigningAddress")
-                .encodeOneAddress(signingAddress)
+                .encodeOneString("getSigningAddress")
+                .encodeOneAddress(newStakerAddress)
                 .toBytes();
         result = RULE.call(newStakerAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(anotherCoinbaseAddress, result.getDecodedReturnData());
+        Assert.assertEquals(signingAddress, result.getDecodedReturnData());
     }
 
     @Test

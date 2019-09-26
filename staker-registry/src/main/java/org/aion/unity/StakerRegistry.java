@@ -270,6 +270,7 @@ public class StakerRegistry {
     @Callable
     public static BigInteger getEffectiveStake(Address signingAddress, Address coinbaseAddress) {
         requireNonNull(signingAddress);
+        requireNonNull(coinbaseAddress);
         requireNoValue();
 
         // if not a staker
@@ -430,29 +431,13 @@ public class StakerRegistry {
      * @return the coinbase address
      */
     @Callable
-    public static Address getCoinbaseAddressForIdentityAddress(Address staker) {
+    public static Address getCoinbaseAddress(Address staker) {
         requireNonNull(staker);
         StakerStorageObjects.AddressInfo addressInfo = StakerRegistryStorage.getStakerAddressInfo(staker);
         requireNonNull(addressInfo);
         requireNoValue();
 
         return addressInfo.coinbaseAddress;
-    }
-
-    /**
-     * Returns the coinbase address of a staker.
-     *
-     * @param signingAddress the signing address of the staker.
-     * @return the coinbase address
-     */
-    @Callable
-    public static Address getCoinbaseAddressForSigningAddress(Address signingAddress) {
-        requireNoValue();
-
-        Address identityAddress = StakerRegistryStorage.getIdentityAddress(signingAddress);
-        requireNonNull(identityAddress);
-
-        return StakerRegistryStorage.getStakerAddressInfo(identityAddress).coinbaseAddress;
     }
 
     private static void requireStakerAndManager(Address staker, Address manager) {

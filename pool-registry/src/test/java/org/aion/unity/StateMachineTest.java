@@ -420,7 +420,7 @@ public class StateMachineTest {
 
     private Address getCoinbaseAddress(Address pool) {
         byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("getCoinbaseAddressForIdentityAddress")
+                .encodeOneString("getCoinbaseAddress")
                 .encodeOneAddress(pool)
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
