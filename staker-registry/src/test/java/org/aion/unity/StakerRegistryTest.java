@@ -3,6 +3,7 @@ package org.aion.unity;
 import avm.Address;
 import org.aion.avm.core.util.LogSizeUtils;
 import org.aion.avm.embed.AvmRule;
+import org.aion.avm.tooling.ABIUtil;
 import org.aion.avm.userlib.abi.ABIDecoder;
 import org.aion.avm.userlib.abi.ABIStreamingEncoder;
 import org.aion.kernel.TestingState;
@@ -19,7 +20,10 @@ import static org.junit.Assert.assertEquals;
 public class StakerRegistryTest {
 
     private static BigInteger ENOUGH_BALANCE_TO_TRANSACT = BigInteger.TEN.pow(18 + 5);
-
+    private static final BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
+    private static final long SIGNING_ADDRESS_COOLING_PERIOD = 6 * 60 * 24 * 7;
+    private static final long UNDELEGATE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
+    private static final long TRANSFER_LOCK_UP_PERIOD = 6 * 10;
     @Rule
     public AvmRule RULE = new AvmRule(false);
 
@@ -41,9 +45,20 @@ public class StakerRegistryTest {
         signingAddress = RULE.getRandomAddress(BigInteger.ZERO);
         coinbaseAddress = RULE.getRandomAddress(BigInteger.ZERO);
 
+        byte[] arguments = ABIUtil.encodeDeploymentArguments(MIN_SELF_STAKE, SIGNING_ADDRESS_COOLING_PERIOD, UNDELEGATE_LOCK_UP_PERIOD, TRANSFER_LOCK_UP_PERIOD);
+
         // deploy the staker registry contract
-        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null, 1, otherClasses);
-        stakerRegistry = RULE.deploy(preminedAddress, BigInteger.ZERO, jar).getDappAddress();
+        byte[] jar = RULE.getDappBytes(StakerRegistry.class, arguments, 1, otherClasses);
+        AvmRule.ResultWrapper result = RULE.deploy(preminedAddress, BigInteger.ZERO, jar);
+        stakerRegistry = result.getDappAddress();
+
+        assertEquals(1, result.getLogs().size());
+        Log stakerRegistryEvent = result.getLogs().get(0);
+        assertArrayEquals(LogSizeUtils.truncatePadTopic("StakerRegistryDeployed".getBytes()), stakerRegistryEvent.copyOfTopics().get(0));
+        assertEquals(MIN_SELF_STAKE,  new BigInteger(stakerRegistryEvent.copyOfTopics().get(1)));
+        assertEquals(SIGNING_ADDRESS_COOLING_PERIOD, new BigInteger(stakerRegistryEvent.copyOfTopics().get(2)).longValue());
+        assertEquals(UNDELEGATE_LOCK_UP_PERIOD, new BigInteger(stakerRegistryEvent.copyOfTopics().get(3)).longValue());
+        assertEquals(TRANSFER_LOCK_UP_PERIOD, new BigInteger(stakerRegistryEvent.copyOfData()).longValue());
 
         // register the staker
         byte[] txData = new ABIStreamingEncoder()
@@ -53,7 +68,7 @@ public class StakerRegistryTest {
                 .encodeOneAddress(signingAddress)
                 .encodeOneAddress(coinbaseAddress)
                 .toBytes();
-        AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, StakerRegistry.MIN_SELF_STAKE, txData);
+        result = RULE.call(stakerAddress, stakerRegistry, MIN_SELF_STAKE, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
     }
 
@@ -120,7 +135,7 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE.add(voteAmount.subtract(unvoteAmount)), result.getDecodedReturnData());
+        Assert.assertEquals(MIN_SELF_STAKE.add(voteAmount.subtract(unvoteAmount)), result.getDecodedReturnData());
     }
 
     @Test
@@ -142,7 +157,7 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE.add(voteAmount), result.getDecodedReturnData());
+        Assert.assertEquals(MIN_SELF_STAKE.add(voteAmount), result.getDecodedReturnData());
 
         // then undelegate
         txData = new ABIStreamingEncoder()
@@ -161,7 +176,7 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE, result.getDecodedReturnData());
+        Assert.assertEquals(MIN_SELF_STAKE, result.getDecodedReturnData());
     }
 
     @Test
@@ -183,7 +198,7 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE.add(voteAmount), result.getDecodedReturnData());
+        Assert.assertEquals(MIN_SELF_STAKE.add(voteAmount), result.getDecodedReturnData());
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -198,7 +213,7 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE.add(voteAmount.multiply(BigInteger.TWO)), result.getDecodedReturnData());
+        Assert.assertEquals(MIN_SELF_STAKE.add(voteAmount.multiply(BigInteger.TWO)), result.getDecodedReturnData());
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -224,7 +239,7 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE.add(voteAmount.multiply(BigInteger.TWO)), result.getDecodedReturnData());
+        Assert.assertEquals(MIN_SELF_STAKE.add(voteAmount.multiply(BigInteger.TWO)), result.getDecodedReturnData());
 
         Address stakerAddress2 = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
 
@@ -235,7 +250,7 @@ public class StakerRegistryTest {
                 .encodeOneAddress(stakerAddress2)
                 .encodeOneAddress(stakerAddress2)
                 .toBytes();
-        result = RULE.call(stakerAddress2, stakerRegistry, StakerRegistry.MIN_SELF_STAKE, txData);
+        result = RULE.call(stakerAddress2, stakerRegistry, MIN_SELF_STAKE, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()
@@ -255,12 +270,12 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE.add(voteAmount), result.getDecodedReturnData());
+        Assert.assertEquals(MIN_SELF_STAKE.add(voteAmount), result.getDecodedReturnData());
     }
 
     @Test
     public void testGetEffectiveStake() {
-        BigInteger halfMinStake = StakerRegistry.MIN_SELF_STAKE.divide(BigInteger.TWO);
+        BigInteger halfMinStake = MIN_SELF_STAKE.divide(BigInteger.TWO);
 
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("unbond")
@@ -285,7 +300,7 @@ public class StakerRegistryTest {
                 .encodeOneString("bond")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
-        result = RULE.call(stakerAddress, stakerRegistry, StakerRegistry.MIN_SELF_STAKE, txData);
+        result = RULE.call(stakerAddress, stakerRegistry, MIN_SELF_STAKE, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         // query the effective stake again
@@ -296,7 +311,7 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE.add(halfMinStake), result.getDecodedReturnData());
+        Assert.assertEquals(MIN_SELF_STAKE.add(halfMinStake), result.getDecodedReturnData());
 
         // wrong signing address
         txData = new ABIStreamingEncoder()
@@ -324,7 +339,7 @@ public class StakerRegistryTest {
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("unbond")
                 .encodeOneAddress(stakerAddress)
-                .encodeOneBigInteger(StakerRegistry.MIN_SELF_STAKE)
+                .encodeOneBigInteger(MIN_SELF_STAKE)
                 .encodeOneBigInteger(BigInteger.ZERO)
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
@@ -335,7 +350,7 @@ public class StakerRegistryTest {
                 .encodeOneString("delegate")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
-        result = RULE.call(stakerAddress, stakerRegistry, StakerRegistry.MIN_SELF_STAKE, txData);
+        result = RULE.call(stakerAddress, stakerRegistry, MIN_SELF_STAKE, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         // query the effective stake
@@ -352,7 +367,7 @@ public class StakerRegistryTest {
                 .encodeOneString("bond")
                 .encodeOneAddress(stakerAddress)
                 .toBytes();
-        result = RULE.call(stakerAddress, stakerRegistry, StakerRegistry.MIN_SELF_STAKE, txData);
+        result = RULE.call(stakerAddress, stakerRegistry, MIN_SELF_STAKE, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         // query the effective stake again
@@ -363,7 +378,7 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE.multiply(BigInteger.TWO), result.getDecodedReturnData());
+        Assert.assertEquals(MIN_SELF_STAKE.multiply(BigInteger.TWO), result.getDecodedReturnData());
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("getSelfBondStake")
@@ -371,7 +386,7 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE, result.getDecodedReturnData());
+        Assert.assertEquals(MIN_SELF_STAKE, result.getDecodedReturnData());
     }
 
     @Test
@@ -389,7 +404,7 @@ public class StakerRegistryTest {
                 .encodeOneAddress(signingAddress2)
                 .encodeOneAddress(coinbaseAddress2)
                 .toBytes();
-        AvmRule.ResultWrapper result = RULE.call(stakerAddress2, stakerRegistry, StakerRegistry.MIN_SELF_STAKE, txData);
+        AvmRule.ResultWrapper result = RULE.call(stakerAddress2, stakerRegistry, MIN_SELF_STAKE, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         // delegate first
@@ -412,7 +427,7 @@ public class StakerRegistryTest {
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         // tweak the block number to skip the TRANSFER_LOCK_UP_PERIOD
-        tweakBlockNumber(RULE.kernel.getBlockNumber() + StakerRegistry.TRANSFER_LOCK_UP_PERIOD);
+        tweakBlockNumber(RULE.kernel.getBlockNumber() + TRANSFER_LOCK_UP_PERIOD);
 
         // the recipient staker needs to finalize the transfer
         txData = new ABIStreamingEncoder()
@@ -429,7 +444,7 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE.add(voteAmount.subtract(transferAmount)), result.getDecodedReturnData());
+        Assert.assertEquals(MIN_SELF_STAKE.add(voteAmount.subtract(transferAmount)), result.getDecodedReturnData());
 
         // query the stake to the other staker
         txData = new ABIStreamingEncoder()
@@ -438,7 +453,7 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        Assert.assertEquals(StakerRegistry.MIN_SELF_STAKE.add(transferAmount), result.getDecodedReturnData());
+        Assert.assertEquals(MIN_SELF_STAKE.add(transferAmount), result.getDecodedReturnData());
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("finalizeTransfer")
@@ -460,7 +475,7 @@ public class StakerRegistryTest {
         AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertFalse(result.getReceiptStatus().isSuccess());
 
-        tweakBlockNumber(RULE.kernel.getBlockNumber() + StakerRegistry.SIGNING_ADDRESS_COOLING_PERIOD);
+        tweakBlockNumber(RULE.kernel.getBlockNumber() + SIGNING_ADDRESS_COOLING_PERIOD);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("setSigningAddress")
@@ -534,7 +549,7 @@ public class StakerRegistryTest {
         Assert.assertFalse(result.getReceiptStatus().isSuccess());
 
         // tweak the block number
-        tweakBlockNumber(blockNumber + StakerRegistry.UNDELEGATE_LOCK_UP_PERIOD);
+        tweakBlockNumber(blockNumber + UNDELEGATE_LOCK_UP_PERIOD);
 
         // and, query again
         txData = new ABIStreamingEncoder()
@@ -550,7 +565,7 @@ public class StakerRegistryTest {
         Address anotherSigningAddress = RULE.getRandomAddress(BigInteger.ZERO);
         Address anotherCoinbaseAddress = RULE.getRandomAddress(BigInteger.ZERO);
 
-        tweakBlockNumber(RULE.kernel.getBlockNumber() + StakerRegistry.SIGNING_ADDRESS_COOLING_PERIOD);
+        tweakBlockNumber(RULE.kernel.getBlockNumber() + SIGNING_ADDRESS_COOLING_PERIOD);
 
         // update the signing address
         byte[] txData = new ABIStreamingEncoder()
@@ -579,7 +594,7 @@ public class StakerRegistryTest {
                 .encodeOneAddress(anotherCoinbaseAddress)
                 .toBytes();
 
-        result = RULE.call(newStakerAddress, stakerRegistry, StakerRegistry.MIN_SELF_STAKE, txData);
+        result = RULE.call(newStakerAddress, stakerRegistry, MIN_SELF_STAKE, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         txData = new ABIStreamingEncoder()

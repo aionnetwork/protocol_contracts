@@ -91,6 +91,14 @@ public class PoolRegistryEvents {
                 BigInteger.valueOf(id).toByteArray());
     }
 
+    protected static void poolRegistryDeployed(Address stakerRegistry, BigInteger minSelfStake, BigInteger minSelfStakePercentage, long commissionRateChangeTimeLock) {
+        Blockchain.log("ADSDeployed".getBytes(),
+                stakerRegistry.toByteArray(),
+                AionUtilities.padLeft(minSelfStake.toByteArray()),
+                AionUtilities.padLeft(minSelfStakePercentage.toByteArray()),
+                BigInteger.valueOf(commissionRateChangeTimeLock).toByteArray());
+    }
+
     // following events are implemented only in StakerRegistry
 //    - finalizedUndelegate
 //    - finalizedTransfer

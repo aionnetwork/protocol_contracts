@@ -10,10 +10,7 @@ import java.math.BigInteger;
  */
 public class PoolRewardsStateMachine {
 
-    // todo possible to replace multiplication and division with shift operation
     private static BigInteger precisionInt = new BigInteger("1000000000000000000000000000");
-    private static BigInteger feeDivisor = new BigInteger("1000000");
-
     PoolStorageObjects.PoolRewards currentPoolRewards;
 
     // Initialize pool
@@ -66,7 +63,7 @@ public class PoolRewardsStateMachine {
 
         // deal with the block rewards
         BigInteger commission = (BigInteger.valueOf(currentPoolRewards.commissionRate).multiply(currentPoolRewards.accumulatedBlockRewards))
-                .divide(feeDivisor);
+                .divide(BigInteger.valueOf(1000000));
 
         BigInteger currentRewards = currentPoolRewards.accumulatedBlockRewards.subtract(commission);
 

@@ -2,6 +2,7 @@ package org.aion.unity;
 
 import org.aion.avm.core.dappreading.JarBuilder;
 import org.aion.avm.embed.AvmRule;
+import org.aion.avm.tooling.ABIUtil;
 import org.aion.avm.tooling.deploy.OptimizedJarBuilder;
 import org.junit.Rule;
 import org.junit.Test;
@@ -10,6 +11,7 @@ import org.spongycastle.util.encoders.Hex;
 import java.io.DataOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.math.BigInteger;
 
 /**
  * This test includes methods that are used to build resources
@@ -17,7 +19,10 @@ import java.io.IOException;
 public class ContractCodeExtractor {
 
     private Class[] otherClasses = {StakerRegistryEvents.class, StakerStorageObjects.class, StakerRegistryStorage.class};
-
+    private static final BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
+    private static final long SIGNING_ADDRESS_COOLING_PERIOD = 6 * 60 * 24 * 7;
+    private static final long UNDELEGATE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
+    private static final long TRANSFER_LOCK_UP_PERIOD = 6 * 10;
     @Rule
     public AvmRule RULE = new AvmRule(false);
 
@@ -27,7 +32,8 @@ public class ContractCodeExtractor {
      */
     @Test
     public void testPrintJarInHex() {
-        byte[] jar = RULE.getDappBytes(StakerRegistry.class, null, 1, otherClasses);
+        byte[] arguments = ABIUtil.encodeDeploymentArguments(MIN_SELF_STAKE, SIGNING_ADDRESS_COOLING_PERIOD, UNDELEGATE_LOCK_UP_PERIOD, TRANSFER_LOCK_UP_PERIOD);
+        byte[] jar = RULE.getDappBytes(StakerRegistry.class, arguments, 1, otherClasses);
         System.out.println(Hex.toHexString(jar));
     }
 

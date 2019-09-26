@@ -89,4 +89,12 @@ public class StakerRegistryEvents {
                 staker.toByteArray(),
                 new byte[]{(byte) (state ? 1 : 0)});
     }
+
+    protected static void stakerRegistryDeployed(BigInteger minSelfStake, long signingAddressCoolingPeriod, long undelegateLockUpPeriod, long transferLockUpPeriod) {
+        Blockchain.log("StakerRegistryDeployed".getBytes(),
+                AionUtilities.padLeft(minSelfStake.toByteArray()),
+                AionUtilities.padLeft(BigInteger.valueOf(signingAddressCoolingPeriod).toByteArray()),
+                AionUtilities.padLeft(BigInteger.valueOf(undelegateLockUpPeriod).toByteArray()),
+                BigInteger.valueOf(transferLockUpPeriod).toByteArray());
+    }
 }

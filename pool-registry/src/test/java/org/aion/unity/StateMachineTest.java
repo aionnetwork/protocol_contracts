@@ -1,6 +1,7 @@
 package org.aion.unity;
 
 import avm.Address;
+import org.aion.avm.core.util.Helpers;
 import org.aion.avm.embed.AvmRule;
 import org.aion.avm.tooling.ABIUtil;
 import org.aion.avm.userlib.abi.ABIStreamingEncoder;
@@ -23,6 +24,7 @@ public class StateMachineTest {
 
     private static BigInteger ENOUGH_BALANCE_TO_TRANSACT = BigInteger.TEN.pow(18 + 5);
     private static BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
+    private static long COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD = 6 * 60 * 24 * 7;
 
     @Rule
     public AvmRule RULE = new AvmRule(false);
@@ -43,7 +45,11 @@ public class StateMachineTest {
             stakerRegistry = result.getDappAddress();
         }
 
-        byte[] arguments = ABIUtil.encodeDeploymentArguments(stakerRegistry);
+        Address placeHolder = new Address(Helpers.hexStringToBytes("0000000000000000000000000000000000000000000000000000000000000000"));
+        byte[] coinbaseArguments = ABIUtil.encodeDeploymentArguments(placeHolder);
+        byte[] coinbaseBytes = RULE.getDappBytes(PoolCoinbase.class, coinbaseArguments, 1);
+
+        byte[] arguments = ABIUtil.encodeDeploymentArguments(stakerRegistry, MIN_SELF_STAKE, BigInteger.ONE, COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD, coinbaseBytes);
         byte[] data = RULE.getDappBytes(PoolRegistry.class, arguments, 1, PoolStorageObjects.class, PoolRewardsStateMachine.class, PoolRegistryEvents.class, PoolRegistryStorage.class);
 
         AvmRule.ResultWrapper result = RULE.deploy(preminedAddress, BigInteger.ZERO, data);

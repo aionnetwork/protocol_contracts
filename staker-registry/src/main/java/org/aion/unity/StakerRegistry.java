@@ -5,6 +5,7 @@ import avm.Blockchain;
 import avm.Result;
 import org.aion.avm.tooling.abi.Callable;
 import org.aion.avm.tooling.abi.Fallback;
+import org.aion.avm.userlib.abi.ABIDecoder;
 
 import java.math.BigInteger;
 
@@ -13,15 +14,23 @@ import java.math.BigInteger;
  */
 public class StakerRegistry {
 
-    public static final long SIGNING_ADDRESS_COOLING_PERIOD = 6 * 60 * 24 * 7;
-    public static final long UNDELEGATE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
-    public static final long TRANSFER_LOCK_UP_PERIOD = 6 * 10;
-
-    // 1000 Aions
-    public static final BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
+    private static final BigInteger MIN_SELF_STAKE; // 1000 Aions
+    private static final long SIGNING_ADDRESS_COOLING_PERIOD; // 6 * 60 * 24 * 7;
+    private static final long UNDELEGATE_LOCK_UP_PERIOD; // 6 * 60 * 24 * 7;
+    private static final long TRANSFER_LOCK_UP_PERIOD; // 6 * 10;
 
     private static long nextUndelegateId = 0;
     private static long nextTransferId = 0;
+
+    static {
+        ABIDecoder decoder = new ABIDecoder(Blockchain.getData());
+        MIN_SELF_STAKE = decoder.decodeOneBigInteger();
+        SIGNING_ADDRESS_COOLING_PERIOD = decoder.decodeOneLong();
+        UNDELEGATE_LOCK_UP_PERIOD = decoder.decodeOneLong();
+        TRANSFER_LOCK_UP_PERIOD = decoder.decodeOneLong();
+
+        StakerRegistryEvents.stakerRegistryDeployed(MIN_SELF_STAKE, SIGNING_ADDRESS_COOLING_PERIOD, UNDELEGATE_LOCK_UP_PERIOD, TRANSFER_LOCK_UP_PERIOD);
+    }
 
     /**
      * Registers a staker. The caller address will be the identification

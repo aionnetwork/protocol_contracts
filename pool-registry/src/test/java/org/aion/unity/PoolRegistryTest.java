@@ -1,6 +1,7 @@
 package org.aion.unity;
 
 import avm.Address;
+import org.aion.avm.core.util.Helpers;
 import org.aion.avm.core.util.LogSizeUtils;
 import org.aion.avm.embed.AvmRule;
 import org.aion.avm.tooling.ABIUtil;
@@ -26,7 +27,8 @@ public class PoolRegistryTest {
 
     private static BigInteger ENOUGH_BALANCE_TO_TRANSACT = BigInteger.TEN.pow(18 + 5);
     private static BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
-
+    private static long COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD = 6 * 60 * 24 * 7;
+    
     @Rule
     public AvmRule RULE = new AvmRule(false);
 
@@ -46,11 +48,24 @@ public class PoolRegistryTest {
             stakerRegistry = result.getDappAddress();
         }
 
-        byte[] arguments = ABIUtil.encodeDeploymentArguments(stakerRegistry);
+        Address placeHolder = new Address(Helpers.hexStringToBytes("0000000000000000000000000000000000000000000000000000000000000000"));
+        byte[] coinbaseArguments = ABIUtil.encodeDeploymentArguments(placeHolder);
+        byte[] coinbaseBytes = RULE.getDappBytes(PoolCoinbase.class, coinbaseArguments, 1);
+
+        byte[] arguments = ABIUtil.encodeDeploymentArguments(stakerRegistry, MIN_SELF_STAKE, BigInteger.ONE, COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD, coinbaseBytes);
         byte[] data = RULE.getDappBytes(PoolRegistry.class, arguments, 1, PoolStorageObjects.class, PoolRewardsStateMachine.class, PoolRegistryEvents.class, PoolRegistryStorage.class);
 
         AvmRule.ResultWrapper result = RULE.deploy(preminedAddress, BigInteger.ZERO, data);
         assertTrue(result.getReceiptStatus().isSuccess());
+
+        assertEquals(1, result.getLogs().size());
+        Log poolRegistryEvent = result.getLogs().get(0);
+        assertArrayEquals(LogSizeUtils.truncatePadTopic("ADSDeployed".getBytes()), poolRegistryEvent.copyOfTopics().get(0));
+        assertArrayEquals(stakerRegistry.toByteArray(), poolRegistryEvent.copyOfTopics().get(1));
+        assertEquals(MIN_SELF_STAKE, new BigInteger(poolRegistryEvent.copyOfTopics().get(2)));
+        assertEquals(BigInteger.ONE, new BigInteger(poolRegistryEvent.copyOfTopics().get(3)));
+        assertEquals(COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD, new BigInteger(poolRegistryEvent.copyOfData()).longValue());
+
         poolRegistry = result.getDappAddress();
     }
 
@@ -773,7 +788,7 @@ public class PoolRegistryTest {
         byte[] expected = new byte[]{0, 1, -122, -96};
         Assert.assertArrayEquals(expected, Arrays.copyOfRange(info, 32 + 1 + 1, 32 + 1 + 1 + 4));
 
-        tweakBlockNumber(getBlockNumber() +  PoolRegistry.COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD);
+        tweakBlockNumber(getBlockNumber() + COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("finalizeCommissionRateChange")
