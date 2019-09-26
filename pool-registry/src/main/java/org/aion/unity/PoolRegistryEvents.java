@@ -74,16 +74,11 @@ public class PoolRegistryEvents {
                 BigInteger.valueOf(newCommissionRate).toByteArray());
     }
 
-    protected static void updatedMetaDataUrl(Address pool, byte[] newMetaDataUrl) {
-        Blockchain.log("ADSMetaDataUrlUpdated".getBytes(),
+    protected static void updatedMetaData(Address pool, byte[] newMetaDataUrl, byte[] newMetaDataContentHash) {
+        Blockchain.log("ADSPoolMetaDataUpdated".getBytes(),
                 pool.toByteArray(),
+                newMetaDataContentHash,
                 newMetaDataUrl);
-    }
-
-    protected static void updatedMetaDataContentHash(Address pool, byte[] newMetaDataContentHash) {
-        Blockchain.log("ADSMetaDataContentHashUpdated".getBytes(),
-                pool.toByteArray(),
-                newMetaDataContentHash);
     }
 
     protected static void finalizedCommissionRateChange(long id) {

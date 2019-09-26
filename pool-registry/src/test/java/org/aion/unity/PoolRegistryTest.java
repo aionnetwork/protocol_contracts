@@ -829,39 +829,32 @@ public class PoolRegistryTest {
         Arrays.fill(newMetaDataContentHash, Byte.MIN_VALUE);
 
         byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("updateMetaDataUrl")
+                .encodeOneString("updateMetaData")
                 .encodeOneByteArray(newMetaDataUrl)
+                .encodeOneByteArray(newMetaDataContentHash)
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
         // validate the log
         assertEquals(1, result.getLogs().size());
-        assertArrayEquals(LogSizeUtils.truncatePadTopic("ADSMetaDataUrlUpdated".getBytes()),
+        assertArrayEquals(LogSizeUtils.truncatePadTopic("ADSPoolMetaDataUpdated".getBytes()),
                 result.getLogs().get(0).copyOfTopics().get(0));
         assertArrayEquals(pool.toByteArray(), result.getLogs().get(0).copyOfTopics().get(1));
+        assertArrayEquals(newMetaDataContentHash, result.getLogs().get(0).copyOfTopics().get(2));
         assertArrayEquals(newMetaDataUrl, result.getLogs().get(0).copyOfData());
-
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("updateMetaDataContentHash")
-                .encodeOneByteArray(newMetaDataContentHash)
-                .toBytes();
-        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
-        assertTrue(result.getReceiptStatus().isSuccess());
-        // validate the log
-        assertEquals(1, result.getLogs().size());
-        assertArrayEquals(LogSizeUtils.truncatePadTopic("ADSMetaDataContentHashUpdated".getBytes()),
-                result.getLogs().get(0).copyOfTopics().get(0));
-        assertArrayEquals(pool.toByteArray(), result.getLogs().get(0).copyOfTopics().get(1));
-        assertArrayEquals(newMetaDataContentHash, result.getLogs().get(0).copyOfData());
     }
 
     @Test
     public void testGetPoolInfo(){
         Address pool = setupNewPool(10);
         byte[] metaDataUrl = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".getBytes();
+        byte[] newMetaDataContentHash = new byte[32];
+        Arrays.fill(newMetaDataContentHash, Byte.MIN_VALUE);
+
         byte[] txData = new ABIStreamingEncoder()
-                .encodeOneString("updateMetaDataUrl")
+                .encodeOneString("updateMetaData")
                 .encodeOneByteArray(metaDataUrl)
+                .encodeOneByteArray(newMetaDataContentHash)
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
@@ -877,7 +870,7 @@ public class PoolRegistryTest {
         Assert.assertEquals(getCoinbaseAddress(pool), decoder.decodeOneAddress());
         Assert.assertEquals(10 * 10000, decoder.decodeOneInteger());
         Assert.assertEquals(true, decoder.decodeOneBoolean());
-        Assert.assertArrayEquals(new byte[32], decoder.decodeOneByteArray());
+        Assert.assertArrayEquals(newMetaDataContentHash, decoder.decodeOneByteArray());
         Assert.assertArrayEquals(metaDataUrl, decoder.decodeOneByteArray());
     }
 

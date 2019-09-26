@@ -692,37 +692,20 @@ public class PoolRegistry {
     }
 
     @Callable
-    public static void updateMetaDataUrl(byte[] newMetaDataUrl){
+    public static void updateMetaData(byte[] newMetaDataUrl, byte[] newMetaDataContentHash){
         requireNoValue();
         Address pool = Blockchain.getCaller();
         // validate pool exists
         byte[] metadata = PoolRegistryStorage.getPoolMetaData(pool);
         requireNonNull(metadata);
 
+        // validate input
         requireNonNull(newMetaDataUrl);
-
-        byte[] metaDataHash = new byte[32];
-        System.arraycopy(metadata, 0, metaDataHash, 0, 32);
-        PoolRegistryStorage.putPoolMetaData(pool, metaDataHash, newMetaDataUrl);
-
-        PoolRegistryEvents.updatedMetaDataUrl(pool, newMetaDataUrl);
-    }
-
-    @Callable
-    public static void updateMetaDataContentHash(byte[] newMetaDataContentHash){
-        requireNoValue();
-        Address pool = Blockchain.getCaller();
-        // validate pool exists
-        byte[] metadata = PoolRegistryStorage.getPoolMetaData(pool);
-        requireNonNull(metadata);
-
         require(newMetaDataContentHash != null && newMetaDataContentHash.length == 32);
 
-        byte[] metaDataUrl = new byte[metadata.length - 32];
-        System.arraycopy(metadata, 32, metaDataUrl, 0, metaDataUrl.length);
-        PoolRegistryStorage.putPoolMetaData(pool, newMetaDataContentHash, metaDataUrl);
+        PoolRegistryStorage.putPoolMetaData(pool, newMetaDataContentHash, newMetaDataUrl);
 
-        PoolRegistryEvents.updatedMetaDataContentHash(pool, newMetaDataContentHash);
+        PoolRegistryEvents.updatedMetaData(pool, newMetaDataUrl, newMetaDataContentHash);
     }
 
     @Callable
