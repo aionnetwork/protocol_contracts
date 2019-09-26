@@ -75,12 +75,12 @@ public class StateMachineTest {
 
         // verify now
         txData = new ABIStreamingEncoder()
-                .encodeOneString("getPoolStatus")
+                .encodeOneString("isActive")
                 .encodeOneAddress(newPool)
                 .toBytes();
-        result = RULE.call(newPool, poolRegistry, BigInteger.ZERO, txData);
-        Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        assertEquals("ACTIVE", result.getDecodedReturnData());
+        result = RULE.call(newPool, stakerRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        assertEquals(true, result.getDecodedReturnData());
 
         return newPool;
     }

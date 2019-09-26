@@ -730,20 +730,6 @@ public class PoolRegistry {
         return info;
     }
 
-    /**
-     * Returns the status of a pool.
-     *
-     * @param pool the pool address.
-     * @return
-     */
-    @Callable
-    public static String getPoolStatus(Address pool) {
-        PoolStorageObjects.PoolRewards poolRewards = validateAndGetPoolRewards(pool);
-        BigInteger selfStake = getSelfStake(pool);
-        requireNoValue();
-        return isSelfStakeSatisfied(selfStake, poolRewards.accumulatedStake, poolRewards.pendingStake) ? "ACTIVE" : "BROKEN";
-    }
-
     @Callable
     public static BigInteger getOutstandingRewards(Address pool){
         PoolStorageObjects.PoolRewards poolRewards = validateAndGetPoolRewards(pool);

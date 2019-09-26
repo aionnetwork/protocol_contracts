@@ -74,13 +74,7 @@ public class PoolStateTest {
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
         // verify now
-        txData = new ABIStreamingEncoder()
-                .encodeOneString("getPoolStatus")
-                .encodeOneAddress(newPool)
-                .toBytes();
-        result = RULE.call(newPool, poolRegistry, BigInteger.ZERO, txData);
-        Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        assertEquals("ACTIVE", result.getDecodedReturnData());
+        validateState(newPool, true);
 
         return newPool;
     }
@@ -98,6 +92,7 @@ public class PoolStateTest {
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(delegator, poolRegistry, remainingCapacity, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
 
         // transfer to active pool
         txData = new ABIStreamingEncoder()
@@ -110,6 +105,8 @@ public class PoolStateTest {
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
         long id = (long) result.getDecodedReturnData();
+        validateState(pool1, true);
+        validateState(pool2, true);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -117,6 +114,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, nStake(1), txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -124,6 +122,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, nStake(1), txData);
         assertTrue(result.getReceiptStatus().isFailed());
+        validateState(pool2, true);
 
         tweakBlockNumber(RULE.kernel.getBlockNumber() + 6 * 10);
 
@@ -140,6 +139,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, nStake(1), txData);
         assertTrue(result.getReceiptStatus().isFailed());
+        validateState(pool2, true);
     }
 
     @Test
@@ -149,7 +149,6 @@ public class PoolStateTest {
         Address delegator1 = RULE.getRandomAddress(nStake(1000));
         Address delegator2 = RULE.getRandomAddress(nStake(1000));
 
-
         BigInteger remainingCapacity = nStake(99);
 
         byte[] txData = new ABIStreamingEncoder()
@@ -158,6 +157,7 @@ public class PoolStateTest {
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(delegator1, poolRegistry, remainingCapacity.divide(BigInteger.TWO), txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -165,6 +165,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator2, poolRegistry, remainingCapacity.divide(BigInteger.TWO), txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("transferDelegation")
@@ -175,6 +176,8 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator1, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
+        validateState(pool2, true);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("transferDelegation")
@@ -185,6 +188,8 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator2, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
+        validateState(pool2, true);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -192,6 +197,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator2, poolRegistry, nStake(1), txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -218,6 +224,8 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator2, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isFailed());
+        validateState(pool1, true);
+        validateState(pool2, true);
 
         // fee is not included in pending stake, and can be transferred
         txData = new ABIStreamingEncoder()
@@ -229,6 +237,8 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator2, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
+        validateState(pool2, true);
     }
 
     @Test
@@ -282,6 +292,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator2, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool2, true);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("transferDelegation")
@@ -292,6 +303,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator1, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool2, true);
     }
 
     @Test
@@ -325,6 +337,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(pool2, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool2, false);
 
         // transfer to a broken pool will fail
         txData = new ABIStreamingEncoder()
@@ -336,6 +349,8 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator1, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isFailed());
+        validateState(pool1, true);
+        validateState(pool2, false);
     }
 
     @Test
@@ -352,6 +367,7 @@ public class PoolStateTest {
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(pool1, poolRegistry, nStake(1), txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -359,6 +375,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(pool2, poolRegistry, nStake(1), txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool2, true);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -366,6 +383,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator1, poolRegistry, remainingCapacity, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("undelegate")
@@ -375,6 +393,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(pool1, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, false);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -393,6 +412,8 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator1, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
+        validateState(pool2, true);
 
         // from pool becomes active after the transfer
         txData = new ABIStreamingEncoder()
@@ -401,6 +422,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator1, poolRegistry, BigInteger.TEN, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
     }
 
     @Test
@@ -416,6 +438,7 @@ public class PoolStateTest {
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(delegator, poolRegistry, remainingCapacity, txData);
         assertTrue(result.getReceiptStatus().isFailed());
+        validateState(pool, true);
     }
 
     @Test
@@ -441,6 +464,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool, false);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -455,6 +479,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(pool, poolRegistry, nStake(1), txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool, true);
 
         // pool becomes active after the delegate
         txData = new ABIStreamingEncoder()
@@ -463,6 +488,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, remainingCapacity.divide(BigInteger.TWO), txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool, true);
     }
 
     @Test
@@ -488,6 +514,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool, false);
 
         // validate the event from staker registry
         assertEquals(3, result.getLogs().size());
@@ -517,6 +544,7 @@ public class PoolStateTest {
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(pool, poolRegistry, nStake(1), txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool, true);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -524,6 +552,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, remainingCapacity, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool, true);
 
         // undelegate puts the pool into a broken state
         txData = new ABIStreamingEncoder()
@@ -534,6 +563,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool, false);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -551,6 +581,7 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool, true);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -558,6 +589,17 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, nStake(90), txData);
         assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool, true);
+    }
+
+    private void validateState(Address pool, boolean expectedState){
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("isActive")
+                .encodeOneAddress(pool)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(pool, stakerRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        assertEquals(expectedState, result.getDecodedReturnData());
     }
 
     private void tweakBlockNumber(long number) {
