@@ -33,20 +33,16 @@ public class StakerRegistry {
     }
 
     /**
-     * Registers a staker. The caller address will be the identification
-     * address of the new staker.
+     * Registers a staker. The caller address will be the management address of the new staker.
      * Note that the minimum self bond value should be passed along the call.
      *
      * @param identityAddress  the identity of the staker; can't be changed
-     * @param managementAddress  the address with management rights. can't be changed.
      * @param signingAddress  the address of the key used for signing PoS blocks
      * @param coinbaseAddress the address of the key used for collecting block rewards
      */
     @Callable
-    public static void registerStaker(Address identityAddress, Address managementAddress,
-                                      Address signingAddress, Address coinbaseAddress) {
+    public static void registerStaker(Address identityAddress, Address signingAddress, Address coinbaseAddress) {
         requireNonNull(identityAddress);
-        requireNonNull(managementAddress);
         requireNonNull(signingAddress);
         requireNonNull(coinbaseAddress);
 
@@ -55,6 +51,8 @@ public class StakerRegistry {
 
         BigInteger selfStake = Blockchain.getValue();
         require(selfStake.compareTo(MIN_SELF_STAKE) >= 0);
+
+        Address managementAddress = Blockchain.getCaller();
 
         // signingAddress -> identityAddress
         StakerRegistryStorage.putIdentityAddress(signingAddress, identityAddress);

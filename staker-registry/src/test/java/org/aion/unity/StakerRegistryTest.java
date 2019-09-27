@@ -64,7 +64,6 @@ public class StakerRegistryTest {
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("registerStaker")
                 .encodeOneAddress(stakerAddress)
-                .encodeOneAddress(stakerAddress)
                 .encodeOneAddress(signingAddress)
                 .encodeOneAddress(coinbaseAddress)
                 .toBytes();
@@ -248,7 +247,6 @@ public class StakerRegistryTest {
                 .encodeOneAddress(stakerAddress2)
                 .encodeOneAddress(stakerAddress2)
                 .encodeOneAddress(stakerAddress2)
-                .encodeOneAddress(stakerAddress2)
                 .toBytes();
         result = RULE.call(stakerAddress2, stakerRegistry, MIN_SELF_STAKE, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
@@ -399,7 +397,6 @@ public class StakerRegistryTest {
 
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("registerStaker")
-                .encodeOneAddress(stakerAddress2)
                 .encodeOneAddress(stakerAddress2)
                 .encodeOneAddress(signingAddress2)
                 .encodeOneAddress(coinbaseAddress2)
@@ -589,7 +586,6 @@ public class StakerRegistryTest {
         txData = new ABIStreamingEncoder()
                 .encodeOneString("registerStaker")
                 .encodeOneAddress(newStakerAddress)
-                .encodeOneAddress(newStakerAddress)
                 .encodeOneAddress(signingAddress)
                 .encodeOneAddress(anotherCoinbaseAddress)
                 .toBytes();
@@ -641,7 +637,6 @@ public class StakerRegistryTest {
         txData = new ABIStreamingEncoder()
                 .encodeOneString("registerStaker")
                 .encodeOneAddress(newStakerAddress)
-                .encodeOneAddress(newStakerAddress)
                 .encodeOneAddress(newSigningAddress)
                 .encodeOneAddress(newSigningAddress)
                 .toBytes();
@@ -667,7 +662,6 @@ public class StakerRegistryTest {
         byte[] txData = new ABIStreamingEncoder()
                 .encodeOneString("registerStaker")
                 .encodeOneAddress(newAddress)
-                .encodeOneAddress(newAddress)
                 .encodeOneAddress(signingAddress)
                 .encodeOneAddress(newAddress)
                 .toBytes();
@@ -678,7 +672,6 @@ public class StakerRegistryTest {
         txData = new ABIStreamingEncoder()
                 .encodeOneString("registerStaker")
                 .encodeOneAddress(stakerAddress)
-                .encodeOneAddress(newAddress)
                 .encodeOneAddress(newAddress)
                 .encodeOneAddress(newAddress)
                 .toBytes();

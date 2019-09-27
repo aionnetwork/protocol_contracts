@@ -87,11 +87,10 @@ public class PoolRegistry {
          */
         String methodName = "registerStaker";
         // encoded data is directly written to the byte array to reduce energy usage
-        byte[] registerStakerCall = new byte[getStringSize(methodName) + getAddressSize() * 4];
+        byte[] registerStakerCall = new byte[getStringSize(methodName) + getAddressSize() * 3];
         new ABIStreamingEncoder(registerStakerCall)
                 .encodeOneString(methodName)
                 .encodeOneAddress(caller)
-                .encodeOneAddress(Blockchain.getAddress())
                 .encodeOneAddress(signingAddress)
                 .encodeOneAddress(coinbaseAddress);
         secureCall(STAKER_REGISTRY, selfStake, registerStakerCall, Blockchain.getRemainingEnergy());
