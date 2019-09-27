@@ -14,6 +14,7 @@ import org.junit.Test;
 import org.spongycastle.util.encoders.Hex;
 
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Scanner;
 
@@ -97,7 +98,7 @@ public class StateMachineTest {
         AvmRule.ResultWrapper result = RULE.call(delegator, poolRegistry, nStake(1), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
-        generateBlock(pool, 1000);
+        generateBlock(pool, BigInteger.valueOf(1000));
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -106,7 +107,7 @@ public class StateMachineTest {
         result = RULE.call(delegator, poolRegistry, nStake(1), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
-        generateBlock(pool, 1000);
+        generateBlock(pool, BigInteger.valueOf(1000));
         long expectedDelegatorRewards = (1000 - 40) / 2 + ((1000 - 40) * 2 / 3);
 
         txData = new ABIStreamingEncoder()
@@ -130,7 +131,7 @@ public class StateMachineTest {
         AvmRule.ResultWrapper result = RULE.call(delegator, poolRegistry, nStake(1), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
-        generateBlock(pool, 1000);
+        generateBlock(pool, BigInteger.valueOf(1000));
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("undelegate")
@@ -141,7 +142,7 @@ public class StateMachineTest {
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
 
-        generateBlock(pool, 1000);
+        generateBlock(pool, BigInteger.valueOf(1000));
         long expectedDelegatorRewards = (1000 - 40) / 2;
         long expectedPoolRewards = (1000 - 40) / 2 + 1000 + 40;
 
@@ -176,7 +177,7 @@ public class StateMachineTest {
         AvmRule.ResultWrapper result = RULE.call(delegator, poolRegistry, nStake(1), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
-        generateBlock(pool1, 1000);
+        generateBlock(pool1, BigInteger.valueOf(1000));
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("transferDelegation")
@@ -189,8 +190,8 @@ public class StateMachineTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         long id = (long) result.getDecodedReturnData();
 
-        generateBlock(pool1, 1000);
-        generateBlock(pool2, 1000);
+        generateBlock(pool1, BigInteger.valueOf(1000));
+        generateBlock(pool2, BigInteger.valueOf(1000));
 
         tweakBlockNumber(RULE.kernel.getBlockNumber() + 6 * 10);
         txData = new ABIStreamingEncoder()
@@ -218,7 +219,7 @@ public class StateMachineTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         Assert.assertEquals(BigInteger.ZERO, result.getDecodedReturnData());
 
-        generateBlock(pool2, 1000);
+        generateBlock(pool2, BigInteger.valueOf(1000));
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("withdrawRewards")
@@ -241,7 +242,7 @@ public class StateMachineTest {
         AvmRule.ResultWrapper result = RULE.call(delegator, poolRegistry, nStake(1), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
-        generateBlock(pool, 1000);
+        generateBlock(pool, BigInteger.valueOf(1000));
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("undelegate")
@@ -271,7 +272,7 @@ public class StateMachineTest {
         result = RULE.call(random, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
 
-        generateBlock(pool, 1000);
+        generateBlock(pool, BigInteger.valueOf(1000));
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("delegate")
@@ -280,7 +281,7 @@ public class StateMachineTest {
         result = RULE.call(delegator, poolRegistry, nStake(1), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
-        generateBlock(pool, 1000);
+        generateBlock(pool, BigInteger.valueOf(1000));
 
         BigInteger expectedDelegatorRewards = BigInteger.valueOf(1000 - 40).multiply(new BigInteger("1000000000000000000432"))
                 .divide(new BigInteger("1000000000000000000000").add(new BigInteger("1000000000000000000432")));
@@ -309,7 +310,7 @@ public class StateMachineTest {
         AvmRule.ResultWrapper result = RULE.call(delegator1, poolRegistry, nStake(1), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
-        generateBlock(pool, 1000);
+        generateBlock(pool, BigInteger.valueOf(1000));
 
         long expectedDelegatorRewards = (1000 - 40) / 2;
         long expectedPoolRewards = (1000 - 40) / 2 + 40;
@@ -332,7 +333,7 @@ public class StateMachineTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         Assert.assertEquals(BigInteger.valueOf(expectedPoolRewards), result.getDecodedReturnData());
 
-        generateBlock(pool, 1000);
+        generateBlock(pool, BigInteger.valueOf(1000));
 
         expectedDelegatorRewards += (1000 - 40) / 2;
         expectedPoolRewards += (1000 - 40) / 2 + 40;
@@ -362,7 +363,7 @@ public class StateMachineTest {
         result = RULE.call(delegator2, poolRegistry, nStake(1), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
-        generateBlock(pool, 1000);
+        generateBlock(pool, BigInteger.valueOf(1000));
 
         expectedDelegatorRewards += (1000 - 40) / 3;
         expectedPoolRewards += (1000 - 40) / 3 + 40;
@@ -402,13 +403,107 @@ public class StateMachineTest {
         Assert.assertEquals(BigInteger.valueOf(expectedPoolRewards), result.getDecodedReturnData());
     }
 
+    @Test
+    public void testHighStakeHighReward(){
+        Address pool = setupNewPool(4);
+        RULE.kernel.adjustBalance(new AionAddress(pool.toByteArray()), nStake(150000));
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(pool, poolRegistry, nStake(140000), txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        // assumption is 1.5 Aions as reward per staking block that has been produced for one year
+        BigInteger reward = new BigDecimal(1.5).multiply(BigDecimal.TEN.pow(18)).multiply(new BigDecimal(1576800)).toBigInteger();
+
+        generateBlock(pool, reward);
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("withdrawRewards")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        // NOTE that this is -1 nAmp due to rounding errors
+        Assert.assertEquals(reward.subtract(BigInteger.ONE), result.getDecodedReturnData());
+    }
+
+    @Test
+    public void testHighStakeHighRewardMultipleBlocks(){
+        Address pool = setupNewPool(4);
+        RULE.kernel.adjustBalance(new AionAddress(pool.toByteArray()), nStake(150000));
+
+        Address delegator = RULE.getRandomAddress(nStake(150000));
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(pool, poolRegistry, nStake(140000), txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(delegator, poolRegistry, nStake(1), txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        BigInteger reward = new BigDecimal(1.5).multiply(BigDecimal.TEN.pow(18)).multiply(new BigDecimal(1576800)).toBigInteger();
+
+        generateBlock(pool, BigInteger.valueOf(100000));
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("withdrawRewards")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(BigInteger.valueOf(99999), result.getDecodedReturnData());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("withdrawRewards")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(BigInteger.ZERO, result.getDecodedReturnData());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(delegator, poolRegistry, nStake(1000), txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        generateBlock(pool, BigInteger.valueOf(10000));
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getRewards")
+                .encodeOneAddress(pool)
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(BigInteger.valueOf(9931), result.getDecodedReturnData());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("withdrawRewards")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(BigInteger.valueOf(68), result.getDecodedReturnData());
+    }
+
     private long getBlockNumber() {
         return RULE.kernel.getBlockNumber();
     }
 
-    private void generateBlock(Address pool, long blockRewards) {
+    private void generateBlock(Address pool, BigInteger blockRewards) {
         AionAddress coinbaseAddress = new AionAddress(getCoinbaseAddress(pool).toByteArray());
-        RULE.kernel.adjustBalance(coinbaseAddress, BigInteger.valueOf(blockRewards));
+        RULE.kernel.adjustBalance(coinbaseAddress, blockRewards);
         tweakBlockNumber(getBlockNumber() + 1);
     }
 
