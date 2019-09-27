@@ -254,7 +254,7 @@ public class PoolRegistry {
      * @param pool the pool address
      */
     @Callable
-    public static void redelegate(Address pool) {
+    public static void redelegateRewards(Address pool) {
         Address caller = Blockchain.getCaller();
         PoolStorageObjects.PoolRewards poolRewards = validateAndGetPoolRewards(pool);
         requireNoValue();
@@ -429,7 +429,7 @@ public class PoolRegistry {
      * @param pool the pool address
      */
     @Callable
-    public static BigInteger withdraw(Address pool) {
+    public static BigInteger withdrawRewards(Address pool) {
         Address caller = Blockchain.getCaller();
 
         PoolStorageObjects.PoolRewards poolRewards = validateAndGetPoolRewards(pool);

@@ -368,7 +368,7 @@ public class PoolRegistryTest {
 
         // User1 withdraw
         txData = new ABIStreamingEncoder()
-                .encodeOneString("withdraw")
+                .encodeOneString("withdrawRewards")
                 .encodeOneAddress(pool)
                 .toBytes();
         result = RULE.call(user1, poolRegistry, BigInteger.ZERO, txData);
@@ -405,7 +405,7 @@ public class PoolRegistryTest {
 
         // User1 redelegate
         txData = new ABIStreamingEncoder()
-                .encodeOneString("redelegate")
+                .encodeOneString("redelegateRewards")
                 .encodeOneAddress(pool)
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
@@ -416,7 +416,7 @@ public class PoolRegistryTest {
 
         // User1 withdraw
         txData = new ABIStreamingEncoder()
-                .encodeOneString("withdraw")
+                .encodeOneString("withdrawRewards")
                 .encodeOneAddress(pool)
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
@@ -978,7 +978,7 @@ public class PoolRegistryTest {
 
         long expectedDelegatorRewards = (1000 - 40) / 2;
         txData = new ABIStreamingEncoder()
-                .encodeOneString("withdraw")
+                .encodeOneString("withdrawRewards")
                 .encodeOneAddress(pool)
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
@@ -1016,7 +1016,7 @@ public class PoolRegistryTest {
         Assert.assertEquals(BigInteger.valueOf(expectedDelegatorRewards), result.getDecodedReturnData());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("withdraw")
+                .encodeOneString("withdrawRewards")
                 .encodeOneAddress(pool)
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
@@ -1025,7 +1025,7 @@ public class PoolRegistryTest {
 
         long expectedPoolRewards = (1000 - 40) / 2 + (1000 - 40) / 2 + 40 + 40;
         txData = new ABIStreamingEncoder()
-                .encodeOneString("withdraw")
+                .encodeOneString("withdrawRewards")
                 .encodeOneAddress(pool)
                 .toBytes();
         result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
@@ -1042,7 +1042,7 @@ public class PoolRegistryTest {
         Assert.assertEquals(BigInteger.ZERO, result.getDecodedReturnData());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("withdraw")
+                .encodeOneString("withdrawRewards")
                 .encodeOneAddress(pool)
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
@@ -1050,7 +1050,7 @@ public class PoolRegistryTest {
         Assert.assertEquals(BigInteger.ZERO, result.getDecodedReturnData());
 
         txData = new ABIStreamingEncoder()
-                .encodeOneString("withdraw")
+                .encodeOneString("withdrawRewards")
                 .encodeOneAddress(pool)
                 .toBytes();
         result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
