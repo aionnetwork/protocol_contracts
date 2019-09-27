@@ -48,12 +48,6 @@ public class PoolRegistry {
         PoolRegistryEvents.poolRegistryDeployed(STAKER_REGISTRY, MIN_SELF_STAKE, MIN_SELF_STAKE_PERCENTAGE, COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD);
     }
 
-    @Callable
-    public static Address getStakerRegistry() {
-        requireNoValue();
-        return STAKER_REGISTRY;
-    }
-
     /**
      * Registers a pool in the registry.
      * Note that the minimum self bond value should be passed along the call.
@@ -117,28 +111,6 @@ public class PoolRegistry {
         PoolRegistryStorage.putPoolMetaData(caller, metaDataContentHash, metaDataUrl);
 
         PoolRegistryEvents.registeredPool(caller, commissionRate, metaDataContentHash, metaDataUrl);
-    }
-
-    /**
-     * Updates the signing address of a staker. Owner only.
-     *
-     * @param newAddress the new signing address
-     */
-    @Callable
-    public static void setSigningAddress(Address newAddress) {
-        requireNonNull(newAddress);
-        requireNoValue();
-        Address staker = Blockchain.getCaller();
-        requirePool(staker);
-
-        String methodName = "setSigningAddress";
-        // encoded data is directly written to the byte array to reduce energy usage
-        byte[] data = new byte[getStringSize(methodName) + getAddressSize() * 2];
-        new ABIStreamingEncoder(data)
-                .encodeOneString(methodName)
-                .encodeOneAddress(staker)
-                .encodeOneAddress(newAddress);
-        secureCall(STAKER_REGISTRY, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
     }
 
     /**
@@ -380,36 +352,6 @@ public class PoolRegistry {
     }
 
     /**
-     * Returns the stake of a delegator to a pool.
-     *
-     * @param pool      the pool address
-     * @param delegator the delegator address
-     * @return the amount of stake
-     */
-    @Callable
-    public static BigInteger getStake(Address pool, Address delegator) {
-        requirePool(pool);
-        requireNonNull(delegator);
-        requireNoValue();
-
-        return PoolRegistryStorage.getDelegator(pool, delegator).stake;
-    }
-
-    /**
-     * Returns the total stake of a pool.
-     *
-     * @param pool the pool address
-     * @return the amount of stake. returned array has two elements:
-     * first element represents the total stake of the pool, and the second element represents the stake that was transferred but has not been finalized yet.
-     */
-    @Callable
-    public static BigInteger[] getTotalStake(Address pool) {
-        PoolStorageObjects.PoolRewards rewards = validateAndGetPoolRewards(pool);
-        requireNoValue();
-        return new BigInteger[]{rewards.accumulatedStake, rewards.pendingStake};
-    }
-
-    /**
      * Finalizes an undelegate operation.
      *
      * @param id pending undelegation id
@@ -482,18 +424,42 @@ public class PoolRegistry {
     }
 
     /**
-     * Returns the auto-redelegation fee set by a delegator, or -1 if not set.
+     * Withdraws block rewards from one pool.
      *
-     * @param pool      the pool's address
-     * @param delegator the delegator's address
-     * @return the fee in percentage, or -1
+     * @param pool the pool address
      */
     @Callable
-    public static int getAutoRewardsDelegationFee(Address pool, Address delegator) {
-        requirePool(pool);
+    public static BigInteger withdraw(Address pool) {
+        Address caller = Blockchain.getCaller();
+
+        PoolStorageObjects.PoolRewards poolRewards = validateAndGetPoolRewards(pool);
         requireNoValue();
 
-        return PoolRegistryStorage.getAutoDelegationFee(pool, delegator);
+        PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(poolRewards);
+        detectBlockRewards(stateMachine);
+
+        PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(pool, caller);
+        // query withdraw amount from rewards state machine
+        BigInteger amount = stateMachine.onWithdraw(delegatorInfo, Blockchain.getBlockNumber());
+        if (caller.equals(pool)) {
+            amount = amount.add(stateMachine.onWithdrawOperator());
+        }
+
+        // do a transfer if amount > 0
+        if (amount.signum() == 1) {
+            secureCall(caller, amount, new byte[0], Blockchain.getRemainingEnergy());
+        }
+
+        // remove the delegator from storage if the stake is zero and all the rewards have been withdrawn
+        if(delegatorInfo.stake.equals(BigInteger.ZERO)) {
+            delegatorInfo = null;
+        }
+
+        PoolRegistryStorage.putDelegator(pool, caller, delegatorInfo);
+        PoolRegistryStorage.putPoolRewards(pool, stateMachine.currentPoolRewards);
+
+        PoolRegistryEvents.withdrew(caller, pool, amount);
+        return amount;
     }
 
     /**
@@ -573,77 +539,6 @@ public class PoolRegistry {
         }
     }
 
-    /**
-     * Returns the outstanding rewards of a delegator.
-     *
-     * @param pool      the pool address
-     * @param delegator the delegator address
-     * @return the amount of outstanding rewards
-     */
-    @Callable
-    public static BigInteger getRewards(Address pool, Address delegator) {
-        PoolStorageObjects.PoolRewards poolRewards = validateAndGetPoolRewards(pool);
-        requireNonNull(delegator);
-        requireNoValue();
-
-        PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(poolRewards);
-
-        // update block rewards without transferring the balance
-        BigInteger balance = Blockchain.getBalance(poolRewards.coinbaseAddress);
-
-        if (balance.signum() == 1) {
-            stateMachine.onBlock(Blockchain.getBlockNumber(), balance);
-        }
-        PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(pool, delegator);
-        // query withdraw amount from rewards state machine.
-        // Updated values are only stored when the rewards are withdrawn
-        BigInteger amount = stateMachine.onWithdraw(delegatorInfo, Blockchain.getBlockNumber());
-        if (delegator.equals(pool)) {
-            amount = amount.add(stateMachine.onWithdrawOperator());
-        }
-
-        return amount;
-    }
-
-    /**
-     * Withdraws block rewards from one pool.
-     *
-     * @param pool the pool address
-     */
-    @Callable
-    public static BigInteger withdraw(Address pool) {
-        Address caller = Blockchain.getCaller();
-
-        PoolStorageObjects.PoolRewards poolRewards = validateAndGetPoolRewards(pool);
-        requireNoValue();
-
-        PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(poolRewards);
-        detectBlockRewards(stateMachine);
-
-        PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(pool, caller);
-        // query withdraw amount from rewards state machine
-        BigInteger amount = stateMachine.onWithdraw(delegatorInfo, Blockchain.getBlockNumber());
-        if (caller.equals(pool)) {
-            amount = amount.add(stateMachine.onWithdrawOperator());
-        }
-
-        // do a transfer if amount > 0
-        if (amount.signum() == 1) {
-            secureCall(caller, amount, new byte[0], Blockchain.getRemainingEnergy());
-        }
-
-        // remove the delegator from storage if the stake is zero and all the rewards have been withdrawn
-        if(delegatorInfo.stake.equals(BigInteger.ZERO)) {
-            delegatorInfo = null;
-        }
-
-        PoolRegistryStorage.putDelegator(pool, caller, delegatorInfo);
-        PoolRegistryStorage.putPoolRewards(pool, stateMachine.currentPoolRewards);
-
-        PoolRegistryEvents.withdrew(caller, pool, amount);
-        return amount;
-    }
-
     @Callable
     public static long requestCommissionRateChange(int newCommissionRate) {
         requireNoValue();
@@ -708,6 +603,90 @@ public class PoolRegistry {
         PoolRegistryEvents.updatedMetaData(pool, newMetaDataUrl, newMetaDataContentHash);
     }
 
+    /**
+     * Updates the signing address of a staker. Owner only.
+     *
+     * @param newAddress the new signing address
+     */
+    @Callable
+    public static void setSigningAddress(Address newAddress) {
+        requireNonNull(newAddress);
+        requireNoValue();
+        Address staker = Blockchain.getCaller();
+        requirePool(staker);
+
+        String methodName = "setSigningAddress";
+        // encoded data is directly written to the byte array to reduce energy usage
+        byte[] data = new byte[getStringSize(methodName) + getAddressSize() * 2];
+        new ABIStreamingEncoder(data)
+                .encodeOneString(methodName)
+                .encodeOneAddress(staker)
+                .encodeOneAddress(newAddress);
+        secureCall(STAKER_REGISTRY, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
+    }
+
+    /**
+     * Returns the outstanding rewards of a delegator.
+     *
+     * @param pool      the pool address
+     * @param delegator the delegator address
+     * @return the amount of outstanding rewards
+     */
+    @Callable
+    public static BigInteger getRewards(Address pool, Address delegator) {
+        PoolStorageObjects.PoolRewards poolRewards = validateAndGetPoolRewards(pool);
+        requireNonNull(delegator);
+        requireNoValue();
+
+        PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(poolRewards);
+
+        // update block rewards without transferring the balance
+        BigInteger balance = Blockchain.getBalance(poolRewards.coinbaseAddress);
+
+        if (balance.signum() == 1) {
+            stateMachine.onBlock(Blockchain.getBlockNumber(), balance);
+        }
+        PoolStorageObjects.DelegatorInfo delegatorInfo = PoolRegistryStorage.getDelegator(pool, delegator);
+        // query withdraw amount from rewards state machine.
+        // Updated values are only stored when the rewards are withdrawn
+        BigInteger amount = stateMachine.onWithdraw(delegatorInfo, Blockchain.getBlockNumber());
+        if (delegator.equals(pool)) {
+            amount = amount.add(stateMachine.onWithdrawOperator());
+        }
+
+        return amount;
+    }
+
+    /**
+     * Returns the stake of a delegator to a pool.
+     *
+     * @param pool      the pool address
+     * @param delegator the delegator address
+     * @return the amount of stake
+     */
+    @Callable
+    public static BigInteger getStake(Address pool, Address delegator) {
+        requirePool(pool);
+        requireNonNull(delegator);
+        requireNoValue();
+
+        return PoolRegistryStorage.getDelegator(pool, delegator).stake;
+    }
+
+    /**
+     * Returns the total stake of a pool.
+     *
+     * @param pool the pool address
+     * @return the amount of stake. returned array has two elements:
+     * first element represents the total stake of the pool, and the second element represents the stake that was transferred but has not been finalized yet.
+     */
+    @Callable
+    public static BigInteger[] getTotalStake(Address pool) {
+        PoolStorageObjects.PoolRewards rewards = validateAndGetPoolRewards(pool);
+        requireNoValue();
+        return new BigInteger[]{rewards.accumulatedStake, rewards.pendingStake};
+    }
+
     @Callable
     public static byte[] getPoolInfo(Address pool) {
         requireNoValue();
@@ -735,6 +714,27 @@ public class PoolRegistry {
         PoolStorageObjects.PoolRewards poolRewards = validateAndGetPoolRewards(pool);
         requireNoValue();
         return poolRewards.outstandingRewards;
+    }
+
+    /**
+     * Returns the auto-redelegation fee set by a delegator, or -1 if not set.
+     *
+     * @param pool      the pool's address
+     * @param delegator the delegator's address
+     * @return the fee in percentage, or -1
+     */
+    @Callable
+    public static int getAutoRewardsDelegationFee(Address pool, Address delegator) {
+        requirePool(pool);
+        requireNoValue();
+
+        return PoolRegistryStorage.getAutoDelegationFee(pool, delegator);
+    }
+
+    @Callable
+    public static Address getStakerRegistry() {
+        requireNoValue();
+        return STAKER_REGISTRY;
     }
 
     @Fallback

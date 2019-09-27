@@ -184,6 +184,75 @@ public class StakerRegistry {
     }
 
     /**
+     * Bonds the stake to the staker. Any liquid coins, passed along the call, are counted as part of the self-bond stake.
+     *
+     * @param staker the address of the staker
+     */
+    @Callable
+    public static void bond(Address staker){
+        BigInteger amount = Blockchain.getValue();
+
+        requirePositive(amount);
+        requireStakerAndManager(staker, Blockchain.getCaller());
+
+        StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(staker);
+
+        stakeInfo.selfBondStake = stakeInfo.selfBondStake.add(amount);
+        StakerRegistryStorage.putStakerStakeInfo(staker, stakeInfo);
+
+        StakerRegistryEvents.bonded(staker, amount);
+    }
+
+    /**
+     * Unbonds for a staker, After a successful unbond, the locked coins will be released to the original bonder (management address).
+     * This is subject to lock-up period.
+     *
+     * @param staker the address of the staker
+     * @param amount the amount of stake
+     * @param fee the amount of stake that will be transferred to the account that invokes finalizeUndelegate
+     * @return a pending un-delegate identifier
+     */
+    @Callable
+    public static long unbond(Address staker, BigInteger amount, BigInteger fee){
+        return unbondTo(staker, amount, Blockchain.getCaller(), fee);
+    }
+
+    /**
+     * Unbonds for a staker, After a successful unbond, the locked coins will be released to the specified account.
+     * This is subject to lock-up period.
+     *
+     * @param staker the address of the staker
+     * @param amount the amount of stake
+     * @param recipient the receiving address
+     * @param fee the amount of stake that will be transferred to the account that invokes finalizeUndelegate
+     * @return a pending un-delegate identifier
+     */
+    @Callable
+    public static long unbondTo(Address staker, BigInteger amount, Address recipient, BigInteger fee){
+        Address caller = Blockchain.getCaller();
+
+        requireStakerAndManager(staker, caller);
+        requirePositive(amount);
+        requireNoValue();
+        require(fee.signum() >= 0 && fee.compareTo(amount) <= 0);
+
+        StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(staker);
+
+        require(amount.compareTo(stakeInfo.selfBondStake) <= 0);
+
+        stakeInfo.selfBondStake = stakeInfo.selfBondStake.subtract(amount);
+        StakerRegistryStorage.putStakerStakeInfo(staker, stakeInfo);
+
+        long id = nextUndelegateId++;
+        StakerStorageObjects.PendingUndelegate undelegate = new StakerStorageObjects.PendingUndelegate(recipient, amount, fee, Blockchain.getBlockNumber());
+        StakerRegistryStorage.putPendingUndelegte(id, undelegate);
+
+        StakerRegistryEvents.unbonded(id, staker, recipient, amount);
+
+        return id;
+    }
+
+    /**
      * Finalizes an undelegate operation, specified by id.
      *
      * @param id the pending un-delegate identifier
@@ -268,6 +337,61 @@ public class StakerRegistry {
     }
 
     /**
+     * Updates the signing address of a staker.
+     * Can only be invoked by the management address.
+     *
+     * @param newSigningAddress the new signing address
+     */
+    @Callable
+    public static void setSigningAddress(Address staker, Address newSigningAddress) {
+        requireNonNull(newSigningAddress);
+        requireNoValue();
+        requireStakerAndManager(staker, Blockchain.getCaller());
+
+        StakerStorageObjects.AddressInfo addressInfo = StakerRegistryStorage.getStakerAddressInfo(staker);
+
+        if (!newSigningAddress.equals(addressInfo.signingAddress)) {
+            // check last update
+            long blockNumber = Blockchain.getBlockNumber();
+            require(blockNumber >= addressInfo.lastSigningAddressUpdate + SIGNING_ADDRESS_COOLING_PERIOD);
+
+            // check duplicated signing address
+            require(StakerRegistryStorage.getIdentityAddress(newSigningAddress) == null);
+
+            // the old signing address is removed and can be used again by another staker
+            StakerRegistryStorage.putIdentityAddress(addressInfo.signingAddress, null);
+            StakerRegistryStorage.putIdentityAddress(newSigningAddress, staker);
+
+            addressInfo.signingAddress = newSigningAddress;
+            addressInfo.lastSigningAddressUpdate = blockNumber;
+            StakerRegistryStorage.putStakerAddressInfo(staker, addressInfo);
+
+            StakerRegistryEvents.setSigningAddress(staker, newSigningAddress);
+        }
+    }
+
+    /**
+     * Updates the coinbase address of a staker.
+     * Can only be invoked by the management address.
+     *
+     * @param newCoinbaseAddress the new coinbase address
+     */
+    @Callable
+    public static void setCoinbaseAddress(Address staker, Address newCoinbaseAddress) {
+        requireNonNull(newCoinbaseAddress);
+        requireNoValue();
+        requireStakerAndManager(staker, Blockchain.getCaller());
+
+        StakerStorageObjects.AddressInfo addressInfo = StakerRegistryStorage.getStakerAddressInfo(staker);
+
+        if (!newCoinbaseAddress.equals(addressInfo.coinbaseAddress)) {
+            addressInfo.coinbaseAddress = newCoinbaseAddress;
+            StakerRegistryStorage.putStakerAddressInfo(staker, addressInfo);
+            StakerRegistryEvents.setCoinbaseAddress(staker, newCoinbaseAddress);
+        }
+    }
+
+    /**
      * Returns the effective stake, after conversion and status check, of a staker.
      *
      * Designed for kernel usage only.
@@ -319,75 +443,6 @@ public class StakerRegistry {
 
         // returns the sum of delegated stake and self bond stake
         return stakeInfo.otherStake.add(stakeInfo.selfBondStake);
-    }
-
-    /**
-     * Bonds the stake to the staker. Any liquid coins, passed along the call, are counted as part of the self-bond stake.
-     *
-     * @param staker the address of the staker
-     */
-    @Callable
-    public static void bond(Address staker){
-        BigInteger amount = Blockchain.getValue();
-
-        requirePositive(amount);
-        requireStakerAndManager(staker, Blockchain.getCaller());
-
-        StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(staker);
-
-        stakeInfo.selfBondStake = stakeInfo.selfBondStake.add(amount);
-        StakerRegistryStorage.putStakerStakeInfo(staker, stakeInfo);
-
-        StakerRegistryEvents.bonded(staker, amount);
-    }
-
-    /**
-     * Unbonds for a staker, After a successful unbond, the locked coins will be released to the original bonder (management address).
-     * This is subject to lock-up period.
-     *
-     * @param staker the address of the staker
-     * @param amount the amount of stake
-     * @param fee the amount of stake that will be transferred to the account that invokes finalizeUndelegate
-     * @return a pending un-delegate identifier
-     */
-    @Callable
-    public static long unbond(Address staker, BigInteger amount, BigInteger fee){
-        return unbondTo(staker, amount, Blockchain.getCaller(), fee);
-    }
-
-    /**
-     * Unbonds for a staker, After a successful unbond, the locked coins will be released to the specified account.
-     * This is subject to lock-up period.
-     *
-     * @param staker the address of the staker
-     * @param amount the amount of stake
-     * @param recipient the receiving address
-     * @param fee the amount of stake that will be transferred to the account that invokes finalizeUndelegate
-     * @return a pending un-delegate identifier
-     */
-    @Callable
-    public static long unbondTo(Address staker, BigInteger amount, Address recipient, BigInteger fee){
-        Address caller = Blockchain.getCaller();
-
-        requireStakerAndManager(staker, caller);
-        requirePositive(amount);
-        requireNoValue();
-        require(fee.signum() >= 0 && fee.compareTo(amount) <= 0);
-
-        StakerStorageObjects.StakeInfo stakeInfo = StakerRegistryStorage.getStakerStakeInfo(staker);
-
-        require(amount.compareTo(stakeInfo.selfBondStake) <= 0);
-
-        stakeInfo.selfBondStake = stakeInfo.selfBondStake.subtract(amount);
-        StakerRegistryStorage.putStakerStakeInfo(staker, stakeInfo);
-
-        long id = nextUndelegateId++;
-        StakerStorageObjects.PendingUndelegate undelegate = new StakerStorageObjects.PendingUndelegate(recipient, amount, fee, Blockchain.getBlockNumber());
-        StakerRegistryStorage.putPendingUndelegte(id, undelegate);
-
-        StakerRegistryEvents.unbonded(id, staker, recipient, amount);
-
-        return id;
     }
 
     /**
@@ -449,66 +504,6 @@ public class StakerRegistry {
         return addressInfo.coinbaseAddress;
     }
 
-    private static void requireStakerAndManager(Address staker, Address manager) {
-        requireNonNull(staker);
-        Address managementAddress = StakerRegistryStorage.getManagementAddress(staker);
-        require(managementAddress != null && managementAddress.equals(manager));
-    }
-    /**
-     * Updates the signing address of a staker.
-     * Can only be invoked by the management address.
-     *
-     * @param newSigningAddress the new signing address
-     */
-    @Callable
-    public static void setSigningAddress(Address staker, Address newSigningAddress) {
-        requireNonNull(newSigningAddress);
-        requireNoValue();
-        requireStakerAndManager(staker, Blockchain.getCaller());
-
-        StakerStorageObjects.AddressInfo addressInfo = StakerRegistryStorage.getStakerAddressInfo(staker);
-
-        if (!newSigningAddress.equals(addressInfo.signingAddress)) {
-            // check last update
-            long blockNumber = Blockchain.getBlockNumber();
-            require(blockNumber >= addressInfo.lastSigningAddressUpdate + SIGNING_ADDRESS_COOLING_PERIOD);
-
-            // check duplicated signing address
-            require(StakerRegistryStorage.getIdentityAddress(newSigningAddress) == null);
-
-            // the old signing address is removed and can be used again by another staker
-            StakerRegistryStorage.putIdentityAddress(addressInfo.signingAddress, null);
-            StakerRegistryStorage.putIdentityAddress(newSigningAddress, staker);
-
-            addressInfo.signingAddress = newSigningAddress;
-            addressInfo.lastSigningAddressUpdate = blockNumber;
-            StakerRegistryStorage.putStakerAddressInfo(staker, addressInfo);
-
-            StakerRegistryEvents.setSigningAddress(staker, newSigningAddress);
-        }
-    }
-
-    /**
-     * Updates the coinbase address of a staker.
-     * Can only be invoked by the management address.
-     *
-     * @param newCoinbaseAddress the new coinbase address
-     */
-    @Callable
-    public static void setCoinbaseAddress(Address staker, Address newCoinbaseAddress) {
-        requireNonNull(newCoinbaseAddress);
-        requireNoValue();
-        requireStakerAndManager(staker, Blockchain.getCaller());
-
-        StakerStorageObjects.AddressInfo addressInfo = StakerRegistryStorage.getStakerAddressInfo(staker);
-
-        if (!newCoinbaseAddress.equals(addressInfo.coinbaseAddress)) {
-            addressInfo.coinbaseAddress = newCoinbaseAddress;
-            StakerRegistryStorage.putStakerAddressInfo(staker, addressInfo);
-            StakerRegistryEvents.setCoinbaseAddress(staker, newCoinbaseAddress);
-        }
-    }
-
     @Callable
     public static BigInteger getSelfBondStake(Address staker) {
         StakerStorageObjects.StakeInfo stakeInfo = validateAndGetStakeInfo(staker);
@@ -519,6 +514,12 @@ public class StakerRegistry {
     @Fallback
     public static void fallback(){
         Blockchain.revert();
+    }
+
+    private static void requireStakerAndManager(Address staker, Address manager) {
+        requireNonNull(staker);
+        Address managementAddress = StakerRegistryStorage.getManagementAddress(staker);
+        require(managementAddress != null && managementAddress.equals(manager));
     }
 
     private static boolean isStakerActive(Address staker, BigInteger selfBondStake){
