@@ -312,7 +312,7 @@ public class PoolRegistry {
 
         String methodName = "transferStake";
         // encoded data is directly written to the byte array to reduce energy usage
-        byte[] data = new byte[getStringSize(methodName) + getBigIntegerSize() * 2 + getAddressSize() * 3];
+        byte[] data = new byte[getStringSize(methodName) + getBigIntegerSize() * 2 + getAddressSize() * 2];
         new ABIStreamingEncoder(data)
                 .encodeOneString(methodName)
                 .encodeOneAddress(fromPool)
@@ -383,7 +383,7 @@ public class PoolRegistry {
         // encoded data is directly written to the byte array to reduce energy usage
         byte[] data = new byte[getStringSize(methodName) + 1 + Long.BYTES];
         new ABIStreamingEncoder(data)
-                .encodeOneString("finalizeTransfer")
+                .encodeOneString(methodName)
                 .encodeOneLong(id);
 
         secureCall(STAKER_REGISTRY, BigInteger.ZERO, data, Blockchain.getRemainingEnergy());
@@ -783,7 +783,7 @@ public class PoolRegistry {
     }
 
     private static void requirePositive(BigInteger num) {
-        require(num != null && num.compareTo(BigInteger.ZERO) > 0);
+        require(num.signum() == 1);
     }
 
     // ensures the fee percentage is valid, with 4 decimal places

@@ -256,6 +256,7 @@ public class StakerRegistry {
      */
     @Callable
     public static void setState(Address staker, boolean newState){
+        requireNoValue();
         requireStakerAndManager(staker, Blockchain.getCaller());
         boolean currentState = StakerRegistryStorage.getState(staker);
         if(currentState != newState) {
@@ -456,7 +457,7 @@ public class StakerRegistry {
     }
 
     private static void requirePositive(BigInteger num) {
-        require(num != null && num.compareTo(BigInteger.ZERO) > 0);
+        require(num.signum() == 1);
     }
 
     private static void requireNonNull(Object obj) {

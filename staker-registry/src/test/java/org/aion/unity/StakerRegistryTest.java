@@ -653,6 +653,14 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isFailed());
+
+        // bond with zero
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("bond")
+                .encodeOneAddress(stakerAddress)
+                .toBytes();
+        result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isFailed());
     }
 
     @Test
