@@ -31,57 +31,42 @@ public class StakerRegistryEvents {
                 newAddress.toByteArray());
     }
 
-    protected static void delegated(Address staker, BigInteger value) {
-        Blockchain.log("delegated".getBytes(),
-                staker.toByteArray(),
-                value.toByteArray());
-    }
-
-    protected static void undelegated(long id, Address staker, Address recipient, BigInteger amount, BigInteger fee) {
+    protected static void transferredStake(long id, Address fromStaker, Address toStaker, BigInteger amount, BigInteger fee) {
         byte[] data = new byte[(32 + 2) * 2];
         new ABIStreamingEncoder(data).encodeOneBigInteger(amount).encodeOneBigInteger(fee);
 
-        Blockchain.log("Undelegated".getBytes(),
-                AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
-                staker.toByteArray(),
-                recipient.toByteArray(),
-                data);
-    }
-
-    protected static void transferredDelegation(long id, Address fromStaker, Address toStaker, BigInteger amount, BigInteger fee) {
-        byte[] data = new byte[(32 + 2) * 2];
-        new ABIStreamingEncoder(data).encodeOneBigInteger(amount).encodeOneBigInteger(fee);
-
-        Blockchain.log("DelegationTransferred".getBytes(),
+        Blockchain.log("StakeTransferred".getBytes(),
                 AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
                 fromStaker.toByteArray(),
                 toStaker.toByteArray(),
                 data);
     }
 
-    protected static void finalizedUndelegation(long id) {
-        Blockchain.log("UndelegationFinalized".getBytes(),
+    protected static void finalizedUnbond(long id) {
+        Blockchain.log("UnbondFinalized".getBytes(),
                 BigInteger.valueOf(id).toByteArray());
     }
 
-    protected static void finalizedDelegationTransfer(long id) {
+    protected static void finalizedTransfer(long id) {
         Blockchain.log("TransferFinalized".getBytes(),
                 BigInteger.valueOf(id).toByteArray());
     }
 
-    // Events for self bond stake are different to allow the distinction between normal delegation and self-bond stake
     protected static void bonded(Address identityAddress, BigInteger amount) {
         Blockchain.log("Bonded".getBytes(),
                 identityAddress.toByteArray(),
                 amount.toByteArray());
     }
 
-    protected static void unbonded(long id, Address staker, Address recipient, BigInteger amountBI) {
+    protected static void unbonded(long id, Address staker, Address recipient, BigInteger amount, BigInteger fee) {
+        byte[] data = new byte[(32 + 2) * 2];
+        new ABIStreamingEncoder(data).encodeOneBigInteger(amount).encodeOneBigInteger(fee);
+
         Blockchain.log("Unbonded".getBytes(),
                 AionUtilities.padLeft(BigInteger.valueOf(id).toByteArray()),
                 staker.toByteArray(),
                 recipient.toByteArray(),
-                amountBI.toByteArray());
+                data);
     }
 
     protected static void changedState(Address staker, boolean state){

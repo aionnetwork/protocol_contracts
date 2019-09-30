@@ -146,12 +146,7 @@ public class PoolRegistry {
         }
 
         if (doDelegate) {
-            String methodName;
-            if (delegator.equals(pool)) {
-                methodName = "bond";
-            } else {
-                methodName = "delegate";
-            }
+            String methodName = "bond";
             // encoded data is directly written to the byte array to reduce energy usage
             byte[] data = new byte[getStringSize(methodName) + getAddressSize()];
             new ABIStreamingEncoder(data)
@@ -208,12 +203,7 @@ public class PoolRegistry {
 
         BigInteger poolStake = getSelfStake(pool);
 
-        String methodName;
-        if (delegator.equals(pool)) {
-            methodName = "unbondTo";
-        } else {
-            methodName = "undelegateTo";
-        }
+        String methodName = "unbondTo";
         // encoded data is directly written to the byte array to reduce energy usage
         byte[] data = new byte[getStringSize(methodName) + getBigIntegerSize() * 2 + getAddressSize() * 2];
         new ABIStreamingEncoder(data)
@@ -320,7 +310,7 @@ public class PoolRegistry {
         stateMachine.onUndelegate(delegatorInfo, Blockchain.getBlockNumber(), amount);
         PoolRegistryStorage.putDelegator(fromPool, caller, delegatorInfo);
 
-        String methodName = "transferDelegation";
+        String methodName = "transferStake";
         // encoded data is directly written to the byte array to reduce energy usage
         byte[] data = new byte[getStringSize(methodName) + getBigIntegerSize() * 2 + getAddressSize() * 3];
         new ABIStreamingEncoder(data)
@@ -359,7 +349,7 @@ public class PoolRegistry {
     public static void finalizeUndelegate(long id) {
         requireNoValue();
 
-        String methodName = "finalizeUndelegate";
+        String methodName = "finalizeUnbond";
         // encoded data is directly written to the byte array to reduce energy usage
         byte[] data = new byte[getStringSize(methodName) + 1 + Long.BYTES];
         new ABIStreamingEncoder(data)

@@ -95,7 +95,7 @@ public class PoolRegistryEvents {
     }
 
     // following events are implemented only in StakerRegistry
-//    - finalizedUndelegate
+//    - finalizedUnbond
 //    - finalizedTransfer
 //    - setSigningAddress
 //    - changedState

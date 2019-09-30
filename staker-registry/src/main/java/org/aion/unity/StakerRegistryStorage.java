@@ -10,11 +10,11 @@ public class StakerRegistryStorage {
 
     // used for deriving storage key
     private enum StorageSlots {
-        STAKE_INFO, // staker identityAddress -> total stake, self bond stake
+        STAKE_INFO, // staker identityAddress -> total stake
         ADDRESS_INFO, // staker identityAddress -> staker signingAddress, coinbaseAddress
         SIGNING_ADDRESS, // staker signingAddress -> staker identityAddress
         MANAGEMENT_ADDRESS, // staker identityAddress -> staker managementAddress
-        PENDING_UNDELEGATE, // undelegateId -> recipient, value, block number
+        PENDING_UNBOND, // unbondId -> recipient, value, block number
         PENDING_TRANSFER, // transferId -> initiator, toStaker, recipient, value, block number
         STATE, // staker identityAddress -> state
     }
@@ -91,51 +91,50 @@ public class StakerRegistryStorage {
     }
 
     /**
-     * Puts the total stake and self bond stake into storage
+     * Puts the total stake into storage
      *
      * @param identityAddress staker identity address
-     * @param stakeInfo       staker stake info, not null
+     * @param stake       total stake of the staker, non-null
      */
-    protected static void putStakerStakeInfo(Address identityAddress, StakerStorageObjects.StakeInfo stakeInfo) {
+    protected static void putStake(Address identityAddress, BigInteger stake) {
         byte[] key = getKey(StorageSlots.STAKE_INFO, identityAddress.toByteArray());
-        byte[] value = stakeInfo.serialize();
-        Blockchain.putStorage(key, value);
+        Blockchain.putStorage(key, stake.toByteArray());
     }
 
     /**
-     * Retrieves the stake info (total stake and self bond stake) of the staker from storage
+     * Retrieves the total stake of the staker from storage. If the staker has registered, this value will not be null.
      *
      * @param identityAddress identity address of the staker
-     * @return if identityAddress address is present in storage, stake info, null otherwise
+     * @return if identityAddress address is present in storage, total stake, null otherwise
      */
-    protected static StakerStorageObjects.StakeInfo getStakerStakeInfo(Address identityAddress) {
+    protected static BigInteger getStake(Address identityAddress) {
         byte[] key = getKey(StorageSlots.STAKE_INFO, identityAddress.toByteArray());
         byte[] value = Blockchain.getStorage(key);
-        return value == null ? null : StakerStorageObjects.StakeInfo.from(value);
+        return value == null ? null : new BigInteger(value);
     }
 
     /**
-     * Puts new pending undelegate info into storage
+     * Puts new pending unbond info into storage
      *
-     * @param undelegateId      undelegate identifier
-     * @param pendingUndelegate undelegate info
+     * @param unbondId      unbond identifier
+     * @param pendingUnbond unbond info
      */
-    protected static void putPendingUndelegte(long undelegateId, StakerStorageObjects.PendingUndelegate pendingUndelegate) {
-        byte[] key = getKey(StorageSlots.PENDING_UNDELEGATE, BigInteger.valueOf(undelegateId).toByteArray());
-        byte[] value = (pendingUndelegate == null) ? null : pendingUndelegate.serialize();
+    protected static void putPendingUnbond(long unbondId, StakerStorageObjects.PendingUnbond pendingUnbond) {
+        byte[] key = getKey(StorageSlots.PENDING_UNBOND, BigInteger.valueOf(unbondId).toByteArray());
+        byte[] value = (pendingUnbond == null) ? null : pendingUnbond.serialize();
         Blockchain.putStorage(key, value);
     }
 
     /**
-     * Retrieves pending undelegate info from storage
+     * Retrieves pending unbond info from storage
      *
-     * @param undelegateId undelegate identifier
-     * @return PendingUndelegate if transferId present, null otherwise
+     * @param unbondId unbond identifier
+     * @return PendingUnbond if unbondId present, null otherwise
      */
-    protected static StakerStorageObjects.PendingUndelegate getPendingUndelegate(long undelegateId) {
-        byte[] key = getKey(StorageSlots.PENDING_UNDELEGATE, BigInteger.valueOf(undelegateId).toByteArray());
+    protected static StakerStorageObjects.PendingUnbond getPendingUnbond(long unbondId) {
+        byte[] key = getKey(StorageSlots.PENDING_UNBOND, BigInteger.valueOf(unbondId).toByteArray());
         byte[] value = Blockchain.getStorage(key);
-        return value == null ? null : StakerStorageObjects.PendingUndelegate.from(value);
+        return value == null ? null : StakerStorageObjects.PendingUnbond.from(value);
     }
 
     /**

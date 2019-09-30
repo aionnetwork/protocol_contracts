@@ -6,30 +6,6 @@ import org.aion.avm.userlib.AionBuffer;
 import java.math.BigInteger;
 
 public class StakerStorageObjects {
-    static class StakeInfo {
-        // stake that is delegated. Delegation can only be done by the management address through delegate(), and it should be used by the PoolRegistry contract.
-        BigInteger otherStake;
-        // stake that is counted towards self bond. This is done by invoking bond()
-        BigInteger selfBondStake;
-
-        protected StakeInfo(BigInteger otherStake, BigInteger selfBondStake) {
-            this.otherStake = otherStake;
-            this.selfBondStake = selfBondStake;
-        }
-
-        protected byte[] serialize() {
-            int length = 32 * 2;
-            AionBuffer aionBuffer = AionBuffer.allocate(length);
-            aionBuffer.put32ByteInt(otherStake);
-            aionBuffer.put32ByteInt(selfBondStake);
-            return aionBuffer.getArray();
-        }
-
-        protected static StakeInfo from(byte[] serializedBytes) {
-            AionBuffer buffer = AionBuffer.wrap(serializedBytes);
-            return new StakeInfo(buffer.get32ByteInt(), buffer.get32ByteInt());
-        }
-    }
 
     static class AddressInfo {
         Address signingAddress;
@@ -57,13 +33,13 @@ public class StakerStorageObjects {
         }
     }
 
-    static class PendingUndelegate {
+    static class PendingUnbond {
         Address recipient;
         BigInteger value;
         BigInteger fee;
         long blockNumber;
 
-        protected PendingUndelegate(Address recipient, BigInteger value, BigInteger fee, long blockNumber) {
+        protected PendingUnbond(Address recipient, BigInteger value, BigInteger fee, long blockNumber) {
             this.recipient = recipient;
             this.value = value;
             this.fee = fee;
@@ -80,9 +56,9 @@ public class StakerStorageObjects {
             return aionBuffer.getArray();
         }
 
-        protected static PendingUndelegate from(byte[] serializedBytes) {
+        protected static PendingUnbond from(byte[] serializedBytes) {
             AionBuffer buffer = AionBuffer.wrap(serializedBytes);
-            return new PendingUndelegate(buffer.getAddress(), buffer.get32ByteInt(), buffer.get32ByteInt(), buffer.getLong());
+            return new PendingUnbond(buffer.getAddress(), buffer.get32ByteInt(), buffer.get32ByteInt(), buffer.getLong());
         }
     }
 
