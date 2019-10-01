@@ -164,7 +164,7 @@ public class PoolRegistry {
         // if the pool was broken and delegation is from the pool operator, it might go into an active state
         if (delegator.equals(pool) && !stateMachine.currentPoolRewards.isActive) {
             BigInteger poolStake = poolSelfStake.add(value);
-            if (isSelfStakeSatisfied(poolStake, totalStakeAfterDelegation, stateMachine.currentPoolRewards.pendingStake)) {
+            if (isSelfStakeSatisfied(poolStake, totalStakeAfterDelegation, BigInteger.ZERO)) {
                 // set pool state as active
                 stateMachine.currentPoolRewards.isActive = true;
                 setStateInStakerRegistry(pool, true);
@@ -222,11 +222,11 @@ public class PoolRegistry {
 
         // After the un-delegation the state of the pool might change
         // undelegation from a delegator can make a broken pool go into the active state
-        if (!delegator.equals(pool) && !poolRewards.isActive && isSelfStakeSatisfied(poolStake, poolRewards.accumulatedStake, poolRewards.pendingStake)) {
+        if (!delegator.equals(pool) && !poolRewards.isActive && isSelfStakeSatisfied(poolStake, poolRewards.accumulatedStake, BigInteger.ZERO)) {
             stateMachine.currentPoolRewards.isActive = true;
             setStateInStakerRegistry(pool, true);
         }// undelegation from a pool operator can make an active pool go into the broken state
-        else if (delegator.equals(pool) && poolRewards.isActive && !isSelfStakeSatisfied(poolStake.subtract(amount), poolRewards.accumulatedStake, poolRewards.pendingStake)) {
+        else if (delegator.equals(pool) && poolRewards.isActive && !isSelfStakeSatisfied(poolStake.subtract(amount), poolRewards.accumulatedStake, BigInteger.ZERO)) {
             stateMachine.currentPoolRewards.isActive = false;
             setStateInStakerRegistry(pool, false);
         }
@@ -327,7 +327,7 @@ public class PoolRegistry {
 
         // transfer out of a broken fromPool could make it active
         // this call can only be from a delegator
-        if (!fromPoolRewards.isActive && isSelfStakeSatisfied(getSelfStake(fromPool), fromPoolRewards.accumulatedStake, fromPoolRewards.pendingStake)) {
+        if (!fromPoolRewards.isActive && isSelfStakeSatisfied(getSelfStake(fromPool), fromPoolRewards.accumulatedStake, BigInteger.ZERO)) {
             stateMachine.currentPoolRewards.isActive = true;
             setStateInStakerRegistry(fromPool, true);
         }
@@ -692,7 +692,7 @@ public class PoolRegistry {
         new ABIStreamingEncoder(info)
                 .encodeOneAddress(rewards.coinbaseAddress)
                 .encodeOneInteger(rewards.commissionRate)
-                .encodeOneBoolean(isSelfStakeSatisfied(selfStake, rewards.accumulatedStake, rewards.pendingStake))
+                .encodeOneBoolean(isSelfStakeSatisfied(selfStake, rewards.accumulatedStake, BigInteger.ZERO))
                 .encodeOneByteArray(metaDataHash)
                 .encodeOneByteArray(metaDataUrl);
         return info;

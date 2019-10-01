@@ -1155,6 +1155,15 @@ public class PoolRegistryTest {
         long id = (long) result.getDecodedReturnData();
 
         txData = new ABIStreamingEncoder()
+                .encodeOneString("getTotalStake")
+                .encodeOneAddress(pool2)
+                .toBytes();
+        result = RULE.call(pool1, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        BigInteger pendingStake = ((BigInteger[]) result.getDecodedReturnData())[1];
+        assertEquals(unstake.subtract(fee), pendingStake);
+
+        txData = new ABIStreamingEncoder()
                 .encodeOneString("getStake")
                 .encodeOneAddress(pool1)
                 .encodeOneAddress(delegator)
@@ -1177,6 +1186,15 @@ public class PoolRegistryTest {
 
         Assert.assertEquals(RULE.kernel.getBalance(new AionAddress(preminedAddress.toByteArray())),
                 preminedBalance.add(fee).subtract(BigInteger.valueOf(result.getTransactionResult().energyUsed)));
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getTotalStake")
+                .encodeOneAddress(pool2)
+                .toBytes();
+        result = RULE.call(pool1, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        pendingStake = ((BigInteger[]) result.getDecodedReturnData())[1];
+        assertEquals(BigInteger.ZERO, pendingStake);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("getStake")
