@@ -83,7 +83,7 @@ public class PoolRegistry {
 
         // step 2: create a staker in the staker registry
         /*
-        registerStaker(Address identityAddress, Address managementAddress, Address signingAddress, Address coinbaseAddress)
+        registerStaker(Address identityAddress, Address signingAddress, Address coinbaseAddress)
          */
         String methodName = "registerStaker";
         // encoded data is directly written to the byte array to reduce energy usage
@@ -362,9 +362,11 @@ public class PoolRegistry {
         // At this point the StakerRegistry has transferred the fee amount to this contract in a re-entrant call.
         // This is a safe assumption since these two contracts are tightly coupled. Thus, the fee amount is not explicitly stored to save energy.
         assert reentrantValueTransferAmount != null;
-        // transfer the fee to the caller
-        secureCall(Blockchain.getCaller(), reentrantValueTransferAmount, new byte[0], Blockchain.getRemainingEnergy());
+        BigInteger fee = reentrantValueTransferAmount;
         reentrantValueTransferAmount = null;
+
+        // transfer the fee to the caller
+        secureCall(Blockchain.getCaller(), fee, new byte[0], Blockchain.getRemainingEnergy());
     }
 
     /**
@@ -391,10 +393,10 @@ public class PoolRegistry {
         // At this point the StakerRegistry has transferred the fee amount to this contract in a re-entrant call.
         // This is a safe assumption since these two contracts are tightly coupled. Thus, the fee amount is not explicitly stored to save energy.
         assert reentrantValueTransferAmount != null;
-        // transfer fee
-        secureCall(Blockchain.getCaller(), reentrantValueTransferAmount, new byte[0], Blockchain.getRemainingEnergy());
-        BigInteger remainingTransferValue = transfer.amount.subtract(reentrantValueTransferAmount);
+        BigInteger fee = reentrantValueTransferAmount;
         reentrantValueTransferAmount = null;
+        assert fee.compareTo(transfer.amount) <= 0;
+        BigInteger remainingTransferValue = transfer.amount.subtract(fee);
 
         // remove transfer
         PoolRegistryStorage.putPendingTransfer(id, null);
@@ -410,6 +412,9 @@ public class PoolRegistry {
         detectBlockRewards(stateMachine);
 
         delegate(transfer.initiator, transfer.toPool, remainingTransferValue, false, stateMachine, delegatorInfo);
+
+        // transfer fee
+        secureCall(Blockchain.getCaller(), fee, new byte[0], Blockchain.getRemainingEnergy());
     }
 
     /**
@@ -434,11 +439,6 @@ public class PoolRegistry {
             amount = amount.add(stateMachine.onWithdrawOperator());
         }
 
-        // do a transfer if amount > 0
-        if (amount.signum() == 1) {
-            secureCall(caller, amount, new byte[0], Blockchain.getRemainingEnergy());
-        }
-
         // remove the delegator from storage if the stake is zero and all the rewards have been withdrawn
         if(delegatorInfo.stake.equals(BigInteger.ZERO)) {
             delegatorInfo = null;
@@ -448,6 +448,12 @@ public class PoolRegistry {
         PoolRegistryStorage.putPoolRewards(pool, stateMachine.currentPoolRewards);
 
         PoolRegistryEvents.withdrew(caller, pool, amount);
+
+        // do a transfer if amount > 0
+        if (amount.signum() == 1) {
+            secureCall(caller, amount, new byte[0], Blockchain.getRemainingEnergy());
+        }
+
         return amount;
     }
 
@@ -521,10 +527,10 @@ public class PoolRegistry {
 
             Blockchain.println("Auto delegation: fee = " + fee + ", remaining = " + remaining);
 
+            delegate(delegator, pool, remaining, true, stateMachine, delegatorInfo);
+
             // transfer fee to the caller
             secureCall(Blockchain.getCaller(), fee, new byte[0], Blockchain.getRemainingEnergy());
-
-            delegate(delegator, pool, remaining, true, stateMachine, delegatorInfo);
         }
     }
 

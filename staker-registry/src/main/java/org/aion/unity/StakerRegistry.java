@@ -194,6 +194,7 @@ public class StakerRegistry {
         requireNonNull(unbond);
 
         // lock-up period check
+        // since the block number values are never set by a contract caller, overflows cannot happen here.
         require(Blockchain.getBlockNumber() >= unbond.blockNumber + UNBOND_LOCK_UP_PERIOD);
 
         // remove the unbond
@@ -228,6 +229,7 @@ public class StakerRegistry {
         require(caller.equals(transfer.initiator));
 
         // lock-up period check
+        // since the block number values are never set by a contract caller, overflows cannot happen here.
         require(Blockchain.getBlockNumber() >= transfer.blockNumber + TRANSFER_LOCK_UP_PERIOD);
 
         // remove the transfer
@@ -282,6 +284,7 @@ public class StakerRegistry {
         if (!newSigningAddress.equals(addressInfo.signingAddress)) {
             // check last update
             long blockNumber = Blockchain.getBlockNumber();
+            // since the block number values are never set by a contract caller, overflows cannot happen here.
             require(blockNumber >= addressInfo.lastSigningAddressUpdate + SIGNING_ADDRESS_COOLING_PERIOD);
 
             // check duplicated signing address
