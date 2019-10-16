@@ -5,8 +5,9 @@ import avm.Blockchain;
 import java.math.BigInteger;
 
 /**
- * See https://github.com/ali-sharif/f1-fee-distribution for a PoC implementation of the F1 algorithm
- * TODO: need more tests for this class
+ * Note that asserts are used in this class instead of Blockchain.require(), since at this stage of a call all the parameters and the state of
+ * the contract have been validated. We don't expect any of these conditions to be false.
+ * Also, assertions in AVM are always enabled.
  */
 public class PoolRewardsStateMachine {
 

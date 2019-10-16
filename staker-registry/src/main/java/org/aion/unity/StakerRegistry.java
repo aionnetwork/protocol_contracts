@@ -16,7 +16,7 @@ public class StakerRegistry {
 
     private static final BigInteger MIN_STAKE; // 1000 Aions
     private static final long SIGNING_ADDRESS_COOLING_PERIOD; // 6 * 60 * 24 * 7;
-    private static final long UNBOND_LOCK_UP_PERIOD; // 6 * 60 * 24 * 7;
+    private static final long UNBOND_LOCK_UP_PERIOD; // 6 * 60 * 24;
     private static final long TRANSFER_LOCK_UP_PERIOD; // 6 * 10;
 
     private static long nextUnbondId = 0;

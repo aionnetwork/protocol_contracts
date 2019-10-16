@@ -22,7 +22,6 @@ public class PoolRegistry {
 
     private static final BigInteger MIN_SELF_STAKE; // 1000 Aions
     private static final BigInteger MIN_SELF_STAKE_PERCENTAGE; // 1%
-    // todo check value
     private static final long COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD; // 6 * 60 * 24 * 7
 
     private static final Address STAKER_REGISTRY;
@@ -804,6 +803,9 @@ public class PoolRegistry {
     }
 
     private static void detectBlockRewards(PoolRewardsStateMachine rewardsStateMachine) {
+        // This address represents the coinbase contract that was deployed by the PoolRegistry.
+        // PoolRegistry stores the contract bytecode and deploys it for each new pool, and thus this a trusted contract.
+        // Pool operators are unable to deploy their own custom contract or change their coinbase address.
         Address coinbaseAddress = rewardsStateMachine.currentPoolRewards.coinbaseAddress;
         BigInteger balance = Blockchain.getBalance(coinbaseAddress);
         // balance > 0
