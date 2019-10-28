@@ -60,8 +60,6 @@ public class PoolRewardsStateMachine {
      * ----------------------------------------------------------------------*/
 
     private void incrementPeriod() {
-        // Blockchain.println("Increment period: acc_rewards = " + accumulatedBlockRewards);
-
         // deal with the block rewards
         BigInteger commission = (BigInteger.valueOf(currentPoolRewards.commissionRate).multiply(currentPoolRewards.accumulatedBlockRewards))
                 .divide(BigInteger.valueOf(1000000));
@@ -81,9 +79,6 @@ public class PoolRewardsStateMachine {
             // This is truncated during the calculation of the unsettled rewards for delegator
             BigInteger crr = currentRewards.multiply(precisionInt).divide(currentPoolRewards.accumulatedStake);
             currentPoolRewards.currentCRR = currentPoolRewards.currentCRR.add(crr);
-        } else {
-            // if there is no stake, then there should be no way to have accumulated rewards
-            assert (currentRewards.equals(BigInteger.ZERO));
         }
     }
 
@@ -102,8 +97,6 @@ public class PoolRewardsStateMachine {
         BigInteger startingCRR = delegatorInfo.startingCrr;
         BigInteger endingCRR = currentPoolRewards.currentCRR;
         BigInteger differenceCRR = endingCRR.subtract(startingCRR);
-
-        Blockchain.println("CCR: start = " + startingCRR + ", end = " + endingCRR + ", diff = " + differenceCRR);
 
         // truncate the precision value
         return differenceCRR.multiply(delegatorInfo.stake).divide(precisionInt);
@@ -163,12 +156,12 @@ public class PoolRewardsStateMachine {
     }
 
     public BigInteger onWithdrawOperator() {
-        BigInteger c = currentPoolRewards.accumulatedCommission;
+        BigInteger commission = currentPoolRewards.accumulatedCommission;
         currentPoolRewards.accumulatedCommission = BigInteger.ZERO;
 
-        currentPoolRewards.outstandingRewards = currentPoolRewards.outstandingRewards.subtract(c);
+        currentPoolRewards.outstandingRewards = currentPoolRewards.outstandingRewards.subtract(commission);
 
-        return c;
+        return commission;
     }
 
     public void onBlock(long blockNumber, BigInteger blockReward) {

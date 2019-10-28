@@ -78,7 +78,7 @@ public class StakerStorageObjects {
         }
 
         protected byte[] serialize() {
-            int length = Address.LENGTH * 3 + 32 * 2 + Long.BYTES;
+            int length = Address.LENGTH * 2 + 32 * 2 + Long.BYTES;
             AionBuffer aionBuffer = AionBuffer.allocate(length);
             aionBuffer.putAddress(initiator);
             aionBuffer.putAddress(toStaker);

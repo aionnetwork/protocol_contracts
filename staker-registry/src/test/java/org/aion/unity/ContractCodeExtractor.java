@@ -21,7 +21,7 @@ public class ContractCodeExtractor {
     private Class[] otherClasses = {StakerRegistryEvents.class, StakerStorageObjects.class, StakerRegistryStorage.class};
     private static final BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
     private static final long SIGNING_ADDRESS_COOLING_PERIOD = 6 * 60 * 24 * 7;
-    private static final long UNDELEGATE_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
+    private static final long UNDELEGATE_LOCK_UP_PERIOD = 6 * 60 * 24;
     private static final long TRANSFER_LOCK_UP_PERIOD = 6 * 10;
     @Rule
     public AvmRule RULE = new AvmRule(false);

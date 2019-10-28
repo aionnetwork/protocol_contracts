@@ -468,7 +468,7 @@ public class StakerRegistry {
     }
 
     private static void requireNoValue() {
-        require(Blockchain.getValue().equals(BigInteger.ZERO));
+        require(Blockchain.getValue().signum() == 0);
     }
 
     private static void secureCall(Address targetAddress, BigInteger value, byte[] data, long energyLimit) {

@@ -22,7 +22,7 @@ import static org.junit.Assert.*;
 
 public class PoolStateTest {
 
-    private static BigInteger ENOUGH_BALANCE_TO_TRANSACT = BigInteger.TEN.pow(18 + 5);
+    private static BigInteger ENOUGH_BALANCE_TO_TRANSACT = BigInteger.TEN.pow(18 + 10);
     private static BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
     private static long COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD = 6 * 60 * 24 * 7;
 
@@ -338,6 +338,7 @@ public class PoolStateTest {
         result = RULE.call(pool2, poolRegistry, BigInteger.ZERO, txData);
         assertTrue(result.getReceiptStatus().isSuccess());
         validateState(pool2, false);
+        assertEquals(3, result.getTransactionResult().logs.size());
 
         // transfer to a broken pool will fail
         txData = new ABIStreamingEncoder()
@@ -414,6 +415,7 @@ public class PoolStateTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         validateState(pool1, true);
         validateState(pool2, true);
+        assertEquals(3, result.getTransactionResult().logs.size());
 
         // from pool becomes active after the transfer
         txData = new ABIStreamingEncoder()
@@ -529,6 +531,14 @@ public class PoolStateTest {
                 .toBytes();
         result = RULE.call(delegator, poolRegistry, BigInteger.TEN, txData);
         assertTrue(result.getReceiptStatus().isFailed());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, remainingCapacity, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool, true);
     }
 
     @Test
@@ -590,6 +600,70 @@ public class PoolStateTest {
         result = RULE.call(delegator, poolRegistry, nStake(90), txData);
         assertTrue(result.getReceiptStatus().isSuccess());
         validateState(pool, true);
+    }
+
+
+    @Test
+    public void testTransferRevert() {
+        Address pool1 = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("registerPool")
+                .encodeOneAddress(pool1)
+                .encodeOneInteger(4)
+                .encodeOneByteArray("https://".getBytes())
+                .encodeOneByteArray(new byte[32])
+                .toBytes();
+
+        AvmRule.ResultWrapper result = RULE.call(pool1, poolRegistry, nStake(10), txData, 2_000_000L, 1L);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        Address pool2 = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("registerPool")
+                .encodeOneAddress(pool2)
+                .encodeOneInteger(4)
+                .encodeOneByteArray("https://".getBytes())
+                .encodeOneByteArray(new byte[32])
+                .toBytes();
+
+        result = RULE.call(pool2, poolRegistry, nStake(1), txData, 2_000_000L, 1L);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        Address delegator = RULE.getRandomAddress(BigInteger.TEN.pow(18 + 10));
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool1)
+                .toBytes();
+        result = RULE.call(delegator, poolRegistry, nStake(100), txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
+
+        // stake will be pending after transfer
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("transferDelegation")
+                .encodeOneAddress(pool1)
+                .encodeOneAddress(pool2)
+                .encodeOneBigInteger(nStake(50))
+                .encodeOneBigInteger(BigInteger.ZERO)
+                .toBytes();
+        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        validateState(pool1, true);
+        validateState(pool2, true);
+
+        // transfer will put the toPool in a broken state and it's reverted
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("transferDelegation")
+                .encodeOneAddress(pool1)
+                .encodeOneAddress(pool2)
+                .encodeOneBigInteger(nStake(50))
+                .encodeOneBigInteger(BigInteger.ZERO)
+                .toBytes();
+        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isFailed());
+        validateState(pool1, true);
+        validateState(pool2, true);
     }
 
     private void validateState(Address pool, boolean expectedState){

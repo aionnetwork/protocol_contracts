@@ -414,8 +414,8 @@ public class StateMachineTest {
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(pool, poolRegistry, nStake(140000), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
-        // assumption is 1.5 Aions as reward per staking block that has been produced for one year
-        BigInteger reward = new BigDecimal(1.5).multiply(BigDecimal.TEN.pow(18)).multiply(new BigDecimal(1576800)).toBigInteger();
+        // assumption is 4.5 Aions as reward per staking block that has been produced for one year
+        BigInteger reward = new BigDecimal(4.5).multiply(BigDecimal.TEN.pow(18)).multiply(new BigDecimal(1576800)).toBigInteger();
 
         generateBlock(pool, reward);
 
@@ -450,7 +450,7 @@ public class StateMachineTest {
         result = RULE.call(delegator, poolRegistry, nStake(1), txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
 
-        BigInteger reward = new BigDecimal(1.5).multiply(BigDecimal.TEN.pow(18)).multiply(new BigDecimal(1576800)).toBigInteger();
+        BigInteger reward = new BigDecimal(4.5).multiply(BigDecimal.TEN.pow(18)).multiply(new BigDecimal(1576800)).toBigInteger();
 
         generateBlock(pool, BigInteger.valueOf(100000));
 

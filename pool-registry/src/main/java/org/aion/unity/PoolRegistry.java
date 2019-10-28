@@ -162,8 +162,8 @@ public class PoolRegistry {
 
         // if the pool was broken and delegation is from the pool operator, it might go into an active state
         if (delegator.equals(pool) && !stateMachine.currentPoolRewards.isActive) {
-            BigInteger poolStake = poolSelfStake.add(value);
-            if (isSelfStakeSatisfied(poolStake, totalStakeAfterDelegation, BigInteger.ZERO)) {
+            // pending stake will not be considered towards total stake, until it's finalized
+            if (isSelfStakeSatisfied(delegatorInfo.stake, totalStakeAfterDelegation, BigInteger.ZERO)) {
                 // set pool state as active
                 stateMachine.currentPoolRewards.isActive = true;
                 setStateInStakerRegistry(pool, true);
@@ -221,11 +221,12 @@ public class PoolRegistry {
 
         // After the un-delegation the state of the pool might change
         // undelegation from a delegator can make a broken pool go into the active state
+        // pending stake will not be considered towards total stake, until it's finalized
         if (!delegator.equals(pool) && !poolRewards.isActive && isSelfStakeSatisfied(poolStake, poolRewards.accumulatedStake, BigInteger.ZERO)) {
             stateMachine.currentPoolRewards.isActive = true;
             setStateInStakerRegistry(pool, true);
         }// undelegation from a pool operator can make an active pool go into the broken state
-        else if (delegator.equals(pool) && poolRewards.isActive && !isSelfStakeSatisfied(poolStake.subtract(amount), poolRewards.accumulatedStake, BigInteger.ZERO)) {
+        else if (delegator.equals(pool) && poolRewards.isActive && !isSelfStakeSatisfied(delegatorInfo.stake, poolRewards.accumulatedStake, BigInteger.ZERO)) {
             stateMachine.currentPoolRewards.isActive = false;
             setStateInStakerRegistry(pool, false);
         }
@@ -291,7 +292,7 @@ public class PoolRegistry {
         // fee should be less than the amount for the delegate to be successful and not revert
         require(fee.signum() >= 0 && fee.compareTo(amount) < 0);
 
-        // ensure transfer will not put the to pool in a broken state
+        // pending stake is included in self stake validation to ensure finalized transfers will not put the to pool in a broken state
         toPoolRewards.pendingStake = toPoolRewards.pendingStake.add(amount).subtract(fee);
         require(isSelfStakeSatisfied(getSelfStake(toPool), toPoolRewards.accumulatedStake, toPoolRewards.pendingStake));
 
@@ -326,6 +327,7 @@ public class PoolRegistry {
 
         // transfer out of a broken fromPool could make it active
         // this call can only be from a delegator
+        // pending stake will not be considered towards total stake, until it's finalized
         if (!fromPoolRewards.isActive && isSelfStakeSatisfied(getSelfStake(fromPool), fromPoolRewards.accumulatedStake, BigInteger.ZERO)) {
             stateMachine.currentPoolRewards.isActive = true;
             setStateInStakerRegistry(fromPool, true);
@@ -516,15 +518,12 @@ public class PoolRegistry {
             amount = amount.add(stateMachine.onWithdrawOperator());
         }
 
-        Blockchain.println("Auto delegation: rewards = " + amount);
-
         // amount > 0
         if (amount.signum() == 1) {
             // rounded down
             BigInteger fee = (amount.multiply(BigInteger.valueOf(feePercentage))).divide(BigInteger.valueOf(1000000));
+            assert fee.compareTo(amount) <= 0;
             BigInteger remaining = amount.subtract(fee);
-
-            Blockchain.println("Auto delegation: fee = " + fee + ", remaining = " + remaining);
 
             delegate(delegator, pool, remaining, true, stateMachine, delegatorInfo);
 
@@ -564,14 +563,13 @@ public class PoolRegistry {
         require(commissionUpdate.pool.equals(Blockchain.getCaller()));
 
         PoolStorageObjects.PoolRewards rewards = PoolRegistryStorage.getPoolRewards(commissionUpdate.pool);
-        // commission rate in pool rewards is updated even in broken state to stay consistent with other meta data updates performed by the pool owner
-        rewards.commissionRate = commissionUpdate.newCommissionRate;
 
         // remove request
         PoolRegistryStorage.putPendingCommissionUpdate(id, null);
 
         PoolRewardsStateMachine stateMachine = new PoolRewardsStateMachine(rewards);
         detectBlockRewards(stateMachine);
+        // commission rate in pool rewards is updated even in broken state to stay consistent with other meta data updates performed by the pool owner
         stateMachine.setCommissionRate(commissionUpdate.newCommissionRate);
 
         PoolRegistryStorage.putPoolRewards(commissionUpdate.pool, rewards);
@@ -771,7 +769,7 @@ public class PoolRegistry {
     }
 
     private static void requireNoValue() {
-        require(Blockchain.getValue().equals(BigInteger.ZERO));
+        require(Blockchain.getValue().signum() == 0);
     }
 
     private static void requirePool(Address pool) {
@@ -825,8 +823,6 @@ public class PoolRegistry {
             reentrantValueTransferAmount = null;
 
             rewardsStateMachine.onBlock(Blockchain.getBlockNumber(), balance);
-
-            Blockchain.println("New block rewards: " + balance);
         }
     }
 

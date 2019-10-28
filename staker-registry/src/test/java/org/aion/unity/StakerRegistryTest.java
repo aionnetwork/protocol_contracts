@@ -7,6 +7,7 @@ import org.aion.avm.tooling.ABIUtil;
 import org.aion.avm.userlib.abi.ABIDecoder;
 import org.aion.avm.userlib.abi.ABIStreamingEncoder;
 import org.aion.kernel.TestingState;
+import org.aion.types.AionAddress;
 import org.aion.types.Log;
 import org.junit.*;
 
@@ -22,7 +23,7 @@ public class StakerRegistryTest {
     private static BigInteger ENOUGH_BALANCE_TO_TRANSACT = BigInteger.TEN.pow(18 + 5);
     private static final BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
     private static final long SIGNING_ADDRESS_COOLING_PERIOD = 6 * 60 * 24 * 7;
-    private static final long unbond_LOCK_UP_PERIOD = 6 * 60 * 24 * 7;
+    private static final long unbond_LOCK_UP_PERIOD = 6 * 60 * 24;
     private static final long TRANSFER_LOCK_UP_PERIOD = 6 * 10;
     @Rule
     public AvmRule RULE = new AvmRule(false);
@@ -490,6 +491,23 @@ public class StakerRegistryTest {
         result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
         Assert.assertEquals(anotherAddress, result.getDecodedReturnData());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("setSigningAddress")
+                .encodeOneAddress(stakerAddress)
+                .encodeOneAddress(anotherAddress)
+                .toBytes();
+        result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(0, result.getTransactionResult().logs.size());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getSigningAddress")
+                .encodeOneAddress(stakerAddress)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(anotherAddress, result.getDecodedReturnData());
     }
 
     @Test
@@ -503,6 +521,23 @@ public class StakerRegistryTest {
                 .toBytes();
         AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getCoinbaseAddress")
+                .encodeOneAddress(stakerAddress)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(anotherAddress, result.getDecodedReturnData());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("setCoinbaseAddress")
+                .encodeOneAddress(stakerAddress)
+                .encodeOneAddress(anotherAddress)
+                .toBytes();
+        result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(0, result.getTransactionResult().logs.size());
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("getCoinbaseAddress")
@@ -706,6 +741,122 @@ public class StakerRegistryTest {
                 .toBytes();
         result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
+    }
+
+    @Test
+    public void testUnbondGetEffectiveStake() {
+        BigInteger unbondAmount = BigInteger.valueOf(900L);
+
+        // unbond
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("unbond")
+                .encodeOneAddress(stakerAddress)
+                .encodeOneBigInteger(unbondAmount)
+                .encodeOneBigInteger(BigInteger.ZERO)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        long id = (long) result.getDecodedReturnData();
+        long blockNumber = RULE.kernel.getBlockNumber();
+
+        // query the total effective stake of staker
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getEffectiveStake")
+                .encodeOneAddress(signingAddress)
+                .encodeOneAddress(coinbaseAddress)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(BigInteger.ZERO, result.getDecodedReturnData());
+
+        // tweak the block number
+        tweakBlockNumber(blockNumber + unbond_LOCK_UP_PERIOD);
+
+        // and, query again
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("finalizeUnbond")
+                .encodeOneLong(id)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getEffectiveStake")
+                .encodeOneAddress(signingAddress)
+                .encodeOneAddress(coinbaseAddress)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(BigInteger.ZERO, result.getDecodedReturnData());
+    }
+
+    @Test
+    public void testFeeTransfer() {
+        // unbond
+        BigInteger unbondAmount = BigInteger.valueOf(500).multiply(BigInteger.TEN.pow(18));
+        BigInteger unbondFee = BigInteger.valueOf(10).multiply((BigInteger.TEN).pow(18));
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("unbond")
+                .encodeOneAddress(stakerAddress)
+                .encodeOneBigInteger(unbondAmount)
+                .encodeOneBigInteger(unbondFee)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        long id = (long) result.getDecodedReturnData();
+
+        tweakBlockNumber(RULE.kernel.getBlockNumber() + unbond_LOCK_UP_PERIOD);
+        BigInteger preminedBalance = RULE.kernel.getBalance(new AionAddress(preminedAddress.toByteArray()));
+        BigInteger stakerBalance = RULE.kernel.getBalance(new AionAddress(stakerAddress.toByteArray()));
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("finalizeUnbond")
+                .encodeOneLong(id)
+                .toBytes();
+        result = RULE.call(preminedAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(preminedBalance.add(unbondFee).subtract(BigInteger.valueOf(result.getTransactionResult().energyUsed)),
+                RULE.kernel.getBalance(new AionAddress(preminedAddress.toByteArray())));
+        Assert.assertEquals(stakerBalance.add(unbondAmount.subtract(unbondFee)),
+                RULE.kernel.getBalance(new AionAddress(stakerAddress.toByteArray())));
+
+        // transfer
+        BigInteger transferAmount = BigInteger.valueOf(500).multiply(BigInteger.TEN.pow(18));
+        BigInteger trasnferFee = BigInteger.valueOf(10).multiply((BigInteger.TEN).pow(18));
+        Address stakerAddress2 = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("registerStaker")
+                .encodeOneAddress(stakerAddress2)
+                .encodeOneAddress(stakerAddress2)
+                .encodeOneAddress(stakerAddress2)
+                .toBytes();
+        result = RULE.call(stakerAddress2, stakerRegistry, MIN_SELF_STAKE, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("transferStake")
+                .encodeOneAddress(stakerAddress)
+                .encodeOneAddress(stakerAddress2)
+                .encodeOneBigInteger(transferAmount)
+                .encodeOneBigInteger(trasnferFee)
+                .toBytes();
+        result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        id = (long) result.getDecodedReturnData();
+
+        tweakBlockNumber(RULE.kernel.getBlockNumber() + unbond_LOCK_UP_PERIOD);
+        stakerBalance = RULE.kernel.getBalance(new AionAddress(stakerAddress.toByteArray()));
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("finalizeTransfer")
+                .encodeOneLong(id)
+                .toBytes();
+        result = RULE.call(stakerAddress, stakerRegistry, BigInteger.ZERO, txData);
+        Assert.assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(stakerBalance.add(trasnferFee).subtract(BigInteger.valueOf(result.getTransactionResult().energyUsed)),
+                RULE.kernel.getBalance(new AionAddress(stakerAddress.toByteArray())));
     }
 
     @Test

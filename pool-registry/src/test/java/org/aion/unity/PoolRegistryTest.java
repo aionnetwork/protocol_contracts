@@ -28,6 +28,7 @@ public class PoolRegistryTest {
     private static BigInteger ENOUGH_BALANCE_TO_TRANSACT = BigInteger.TEN.pow(18 + 5);
     private static BigInteger MIN_SELF_STAKE = new BigInteger("1000000000000000000000");
     private static long COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD = 6 * 60 * 24 * 7;
+    private static long UNBOND_LOCK_UP_PERIOD = 6 * 60 * 24;
     
     @Rule
     public AvmRule RULE = new AvmRule(false);
@@ -198,7 +199,7 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         assertEquals(stake.longValue() - unstake.longValue(), ((BigInteger) result.getDecodedReturnData()).longValue());
 
-        tweakBlockNumber(getBlockNumber() +  6 * 60 * 24 * 7);
+        tweakBlockNumber(getBlockNumber() +  UNBOND_LOCK_UP_PERIOD);
 
         // release the pending undelegate
         txData = new ABIStreamingEncoder()
@@ -426,6 +427,14 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         BigInteger stake = (BigInteger) result.getDecodedReturnData();
         assertEquals(3875820019684213186L, stake.longValue());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("redelegateRewards")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(0, result.getTransactionResult().logs.size());
     }
 
     @Test
@@ -777,7 +786,7 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         long id = (long) result.getDecodedReturnData();
 
-        tweakBlockNumber(getBlockNumber() +  6 * 60 * 24 * 7);
+        tweakBlockNumber(getBlockNumber() +  UNBOND_LOCK_UP_PERIOD);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("finalizeUndelegate")
@@ -896,7 +905,7 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         long id2 = (long) result.getDecodedReturnData();
 
-        tweakBlockNumber(getBlockNumber() +  6 * 60 * 24 * 7);
+        tweakBlockNumber(getBlockNumber() + UNBOND_LOCK_UP_PERIOD);
 
         txData = new ABIStreamingEncoder()
                 .encodeOneString("finalizeUndelegate")
@@ -1018,7 +1027,7 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         assertEquals(stake.longValue() - unstake.longValue(), ((BigInteger) result.getDecodedReturnData()).longValue());
 
-        tweakBlockNumber(getBlockNumber() +  6 * 60 * 24 * 7);
+        tweakBlockNumber(getBlockNumber() + UNBOND_LOCK_UP_PERIOD);
 
         BigInteger preminedBalance = RULE.kernel.getBalance(new AionAddress(preminedAddress.toByteArray()));
 
@@ -1089,7 +1098,7 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         assertEquals(delegatorStake.add(nStake(1)), result.getDecodedReturnData());
 
-        tweakBlockNumber(getBlockNumber() +  6 * 60 * 24 * 7);
+        tweakBlockNumber(getBlockNumber() + UNBOND_LOCK_UP_PERIOD);
 
         BigInteger preminedBalance = RULE.kernel.getBalance(new AionAddress(preminedAddress.toByteArray()));
 
@@ -1172,7 +1181,7 @@ public class PoolRegistryTest {
         assertTrue(result.getReceiptStatus().isSuccess());
         assertEquals(stake.longValue() - unstake.longValue(), ((BigInteger) result.getDecodedReturnData()).longValue());
 
-        tweakBlockNumber(getBlockNumber() +  6 * 60 * 24 * 7);
+        tweakBlockNumber(getBlockNumber() + 6 * 10);
 
         BigInteger preminedBalance = RULE.kernel.getBalance(new AionAddress(preminedAddress.toByteArray()));
 
@@ -1246,6 +1255,95 @@ public class PoolRegistryTest {
 
         result = RULE.call(newPool, poolRegistry, nStake(1).multiply(BigInteger.TWO), txData, 2_000_000L, 1L);
         Assert.assertTrue(result.getReceiptStatus().isSuccess());
+    }
+
+    @Test
+    public void testChangeCommissionRateInBrokenState() {
+        Address pool = setupNewPool(4);
+
+        Address delegator = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+        BigInteger stake = nStake(1);
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(delegator, poolRegistry, stake, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        generateBlock(pool, 100000);
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("undelegate")
+                .encodeOneAddress(pool)
+                .encodeOneBigInteger(nStake(1))
+                .encodeOneBigInteger(BigInteger.ZERO)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        generateBlock(pool, 100000);
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("undelegate")
+                .encodeOneAddress(pool)
+                .encodeOneBigInteger(nStake(1))
+                .encodeOneBigInteger(BigInteger.ZERO)
+                .toBytes();
+        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // this cannot happen for normal pool operation because pool is in a broken state. However, someone else can use this coinbase address as their mining or staking coinbase address
+        generateBlock(pool, 100000);
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("requestCommissionRateChange")
+                .encodeOneInteger(20)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        tweakBlockNumber(getBlockNumber() + COMMISSION_RATE_CHANGE_TIME_LOCK_PERIOD);
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("finalizeCommissionRateChange")
+                .encodeOneLong(0)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+    }
+
+    @Test
+    public void testFailedAutoRedelegateRewards() {
+        Address pool = setupNewPool(10);
+        Address delegator = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+
+        BigInteger stake = nStake(2);
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(delegator, poolRegistry, stake, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // some third party calls autoDelegateRewards
+        Address random = RULE.getRandomAddress(ENOUGH_BALANCE_TO_TRANSACT);
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("autoDelegateRewards")
+                .encodeOneAddress(pool)
+                .encodeOneAddress(delegator)
+                .toBytes();
+        result = RULE.call(random, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isFailed());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getAutoRewardsDelegationFee")
+                .encodeOneAddress(pool)
+                .encodeOneAddress(delegator)
+                .toBytes();
+        result = RULE.call(delegator, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        Assert.assertEquals(-1, result.getDecodedReturnData());
     }
 
     @Test

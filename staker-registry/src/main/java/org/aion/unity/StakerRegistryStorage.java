@@ -11,7 +11,7 @@ public class StakerRegistryStorage {
     // used for deriving storage key
     private enum StorageSlots {
         STAKE_INFO, // staker identityAddress -> total stake
-        ADDRESS_INFO, // staker identityAddress -> staker signingAddress, coinbaseAddress
+        ADDRESS_INFO, // staker identityAddress -> staker signingAddress, coinbaseAddress, lastSigningAddressUpdate
         SIGNING_ADDRESS, // staker signingAddress -> staker identityAddress
         MANAGEMENT_ADDRESS, // staker identityAddress -> staker managementAddress
         PENDING_UNBOND, // unbondId -> recipient, value, block number
