@@ -211,6 +211,101 @@ public class PoolRegistryTest {
     }
 
     @Test
+    public void testUndelegateFromBrokenPool() {
+        Address pool = setupNewPool(10);
+
+        BigInteger stake = BigInteger.TEN;
+        BigInteger unstake = BigInteger.ONE;
+
+        byte[] txData = new ABIStreamingEncoder()
+                .encodeOneString("delegate")
+                .encodeOneAddress(pool)
+                .toBytes();
+        AvmRule.ResultWrapper result = RULE.call(preminedAddress, poolRegistry, stake, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // get the amount we self delegated, so know how much to undelegate
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getStake")
+                .encodeOneAddress(pool)
+                .encodeOneAddress(pool)
+                .toBytes();
+
+        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        BigInteger selfDelegated = (BigInteger) result.getDecodedReturnData();
+
+        // now remove self delegation to put pool into broken state
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("undelegate")
+                .encodeOneAddress(pool)
+                .encodeOneBigInteger(selfDelegated)
+                .encodeOneBigInteger(BigInteger.ZERO)
+                .toBytes();
+        result = RULE.call(pool, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        long selfUndelegateFinalizationId = (long) result.getDecodedReturnData();
+
+        // verify state of the pool is broken
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("isActive")
+                .encodeOneAddress(pool)
+                .toBytes();
+        result = RULE.call(pool, stakerRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        assertFalse((Boolean) result.getDecodedReturnData());
+
+        // now attempt (like before) to undelegate
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("undelegate")
+                .encodeOneAddress(pool)
+                .encodeOneBigInteger(unstake)
+                .encodeOneBigInteger(BigInteger.ZERO)
+                .toBytes();
+        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        long id = (long) result.getDecodedReturnData();
+
+        assertEquals(2, result.getLogs().size());
+        Log poolRegistryEvent = result.getLogs().get(1);
+        assertArrayEquals(LogSizeUtils.truncatePadTopic("ADSUndelegated".getBytes()),
+                poolRegistryEvent.copyOfTopics().get(0));
+        assertEquals(id, new BigInteger(poolRegistryEvent.copyOfTopics().get(1)).longValue());
+        assertArrayEquals(preminedAddress.toByteArray(), poolRegistryEvent.copyOfTopics().get(2));
+        assertArrayEquals(pool.toByteArray(), poolRegistryEvent.copyOfTopics().get(3));
+        ABIDecoder decoder = new ABIDecoder(poolRegistryEvent.copyOfData());
+        assertEquals(unstake, decoder.decodeOneBigInteger());
+        assertEquals(BigInteger.ZERO, decoder.decodeOneBigInteger());
+
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("getStake")
+                .encodeOneAddress(pool)
+                .encodeOneAddress(preminedAddress)
+                .toBytes();
+        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+        assertEquals(stake.longValue() - unstake.longValue(), ((BigInteger) result.getDecodedReturnData()).longValue());
+
+        tweakBlockNumber(getBlockNumber() +  UNBOND_LOCK_UP_PERIOD);
+
+        // release the pending undelegate from pool
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("finalizeUndelegate")
+                .encodeOneLong(selfUndelegateFinalizationId)
+                .toBytes();
+        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+
+        // release the pending undelegate
+        txData = new ABIStreamingEncoder()
+                .encodeOneString("finalizeUndelegate")
+                .encodeOneLong(id)
+                .toBytes();
+        result = RULE.call(preminedAddress, poolRegistry, BigInteger.ZERO, txData);
+        assertTrue(result.getReceiptStatus().isSuccess());
+    }
+
+    @Test
     public void testTransferStake() {
         Address pool1 = setupNewPool(10);
         Address pool2 = setupNewPool(10);
